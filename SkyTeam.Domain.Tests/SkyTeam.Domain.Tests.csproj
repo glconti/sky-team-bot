@@ -5,11 +5,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="TUnit" />
+    <PackageReference Include="FluentAssertions"/>
+    <PackageReference Include="TUnit"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SkyTeam.Domain\SkyTeam.Domain.csproj" />
+    <ProjectReference Include="..\SkyTeam.Domain\SkyTeam.Domain.csproj"/>
   </ItemGroup>
 
 </Project>

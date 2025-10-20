@@ -1,7 +1,6 @@
 <Project>
-
   <ItemGroup>
-    <PackageVersion Include="TUnit" Version="0.73.14" />
+    <PackageVersion Include="FluentAssertions" Version="7.2.0" />
+    <PackageVersion Include="TUnit" Version="0.74.2" />
   </ItemGroup>
-
 </Project>
