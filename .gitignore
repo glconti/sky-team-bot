@@ -3,6 +3,7 @@ obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
+**/copilot.data.migration.*.xml
 
 ## A streamlined .gitignore for modern .NET projects
 ## including temporary files, build results, and
@@ -58,3 +59,4 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+.idea/.idea.skyteam-bot/.idea/copilot.data.migration.agent.xml
