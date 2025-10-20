@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AgentMigrationStateService">
+    <option name="pendingSessionIds">
+      <option value="7ff82c0d-5e98-4abe-a2f7-c11364af81c3" />
+      <option value="adf5103d-7594-4210-b2cd-9b27e4b7b9c3" />
+      <option value="b3946ddd-c78f-4606-b268-363f4ee8a238" />
+    </option>
+    <option name="pendingTurns">
+      <map>
+        <entry key="7ff82c0d-5e98-4abe-a2f7-c11364af81c3">
+          <value>
+            <set>
+              <option value="05e16d69-9c72-474a-96fe-accfa11b22df" />
+              <option value="30e90d6e-1dcc-4525-863d-e6f5020d3af1" />
+            </set>
+          </value>
+        </entry>
+        <entry key="adf5103d-7594-4210-b2cd-9b27e4b7b9c3">
+          <value>
+            <set>
+              <option value="114ce1fb-c607-4070-b5db-4fc635765ff0" />
+            </set>
+          </value>
+        </entry>
+        <entry key="b3946ddd-c78f-4606-b268-363f4ee8a238">
+          <value>
+            <set>
+              <option value="2127447f-0971-475e-9d10-f2f8780d90f7" />
+            </set>
+          </value>
+        </entry>
+      </map>
+    </option>
+    <pendingWorkingSetItems>
+      <entry key="7ff82c0d-5e98-4abe-a2f7-c11364af81c3">
+        <set>
+          <option value="file://$PROJECT_DIR$/.github/copilot-instructions.md" />
+        </set>
+      </entry>
+      <entry key="b3946ddd-c78f-4606-b268-363f4ee8a238">
+        <set>
+          <option value="file://$PROJECT_DIR$/SkyTeam.Domain.Tests/AltitudeTests.cs" />
+        </set>
+      </entry>
+    </pendingWorkingSetItems>
+  </component>
+</project>
