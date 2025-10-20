@@ -1,4 +1,10 @@
 ﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=6de718a3_002Db92b_002D4aaa_002Db13a_002D59109a3cd954/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="All tests from Solution" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
-  &lt;Solution /&gt;&#xD;
-&lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>
+	<s:String x:Key="/Default/dotCover/Editor/HighlightingSourceSnapshotLocation/@EntryValue">C:\Users\Gianluigi\AppData\Local\Temp\JetBrains\Rider\vAny\CoverageData\_skyteam-bot.1900530763\Snapshot\snapshot.utdcvr</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=1dc3c8eb_002D1b74_002D44e2_002D9c01_002Dc7835d84ce35/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="All tests from &amp;lt;SkyTeam.Domain.Tests&amp;gt;" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;Project Location="D:\Repos\skyteam-bot\SkyTeam.Domain.Tests" Presentation="&amp;lt;SkyTeam.Domain.Tests&amp;gt;" /&gt;&#xD;
+&lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=58c56b00_002Df81e_002D48fd_002Da74f_002Dc8e84271fcf4/@EntryIndexedValue">&lt;SessionState ContinuousTestingIsOn="True" ContinuousTestingMode="3" IsActive="True" Name="Continuous Testing" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;Project Location="D:\Repos\skyteam-bot\SkyTeam.Domain.Tests" Presentation="&amp;lt;SkyTeam.Domain.Tests&amp;gt;" /&gt;&#xD;
+&lt;/SessionState&gt;</s:String>
+	
+	</wpf:ResourceDictionary>

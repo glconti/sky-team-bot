@@ -1,13 +1,16 @@
-﻿using FluentAssertions;
+﻿using System;
+using System.Collections.Generic;
+using FluentAssertions;
+using Xunit;
 
 namespace SkyTeam.Domain.Tests;
 
 public class DieTests
 {
-    [Test]
-    [Arguments("Die")]
-    [Arguments("BlueDie")]
-    [Arguments("OrangeDie")]
+    [Theory]
+    [InlineData("Die")]
+    [InlineData("BlueDie")]
+    [InlineData("OrangeDie")]
     public void Die_Roll_ShouldReturnDifferentValuesOverMultipleRolls(string dieType)
     {
         // Arrange
@@ -32,6 +35,6 @@ public class DieTests
         }
 
         // Assert
-        rolls.Should().BeEquivalentTo([1, 2, 3, 4, 5, 6]);
+        rolls.Should().BeEquivalentTo(new[] { 1, 2, 3, 4, 5, 6 });
     }
 }

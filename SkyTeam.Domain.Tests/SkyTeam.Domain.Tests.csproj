@@ -2,15 +2,31 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <RootNamespace>SkyTeam.Domain.XUnit.Tests</RootNamespace>
+    <!--
+    This template uses native xUnit.net command line options when using 'dotnet run' and
+    VSTest by default when using 'dotnet test'. For more information on how to enable support
+    for Microsoft Testing Platform, please visit:
+      https://xunit.net/docs/getting-started/v3/microsoft-testing-platform
+    -->
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FluentAssertions"/>
-    <PackageReference Include="TUnit"/>
+    <Using Include="Xunit"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SkyTeam.Domain\SkyTeam.Domain.csproj"/>
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk"/>
+    <PackageReference Include="xunit.v3"/>
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SkyTeam.Domain\SkyTeam.Domain.csproj" />
   </ItemGroup>
 
 </Project>
