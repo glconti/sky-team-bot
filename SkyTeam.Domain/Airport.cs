@@ -1,22 +1,23 @@
 ﻿namespace SkyTeam.Domain;
 
-abstract class Airport
+class Airport(IEnumerable<PathSegment> pathSegments)
 {
-    protected List<PathSegment> _pathSegments = [];
+    public Queue<PathSegment> PathSegments { get; } = new(pathSegments);
 }
 
-class MontrealAirport : Airport
+class MontrealAirport
 {
-    public MontrealAirport()
-    {
-        _pathSegments.Add(new(0));
-        _pathSegments.Add(new(0));
-        _pathSegments.Add(new(1));
-        _pathSegments.Add(new(0));
-        _pathSegments.Add(new(3));
-    }
+    private readonly Airport _airport = new([
+        new(0),
+        new(0),
+        new(1),
+        new(2),
+        new(1),
+        new(3),
+        new(2) // Landed
+    ]);
+
+    public static implicit operator Airport(MontrealAirport airport) => airport._airport;
 }
 
-class PathSegment(int NumberOfPlanes)
-{
-}
+record PathSegment(int NumberOfPlanes);

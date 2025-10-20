@@ -10,6 +10,7 @@ Aim: Generate clean, maintainable .NET 10 / C# 14 code aligned with Domain-Drive
 - Separate domain from infrastructure concerns. Keep domain pure (no I/O, no framework types, no logging inside entities/value objects).
 - Favor immutability; use `record` / `readonly record struct` / `init` setters for value objects.
 - Single Responsibility: one reason to change per class/file.
+- Prefer composition over inheritance; use interfaces for abstractions.
 
 ## C# / .NET Usage
 - Use file-scoped namespaces, `using` directives kept minimal (no unused usings).
