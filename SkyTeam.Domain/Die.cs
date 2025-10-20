@@ -1,6 +1,6 @@
 ﻿namespace SkyTeam.Domain;
 
-class Die
+record Die
 {
     private static readonly Random Random = new();
 
@@ -12,7 +12,7 @@ class Die
     public static implicit operator int(Die die) => die.Value;
 }
 
-class BlueDie
+record BlueDie
 {
     private readonly Die _die;
 
@@ -23,7 +23,7 @@ class BlueDie
     public static implicit operator int(BlueDie die) => die._die;
 }
 
-class OrangeDie
+record OrangeDie
 {
     private readonly Die _die;
 

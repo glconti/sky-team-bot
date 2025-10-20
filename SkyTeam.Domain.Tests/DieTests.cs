@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using FluentAssertions;
-using Xunit;
+﻿using FluentAssertions;
 
 namespace SkyTeam.Domain.Tests;
 
@@ -35,6 +32,6 @@ public class DieTests
         }
 
         // Assert
-        rolls.Should().BeEquivalentTo(new[] { 1, 2, 3, 4, 5, 6 });
+        rolls.Should().BeEquivalentTo([1, 2, 3, 4, 5, 6]);
     }
 }

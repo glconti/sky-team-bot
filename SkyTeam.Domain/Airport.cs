@@ -2,7 +2,7 @@
 
 abstract class Airport
 {
-    protected List<PathSegment> _pathSegments = new();
+    protected List<PathSegment> _pathSegments = [];
 }
 
 class MontrealAirport : Airport

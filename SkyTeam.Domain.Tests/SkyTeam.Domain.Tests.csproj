@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <RootNamespace>SkyTeam.Domain.XUnit.Tests</RootNamespace>
     <!--
     This template uses native xUnit.net command line options when using 'dotnet run' and
     VSTest by default when using 'dotnet test'. For more information on how to enable support
@@ -16,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="FluentAssertions"/>
     <PackageReference Include="Microsoft.NET.Test.Sdk"/>
     <PackageReference Include="xunit.v3"/>
     <PackageReference Include="xunit.runner.visualstudio">
@@ -26,7 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SkyTeam.Domain\SkyTeam.Domain.csproj" />
+    <ProjectReference Include="..\SkyTeam.Domain\SkyTeam.Domain.csproj"/>
   </ItemGroup>
 
 </Project>
