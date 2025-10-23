@@ -11,6 +11,7 @@ Aim: Generate clean, maintainable .NET 10 / C# 14 code aligned with Domain-Drive
 - Favor immutability; use `record` / `readonly record struct` / `init` setters for value objects.
 - Single Responsibility: one reason to change per class/file.
 - Prefer composition over inheritance; use interfaces for abstractions.
+- Use Powershell syntax when running scripts in the IDE terminal.
 
 ## C# / .NET Usage
 - Use file-scoped namespaces, `using` directives kept minimal (no unused usings).
@@ -23,8 +24,7 @@ Aim: Generate clean, maintainable .NET 10 / C# 14 code aligned with Domain-Drive
 - Avoid premature allocation; prefer spans/`ReadOnlySpan<char>` in hot paths if performance critical.
 - Use collection expressions (when available) for concise initialization in tests or static config.
 
-## Error Handling & Guard Clauses
-- Validate inputs at boundaries; throw precise exceptions (`ArgumentNullException.ThrowIfNull`, `ArgumentOutOfRangeException`).
+## Error Handling & Guard Clausesk
 - Domain invariants: throw domain-specific exception types (create minimal, meaningful ones) or return Result types if adopting functional style—pick one pattern consistently.
 - Never swallow exceptions; log or propagate.
 
