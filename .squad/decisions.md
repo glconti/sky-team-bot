@@ -300,3 +300,15 @@ record CoffeeTokenPool
 **Rationale:** Minimal viable design. No over-engineering. Supports audit trails, replay, and deterministic testing.
 
 ---
+
+## 2026-02-20T22:58:00Z: Concentration multi-token spend interpretation
+
+**By:** Gianluigi Conti  
+**Decision:** “Multiple tokens may be spent” means **multiple tokens may be spent on the same die placement**.
+- **Cost:** `k = |adjustedValue - rolledValue|` tokens.
+- **Effect:** the die is treated as `adjustedValue` (must remain within **1–6**, no wraparound).
+- Example: rolled 4 → place as 6 costs 2 tokens; rolled 1 → place as 3 costs 2 tokens.
+
+**Notes:** This supersedes earlier single-token-per-die assumptions in prior specs; the command shape should support spending `k` tokens, not just a boolean.
+
+---
