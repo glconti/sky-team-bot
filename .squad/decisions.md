@@ -312,3 +312,34 @@ record CoffeeTokenPool
 **Notes:** This supersedes earlier single-token-per-die assumptions in prior specs; the command shape should support spending `k` tokens, not just a boolean.
 
 ---
+
+## 2026-02-21T13:47:00Z: PR #15 — Game init refactor follow-up (Skiles)
+
+**Context:** Sully review flagged architectural issues in PR #15: duplicated state between `Game` and `GameState`, mutable `NextRoundCommand.Instance`, and a default-game factory (`Game.New()`) inside the aggregate.
+
+**Decision:**
+- **Single source of truth for per-round state:** `Game` now owns a single `GameState` instance and delegates current-player + unused-dice tracking to it (no duplicated fields in `Game`).
+- **Immutable singleton command:** `NextRoundCommand.Instance` is now get-only and backed by a private constructor.
+- **Factory removed from aggregate:** `Game.New()` was removed; aggregate construction is now explicit via `new Game(airport, altitude, modules)`.
+
+**Rationale:** Keeps the aggregate focused on behavior and delegates mutable round state to a single internal component, while preventing global mutation of command singletons and avoiding opinionated defaults inside the domain.
+
+---
+
+## 2026-02-21T13:47:00Z: PR #15 — Re-review (Sully)
+
+**Decision:** ACCEPT (ready to merge).
+
+**Notes:**
+- Prior concerns are resolved:
+  - **Single source of truth:** `Game` delegates per-round mutable state to `GameState` (current player + unused dice).
+  - **Command immutability:** `NextRoundCommand.Instance` is get-only with private ctor.
+  - **API hygiene:** removed `Game.New()` factory from the aggregate.
+
+**Follow-up (non-blocking):**
+- Once `ExecuteCommand` / placement behavior exists, update tests to avoid reflection hacks used to clear dice.
+
+**GitHub:**
+- Formal "Approve" review was not possible because the active GitHub identity is the PR author; left an architectural "LGTM" comment instead.
+
+---
