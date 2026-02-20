@@ -17,11 +17,20 @@ class Game
 
     private Player _currentPlayer;
 
+    internal Player CurrentPlayer => _currentPlayer;
+
+    internal IReadOnlyList<BlueDie> UnusedBlueDice => _unusedBlueDice.AsReadOnly();
+    internal IReadOnlyList<OrangeDie> UnusedOrangeDice => _unusedOrangeDice.AsReadOnly();
+
     public Game(Airport airport, Altitude altitude, GameModule[] modules)
     {
+        ArgumentNullException.ThrowIfNull(airport);
+        ArgumentNullException.ThrowIfNull(altitude);
+        ArgumentNullException.ThrowIfNull(modules);
+
         _airport = airport;
         _altitude = altitude;
-        _modules = modules;
+        _modules = modules.ToArray();
         _currentPlayer = altitude.CurrentPlayer;
         RollDice();
     }
@@ -75,6 +84,9 @@ class Game
     /// </summary>
     private void RollDice()
     {
+        _unusedBlueDice.Clear();
+        _unusedOrangeDice.Clear();
+
         for (var i = 0; i < 4; i++)
         {
             _unusedBlueDice.Add(BlueDie.Roll());
