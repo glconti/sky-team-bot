@@ -21,4 +21,23 @@
 - **Skiles** identified Phase 1 blocker: GameState aggregate + ExecuteCommand dispatcher must be built first
 - **Aloha** standing by with test harness for module implementations
 
+### Session 2: Telegram Placement + Concentration Token Architecture (2026-02-21)
+**Outcome:** Assessed secret placement and coffee token UX fit against DDD aggregate pattern; produced minimal interaction contract for Telegram bot.
+
+**Key Decisions:**
+- **Secret placement:** Architecturally Excellent — aligns with DDD game aggregate. No public infrastructure changes needed.
+- **Token command model:** Option A (Recommended) — Token spend as parameter on PlaceDieCommand, not separate command. Prevents ordering ambiguity and state-machine complexity.
+- **Telegram contract:** Ephemeral UI (private keyboards, color-coded options), readiness handling, reveal broadcasting. Domain stays UI-agnostic.
+- **Module resolution order locked:** Land on Concentration → Gain token → Advance (prevents race conditions)
+
+**Delivered Artifacts:**
+- Telegram placement + token architecture assessment with risk mitigation table (`.squad/decisions.md`)
+- Minimal interaction contract: Bot ↔ Domain interface, session layer model, UX recommendations
+- One orchestration log entry: Sully (architecture assessment)
+
+**Cross-Coordination:**
+- **Tenerife** finalized official rules spec (99% faithful, 1 open question on multi-token)
+- **Skiles** proposed immutable domain model that aligns with this architecture
+- **Aloha** can incorporate secret storage testing per Skiles' proposal
+
 ---

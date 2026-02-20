@@ -37,4 +37,24 @@
 - **Skiles** audited codebase, confirmed Phase 1 blocker (GameState aggregate)
 - **Aloha** preparing test harness to validate module implementations
 
+### Session 2: Concentration Coffee Tokens Finalization (2026-02-21)
+**Outcome:** Reconciled official Sky Team Concentration rules with user clarifications on coffee tokens; coordinated with Sully (architecture) and Skiles (domain modeling).
+
+**Key Decisions:**
+- **Official rules baseline:** Token pool max capacity = 3, gain +1 per die on Concentration, spend 1 to adjust die by ±1 before placement
+- **User clarifications locked:** Shared pool, cap at 3, multi-token spend (pending interpretation clarification), token-cost options visually distinct in Telegram UI
+- **Open Question:** Does multi-token mean: (A) spend multiple on same die for ±N shift, or (B) multiple dice per round? Escalated to Gianluigi for clarification
+- **Boundary handling:** Die 1 + token → {1,2}; Die 6 + token → {5,6} (no wraparound)
+- **Special case:** Spend token on die → place on Concentration → net zero token change (spend -1, earn +1)
+
+**Delivered Artifacts:**
+- Comprehensive official spec with edge case resolutions (`.squad/decisions.md`)
+- Acceptance criteria for Skiles (implementation) and Aloha (testing)
+- Three orchestration log entries: Tenerife (rules), Sully (architecture), Skiles (domain)
+
+**Cross-Coordination:**
+- **Sully** assessed architectural fit (secret placement + token UX) — Excellent ✓
+- **Skiles** designed immutable CoffeeTokenPool value object + GameState integration — Ready to code ✓
+- **Aloha** can now prepare token-specific test cases per domain model
+
 ---

@@ -41,4 +41,38 @@
 - **Tenerife** provided comprehensive M1 rules and module specifications
 - **Aloha** preparing test harness for module implementations
 
+### Session 2: Coffee Tokens Domain Modeling (2026-02-21)
+**Outcome:** Designed minimal immutable CoffeeTokenPool value object and GameState integration for Concentration module coffee token mechanic.
+
+**Key Decisions:**
+- **CoffeeTokenPool:** Immutable record with Count (0–3), Spend() (throws if empty), Earn() (capped at 3), CanSpend predicate
+- **GameState ownership:** TokenPool property + EarnCoffeeToken() / SpendCoffeeToken() methods (shared across players)
+- **PlaceDieOnConcentrationCommand:** UseTokenForAdjustment boolean, AdjustedValue optional, Validate() method for invariants
+- **ConcentrationModule.PlaceDieOnConcentration():** Validate, deduct token if adjusted, place die, earn token immediately
+- **Secret storage:** PendingPlacement internal class for Telegram secret assignments
+
+**Design Principles:**
+- Immutability enables auditing, replay, deterministic testing
+- GameState-level placement: tokens are shared; natural at aggregate root
+- Immediate earn-after-spend: matches board game flow
+- Command-driven adjustment: UI chooses value; domain validates
+- Explicit guard clauses prevent overspend
+
+**Delivered Artifacts:**
+- Minimal domain modeling spec with C# reference implementation (`.squad/decisions.md`)
+- Implementation checklist (8 items)
+- Test categories enumerated (token count, spend failures, boundaries, immutability, secret storage)
+- One orchestration log entry: Skiles (token modeling)
+
+**Ready to Code:**
+- [ ] CoffeeTokenPool value object
+- [ ] GameState.TokenPool integration
+- [ ] PlaceDieOnConcentrationCommand + validation
+- [ ] ConcentrationModule implementation + secret storage
+
+**Cross-Coordination:**
+- **Tenerife** finalized official rules spec (multi-token pending clarification)
+- **Sully** confirmed architecture fit — minimal changes needed
+- **Aloha** can now write token-specific test suite
+
 ---
