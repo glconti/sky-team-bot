@@ -110,3 +110,11 @@
 **Rationale:** Preserves the base game's hidden-information constraint while remaining playable in chat.
 
 ---
+
+## 2026-02-20T22:43:49Z: Module progress is cumulative
+
+**By:** Gianluigi Conti  
+**Decision:** Engines/Brakes/Flaps (and similar tracks) **accumulate across the whole game** until landing; they do not reset each round.
+**Rationale:** Matches intended base-game progression and informs module state modeling.
+
+---
