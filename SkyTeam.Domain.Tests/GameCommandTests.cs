@@ -127,18 +127,14 @@ public class GameCommandTests
         return new Game(airport, altitude, modules);
     }
 
-    private static void ClearUnusedDice(Game game)
-    {
-        GetUnusedDice<BlueDie>(game, "_unusedBlueDice").Clear();
-        GetUnusedDice<OrangeDie>(game, "_unusedOrangeDice").Clear();
-    }
+    private static void ClearUnusedDice(Game game) => GetState(game).ClearUnusedDice();
 
-    private static List<TDie> GetUnusedDice<TDie>(Game game, string fieldName)
+    private static GameState GetState(Game game)
     {
-        var field = typeof(Game).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException($"Could not find '{fieldName}' field on {nameof(Game)}.");
+        var field = typeof(Game).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Could not find '_state' field on {nameof(Game)}.");
 
-        return (List<TDie>)field.GetValue(game)!;
+        return (GameState)field.GetValue(game)!;
     }
 
     private sealed class TestModule : GameModule

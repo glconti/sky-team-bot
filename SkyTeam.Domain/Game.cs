@@ -11,16 +11,12 @@ class Game
 
     private readonly Altitude _altitude;
     private readonly GameModule[] _modules;
+    private readonly GameState _state = new();
 
-    private readonly List<BlueDie> _unusedBlueDice = [];
-    private readonly List<OrangeDie> _unusedOrangeDice = [];
+    internal Player CurrentPlayer => _state.CurrentPlayer;
 
-    private Player _currentPlayer;
-
-    internal Player CurrentPlayer => _currentPlayer;
-
-    internal IReadOnlyList<BlueDie> UnusedBlueDice => _unusedBlueDice.AsReadOnly();
-    internal IReadOnlyList<OrangeDie> UnusedOrangeDice => _unusedOrangeDice.AsReadOnly();
+    internal IReadOnlyList<BlueDie> UnusedBlueDice => _state.UnusedBlueDice;
+    internal IReadOnlyList<OrangeDie> UnusedOrangeDice => _state.UnusedOrangeDice;
 
     public Game(Airport airport, Altitude altitude, GameModule[] modules)
     {
@@ -31,44 +27,36 @@ class Game
         _airport = airport;
         _altitude = altitude;
         _modules = modules.ToArray();
-        _currentPlayer = altitude.CurrentPlayer;
+        _state.SetCurrentPlayer(altitude.CurrentPlayer);
         RollDice();
     }
 
     public void NextRound()
     {
-        if (_unusedBlueDice.Count > 0 || _unusedOrangeDice.Count > 0)
+        if (_state.UnusedBlueDice.Count > 0 || _state.UnusedOrangeDice.Count > 0)
             throw new InvalidOperationException("Cannot proceed to next round with unused dice.");
 
         _altitude.Advance();
-        _currentPlayer = _altitude.CurrentPlayer;
+        _state.SetCurrentPlayer(_altitude.CurrentPlayer);
         RollDice();
     }
 
-    public void SwitchPlayer() =>
-        _currentPlayer = _currentPlayer == Player.Pilot ? Player.Copilot : Player.Pilot;
+    public void SwitchPlayer() => _state.SwitchPlayer();
 
-    public Game New() =>
-        new(
-            new MontrealAirport(),
-            new(),
-            [
-                new AxisPositionModule()
-            ]);
 
     /// <summary>
     ///     Gets all available commands for the current player based on game state.
     /// </summary>
     public IEnumerable<GameCommand> GetAvailableCommands()
     {
-        if (_unusedBlueDice.Count == 0 && _unusedOrangeDice.Count == 0)
+        if (_state.UnusedBlueDice.Count == 0 && _state.UnusedOrangeDice.Count == 0)
         {
             yield return _allCommands[NextRoundCommand.Instance.CommandId];
             yield break;
         }
 
         foreach (var gameCommand in _modules.SelectMany(module =>
-                     module.GetAvailableCommands(_currentPlayer)))
+                     module.GetAvailableCommands(_state.CurrentPlayer)))
             yield return gameCommand;
     }
 
@@ -84,22 +72,25 @@ class Game
     /// </summary>
     private void RollDice()
     {
-        _unusedBlueDice.Clear();
-        _unusedOrangeDice.Clear();
+        _state.ClearUnusedDice();
 
         for (var i = 0; i < 4; i++)
         {
-            _unusedBlueDice.Add(BlueDie.Roll());
-            _unusedOrangeDice.Add(OrangeDie.Roll());
+            _state.AddBlueDie(BlueDie.Roll());
+            _state.AddOrangeDie(OrangeDie.Roll());
         }
     }
 }
 
-record NextRoundCommand : GameCommand
+sealed record NextRoundCommand : GameCommand
 {
+    private NextRoundCommand()
+    {
+    }
+
     public override string CommandId => "NextRound";
     public override string DisplayName => "Proceed to Next Round";
-    public static GameCommand Instance { get; set; } = new NextRoundCommand();
+    public static NextRoundCommand Instance { get; } = new();
 
     public static void Execute(Game game) => game.NextRound();
 }

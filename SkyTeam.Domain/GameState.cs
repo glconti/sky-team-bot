@@ -10,6 +10,14 @@ sealed class GameState
     internal IReadOnlyList<BlueDie> UnusedBlueDice => _unusedBlueDice.AsReadOnly();
     internal IReadOnlyList<OrangeDie> UnusedOrangeDice => _unusedOrangeDice.AsReadOnly();
 
+    internal void SetCurrentPlayer(Player player) => CurrentPlayer = player;
+
+    internal void ClearUnusedDice()
+    {
+        _unusedBlueDice.Clear();
+        _unusedOrangeDice.Clear();
+    }
+
     internal void AddBlueDie(BlueDie die)
     {
         ArgumentNullException.ThrowIfNull(die);
@@ -45,8 +53,7 @@ sealed class GameState
 
     internal void Reset()
     {
-        _unusedBlueDice.Clear();
-        _unusedOrangeDice.Clear();
+        ClearUnusedDice();
         CurrentPlayer = Player.Pilot;
     }
 }
