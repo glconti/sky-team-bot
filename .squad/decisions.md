@@ -102,3 +102,11 @@
 **Rationale:** Phase 1 is the critical path. Once complete, team can parallelize module work while following Tenerife's rules.
 
 ---
+
+## 2026-02-20T22:39:45Z: Telegram dice assignments are secret
+
+**By:** Gianluigi Conti  
+**Decision:** For Telegram play, dice assignments are **secret**: each player submits placements privately to the bot, and the bot reveals/announces outcomes at resolution time.
+**Rationale:** Preserves the base game's hidden-information constraint while remaining playable in chat.
+
+---
