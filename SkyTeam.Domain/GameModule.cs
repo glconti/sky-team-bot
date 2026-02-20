@@ -17,5 +17,12 @@ abstract class GameModule
     /// </summary>
     public abstract string GetModuleName();
 
-    public abstract IEnumerable<GameCommand> GetAvailableCommands(Player currentPlayer);
+    public abstract IEnumerable<GameCommand> GetAvailableCommands(
+        Player currentPlayer,
+        IReadOnlyList<BlueDie> unusedBlueDice,
+        IReadOnlyList<OrangeDie> unusedOrangeDice);
+
+    public virtual void ResetRound()
+    {
+    }
 }

@@ -147,7 +147,10 @@ public class GameCommandTests
         public override bool CanAcceptOrangeDie(Player player) => true;
         public override string GetModuleName() => "Test Module";
 
-        public override IEnumerable<GameCommand> GetAvailableCommands(Player currentPlayer) => _commands;
+        public override IEnumerable<GameCommand> GetAvailableCommands(
+            Player currentPlayer,
+            IReadOnlyList<BlueDie> unusedBlueDice,
+            IReadOnlyList<OrangeDie> unusedOrangeDice) => _commands;
     }
 
     private sealed record TestCommand(string Id) : GameCommand

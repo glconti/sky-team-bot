@@ -38,6 +38,10 @@ class Game
 
         _altitude.Advance();
         _state.SetCurrentPlayer(_altitude.CurrentPlayer);
+
+        foreach (var module in _modules)
+            module.ResetRound();
+
         RollDice();
     }
 
@@ -56,7 +60,7 @@ class Game
         }
 
         foreach (var gameCommand in _modules.SelectMany(module =>
-                     module.GetAvailableCommands(_state.CurrentPlayer)))
+                     module.GetAvailableCommands(_state.CurrentPlayer, _state.UnusedBlueDice, _state.UnusedOrangeDice)))
             yield return gameCommand;
     }
 
