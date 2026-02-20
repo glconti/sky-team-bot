@@ -1,0 +1,12 @@
+{
+  "universes_allowed": ["aviation-disasters"],
+  "max_capacity_per_universe": 10,
+  "overflow_strategy": "diegetic_expansion",
+  "naming_rules": {
+    "scribe_exempt": true,
+    "ralph_exempt": true,
+    "copilot_exempt": true,
+    "no_roleplay": true,
+    "no_catchphrases": true
+  }
+}

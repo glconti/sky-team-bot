@@ -1,0 +1,52 @@
+{
+  "agents": [
+    {
+      "persistent_name": "Sully",
+      "role": "Lead",
+      "universe": "aviation-disasters",
+      "created_at": "2026-02-20T22:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Skiles",
+      "role": "Domain Dev",
+      "universe": "aviation-disasters",
+      "created_at": "2026-02-20T22:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Tenerife",
+      "role": "Rules Expert",
+      "universe": "aviation-disasters",
+      "created_at": "2026-02-20T22:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Aloha",
+      "role": "Tester",
+      "universe": "aviation-disasters",
+      "created_at": "2026-02-20T22:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Scribe",
+      "role": "Silent Logger",
+      "universe": null,
+      "created_at": "2026-02-20T22:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Ralph",
+      "role": "Work Monitor",
+      "universe": null,
+      "created_at": "2026-02-20T22:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    }
+  ]
+}

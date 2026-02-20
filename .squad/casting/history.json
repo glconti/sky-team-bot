@@ -1,0 +1,11 @@
+{
+  "assignments": [
+    {
+      "assignment_id": "skyteam-bot-2026-02-20",
+      "universe": "aviation-disasters",
+      "created_at": "2026-02-20T22:00:00Z",
+      "agents": ["Sully", "Skiles", "Tenerife", "Aloha"],
+      "reason": "Aviation universe resonates with Sky Team board game (cooperative plane landing)"
+    }
+  ]
+}
