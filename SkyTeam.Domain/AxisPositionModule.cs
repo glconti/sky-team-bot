@@ -1,10 +1,14 @@
 ﻿namespace SkyTeam.Domain;
 
-class AxisPositionModule : GameModule
+sealed class AxisPositionModule : GameModule
 {
-    private short _axisPosition;
+    private const int LossLimit = 3;
+
+    private int _axisPosition;
     private BlueDie? _blueDie;
     private OrangeDie? _orangeDie;
+
+    internal int AxisPosition => _axisPosition;
 
     public override bool CanAcceptBlueDie(Player player) =>
         player == Player.Pilot && _blueDie is null;
@@ -14,65 +18,112 @@ class AxisPositionModule : GameModule
 
     public override string GetModuleName() => "Axis Position";
 
-    public override IEnumerable<GameCommand> GetAvailableCommands(Player currentPlayer)
+    public override IEnumerable<GameCommand> GetAvailableCommands(
+        Player currentPlayer,
+        IReadOnlyList<BlueDie> unusedBlueDice,
+        IReadOnlyList<OrangeDie> unusedOrangeDice)
     {
-        if (CanAcceptBlueDie(currentPlayer))
-            yield return new AssignBlueDieCommand(this);
-        if (CanAcceptOrangeDie(currentPlayer))
-            yield return new AssignOrangeDieCommand(this);
+        if (currentPlayer == Player.Pilot && _blueDie is null)
+        {
+            foreach (var value in unusedBlueDice.Select(die => (int)die).Distinct().Order())
+                yield return CreateBlueCommand(value);
+        }
+
+        if (currentPlayer == Player.Copilot && _orangeDie is null)
+        {
+            foreach (var value in unusedOrangeDice.Select(die => (int)die).Distinct().Order())
+                yield return CreateOrangeCommand(value);
+        }
     }
 
     public void AssignBlueDie(BlueDie die)
     {
+        ArgumentNullException.ThrowIfNull(die);
+
         if (_blueDie is not null)
             throw new InvalidOperationException("Blue die already assigned.");
 
         _blueDie = die;
-        UpdateAxisPosition();
+        ResolveAxisIfReady();
     }
 
     public void AssignOrangeDie(OrangeDie die)
     {
+        ArgumentNullException.ThrowIfNull(die);
+
         if (_orangeDie is not null)
             throw new InvalidOperationException("Orange die already assigned.");
 
         _orangeDie = die;
-        UpdateAxisPosition();
+        ResolveAxisIfReady();
     }
 
-    public void Reset()
+    public override void ResetRound()
     {
         _blueDie = null;
         _orangeDie = null;
     }
 
-    private void UpdateAxisPosition()
+    private void ResolveAxisIfReady()
     {
         if (_blueDie is null || _orangeDie is null) return;
 
-        // Example logic: each die contributes a fixed value to the axis position
-        _axisPosition += (short)Math.Abs(_blueDie - _orangeDie);
+        var blueValue = (int)_blueDie;
+        var orangeValue = (int)_orangeDie;
+        var newAxisPosition = CalculateAxisPositionAfterResolution(blueValue, orangeValue);
 
-        if (_axisPosition is > -3 and < 3) return;
+        EnsureInBounds(newAxisPosition);
+        _axisPosition = newAxisPosition;
+    }
+
+    private int CalculateAxisPositionAfterResolution(int blueValue, int orangeValue)
+    {
+        if (blueValue == orangeValue) return _axisPosition;
+
+        var difference = Math.Abs(blueValue - orangeValue);
+        return blueValue > orangeValue ? _axisPosition + difference : _axisPosition - difference;
+    }
+
+    private static void EnsureInBounds(int axisPosition)
+    {
+        if (axisPosition is > -LossLimit and < LossLimit) return;
 
         throw new InvalidOperationException("Axis position out of bounds.");
     }
-}
 
-record AssignOrangeDieCommand : GameCommand
-{
-    public AssignOrangeDieCommand(AxisPositionModule axisPositionModule) =>
-        throw new NotImplementedException();
+    private GameCommand CreateBlueCommand(int value)
+    {
+        int? resulting = _orangeDie is null
+            ? null
+            : CalculateAxisPositionAfterResolution(value, (int)_orangeDie);
 
-    public override string CommandId => "AssignOrangeDie";
-    public override string DisplayName { get; }
-}
+        return new AssignAxisBlueDieCommand(value, resulting);
+    }
 
-record AssignBlueDieCommand : GameCommand
-{
-    public AssignBlueDieCommand(AxisPositionModule axisPositionModule) =>
-        throw new NotImplementedException();
+    private GameCommand CreateOrangeCommand(int value)
+    {
+        int? resulting = _blueDie is null
+            ? null
+            : CalculateAxisPositionAfterResolution((int)_blueDie, value);
 
-    public override string CommandId => "AssignBlueDie";
-    public override string DisplayName { get; }
+        return new AssignAxisOrangeDieCommand(value, resulting);
+    }
+
+    private sealed record AssignAxisBlueDieCommand(int Value, int? ResultingAxisPosition) : GameCommand
+    {
+        public override string CommandId => $"Axis.AssignBlue:{Value}";
+
+        public override string DisplayName => ResultingAxisPosition is null
+            ? $"Axis: place blue {Value}"
+            : $"Axis: place blue {Value} (axis -> {ResultingAxisPosition})";
+    }
+
+    private sealed record AssignAxisOrangeDieCommand(int Value, int? ResultingAxisPosition) : GameCommand
+    {
+        public override string CommandId => $"Axis.AssignOrange:{Value}";
+
+        public override string DisplayName => ResultingAxisPosition is null
+            ? $"Axis: place orange {Value}"
+            : $"Axis: place orange {Value} (axis -> {ResultingAxisPosition})";
+    }
 }
