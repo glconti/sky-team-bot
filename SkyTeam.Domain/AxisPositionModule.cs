@@ -6,6 +6,22 @@ class AxisPositionModule : GameModule
     private BlueDie? _blueDie;
     private OrangeDie? _orangeDie;
 
+    public override bool CanAcceptBlueDie(Player player) =>
+        player == Player.Pilot && _blueDie is null;
+
+    public override bool CanAcceptOrangeDie(Player player) =>
+        player == Player.Copilot && _orangeDie is null;
+
+    public override string GetModuleName() => "Axis Position";
+
+    public override IEnumerable<GameCommand> GetAvailableCommands(Player currentPlayer)
+    {
+        if (CanAcceptBlueDie(currentPlayer))
+            yield return new AssignBlueDieCommand(this);
+        if (CanAcceptOrangeDie(currentPlayer))
+            yield return new AssignOrangeDieCommand(this);
+    }
+
     public void AssignBlueDie(BlueDie die)
     {
         if (_blueDie is not null)
@@ -41,4 +57,22 @@ class AxisPositionModule : GameModule
 
         throw new InvalidOperationException("Axis position out of bounds.");
     }
+}
+
+record AssignOrangeDieCommand : GameCommand
+{
+    public AssignOrangeDieCommand(AxisPositionModule axisPositionModule) =>
+        throw new NotImplementedException();
+
+    public override string CommandId => "AssignOrangeDie";
+    public override string DisplayName { get; }
+}
+
+record AssignBlueDieCommand : GameCommand
+{
+    public AssignBlueDieCommand(AxisPositionModule axisPositionModule) =>
+        throw new NotImplementedException();
+
+    public override string CommandId => "AssignBlueDie";
+    public override string DisplayName { get; }
 }
