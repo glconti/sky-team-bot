@@ -23,10 +23,10 @@ public sealed class SecretDiceHand
             throw new ArgumentException($"A hand must contain exactly {DicePerHand} dice.", nameof(rolledValues));
 
         var dice = values
-            .Select((value, index) => new SecretHandDie(index, new DieValue(value), IsUsed: false))
+            .Select((value, index) => new SecretHandDie(index, new(value), IsUsed: false))
             .ToImmutableArray();
 
-        return new SecretDiceHand(dice);
+        return new(dice);
     }
 
     public bool CanUse(int dieIndex) => dieIndex is >= 0 and < DicePerHand && !_dice[dieIndex].IsUsed;
@@ -41,7 +41,7 @@ public sealed class SecretDiceHand
             throw new InvalidOperationException("This die has already been used.");
 
         value = die.Value;
-        return new SecretDiceHand(_dice.SetItem(dieIndex, die with { IsUsed = true }));
+        return new(_dice.SetItem(dieIndex, die with { IsUsed = true }));
     }
 
     public SecretDiceHand UnuseDie(int dieIndex)
@@ -53,6 +53,6 @@ public sealed class SecretDiceHand
         if (!die.IsUsed)
             throw new InvalidOperationException("This die is not used.");
 
-        return new SecretDiceHand(_dice.SetItem(dieIndex, die with { IsUsed = false }));
+        return new(_dice.SetItem(dieIndex, die with { IsUsed = false }));
     }
 }

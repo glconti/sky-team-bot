@@ -98,8 +98,8 @@ public class AxisPositionModuleTests
         var module = new AxisPositionModule();
 
         // Act
-        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)], new CoffeeTokenPool()).ToArray();
-        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [], new CoffeeTokenPool()).ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)], new()).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [], new()).ToArray();
 
         // Assert
         pilotCommands.Should().BeEmpty();
@@ -115,8 +115,8 @@ public class AxisPositionModuleTests
         module.AssignOrangeDie(OrangeDie.FromValue(3));
 
         // Act
-        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)], new CoffeeTokenPool()).ToArray();
-        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)], new CoffeeTokenPool()).ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)], new()).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)], new()).ToArray();
 
         // Assert
         pilotCommands.Should().BeEmpty();
@@ -132,8 +132,8 @@ public class AxisPositionModuleTests
         var unusedOrangeDice = new[] { OrangeDie.FromValue(6), OrangeDie.FromValue(1), OrangeDie.FromValue(6) };
 
         // Act
-        var pilotCommands = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, unusedOrangeDice, new CoffeeTokenPool()).ToArray();
-        var copilotCommands = module.GetAvailableCommands(Player.Copilot, unusedBlueDice, unusedOrangeDice, new CoffeeTokenPool()).ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, unusedOrangeDice, new()).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, unusedBlueDice, unusedOrangeDice, new()).ToArray();
 
         // Assert
         pilotCommands.Select(c => c.CommandId).Should().Equal(["Axis.AssignBlue:2", "Axis.AssignBlue:5"]);

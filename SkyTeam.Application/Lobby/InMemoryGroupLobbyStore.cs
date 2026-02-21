@@ -36,12 +36,12 @@ public sealed class InMemoryGroupLobbyStore
         lock (_sync)
         {
             if (_sessions.TryGetValue(groupChatId, out var existing))
-                return new LobbyCreateResult(LobbyCreateStatus.AlreadyExists, existing.ToSnapshot());
+                return new(LobbyCreateStatus.AlreadyExists, existing.ToSnapshot());
 
             var created = new LobbySession(groupChatId);
             _sessions.Add(groupChatId, created);
 
-            return new LobbyCreateResult(LobbyCreateStatus.Created, created.ToSnapshot());
+            return new(LobbyCreateStatus.Created, created.ToSnapshot());
         }
     }
 
@@ -52,24 +52,24 @@ public sealed class InMemoryGroupLobbyStore
         lock (_sync)
         {
             if (!_sessions.TryGetValue(groupChatId, out var session))
-                return new LobbyJoinResult(LobbyJoinStatus.NoLobby, null);
+                return new(LobbyJoinStatus.NoLobby, null);
 
             if (session.Pilot?.UserId == player.UserId || session.Copilot?.UserId == player.UserId)
-                return new LobbyJoinResult(LobbyJoinStatus.AlreadySeated, session.ToSnapshot());
+                return new(LobbyJoinStatus.AlreadySeated, session.ToSnapshot());
 
             if (session.Pilot is null)
             {
                 session.Pilot = player;
-                return new LobbyJoinResult(LobbyJoinStatus.JoinedAsPilot, session.ToSnapshot());
+                return new(LobbyJoinStatus.JoinedAsPilot, session.ToSnapshot());
             }
 
             if (session.Copilot is null)
             {
                 session.Copilot = player;
-                return new LobbyJoinResult(LobbyJoinStatus.JoinedAsCopilot, session.ToSnapshot());
+                return new(LobbyJoinStatus.JoinedAsCopilot, session.ToSnapshot());
             }
 
-            return new LobbyJoinResult(LobbyJoinStatus.Full, session.ToSnapshot());
+            return new(LobbyJoinStatus.Full, session.ToSnapshot());
         }
     }
 

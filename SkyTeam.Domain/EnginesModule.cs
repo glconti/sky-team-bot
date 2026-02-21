@@ -141,7 +141,7 @@ sealed class EnginesModule(Airport airport) : GameModule
         var advanceBy = CalculateApproachAdvance(speed);
         var resultingPosition = _airport.CurrentPositionIndex + advanceBy;
 
-        return new EnginesPlacementPreview(speed, advanceBy, resultingPosition);
+        return new(speed, advanceBy, resultingPosition);
     }
 
     private sealed record EnginesPlacementPreview(int Speed, int AdvanceBy, int ResultingPosition);

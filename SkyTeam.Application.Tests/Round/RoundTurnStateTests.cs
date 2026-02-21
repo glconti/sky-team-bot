@@ -44,7 +44,7 @@ public sealed class RoundTurnStateTests
             Index: 0,
             Player: PlayerSeat.Pilot,
             DieIndex: 0,
-            Value: new DieValue(1),
+            Value: new(1),
             Target: "Axis"));
     }
 
@@ -181,8 +181,8 @@ public sealed class RoundTurnStateTests
         afterCopilot.PlacementsRemaining.Should().Be(RoundTurnState.MaxPlacementsPerRound - 2);
 
         afterCopilot.Placements.Should().Equal(
-            new RoundPlacement(0, PlayerSeat.Pilot, DieIndex: 1, Value: new DieValue(2), Target: "Axis"),
-            new RoundPlacement(1, PlayerSeat.Copilot, DieIndex: 0, Value: new DieValue(5), Target: "Axis"));
+            new RoundPlacement(0, PlayerSeat.Pilot, DieIndex: 1, Value: new(2), Target: "Axis"),
+            new RoundPlacement(1, PlayerSeat.Copilot, DieIndex: 0, Value: new(5), Target: "Axis"));
     }
 
     [Fact]

@@ -13,7 +13,7 @@ public sealed class InMemoryGroupGameSessionStoreTests
     {
         var pilot = new LobbyPlayer(1, "Pilot");
         var copilot = new LobbyPlayer(2, "Copilot");
-        return (pilot, copilot, new LobbySnapshot(GroupChatId, pilot, copilot));
+        return (pilot, copilot, new(GroupChatId, pilot, copilot));
     }
 
     private static string GetCommandIdForDie(InMemoryGroupGameSessionStore store, long userId, int dieIndex)
@@ -46,7 +46,7 @@ public sealed class InMemoryGroupGameSessionStoreTests
     {
         // Arrange
         var store = new InMemoryGroupGameSessionStore();
-        var lobby = new LobbySnapshot(GroupChatId, Pilot: new LobbyPlayer(1, "Pilot"), Copilot: null);
+        var lobby = new LobbySnapshot(GroupChatId, Pilot: new(1, "Pilot"), Copilot: null);
 
         // Act
         var result = store.Start(GroupChatId, lobby, requestingUserId: 1);
@@ -63,8 +63,8 @@ public sealed class InMemoryGroupGameSessionStoreTests
 
         var lobby = new LobbySnapshot(
             GroupChatId,
-            Pilot: new LobbyPlayer(1, "Pilot"),
-            Copilot: new LobbyPlayer(2, "Copilot"));
+            Pilot: new(1, "Pilot"),
+            Copilot: new(2, "Copilot"));
 
         // Act
         var result = store.Start(GroupChatId, lobby, requestingUserId: 99);
@@ -92,7 +92,7 @@ public sealed class InMemoryGroupGameSessionStoreTests
             GroupChatId,
             pilot,
             copilot,
-            new GameRoundSnapshot(RoundNumber: 1, GameRoundStatus.AwaitingRoll)));
+            new(RoundNumber: 1, GameRoundStatus.AwaitingRoll)));
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public sealed class InMemoryGroupGameSessionStoreTests
         var (pilot, copilot, lobby) = CreateReadyLobby();
 
         store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
-        var roll = store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
         roll.Status.Should().Be(GameSessionRollStatus.Rolled);
         roll.StartingPlayer.Should().NotBeNull();
 
@@ -172,7 +172,7 @@ public sealed class InMemoryGroupGameSessionStoreTests
         var (pilot, copilot, lobby) = CreateReadyLobby();
 
         store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
-        var roll = store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
         roll.Status.Should().Be(GameSessionRollStatus.Rolled);
         roll.StartingPlayer.Should().NotBeNull();
 
@@ -194,7 +194,7 @@ public sealed class InMemoryGroupGameSessionStoreTests
         var (pilot, copilot, lobby) = CreateReadyLobby();
 
         store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
-        var roll = store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
         roll.Status.Should().Be(GameSessionRollStatus.Rolled);
         roll.StartingPlayer.Should().NotBeNull();
 
@@ -215,7 +215,7 @@ public sealed class InMemoryGroupGameSessionStoreTests
         var (pilot, copilot, lobby) = CreateReadyLobby();
 
         store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
-        var roll = store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
         roll.Status.Should().Be(GameSessionRollStatus.Rolled);
         roll.StartingPlayer.Should().NotBeNull();
 
@@ -253,7 +253,7 @@ public sealed class InMemoryGroupGameSessionStoreTests
         var (pilot, copilot, lobby) = CreateReadyLobby();
 
         store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
-        var roll = store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
         roll.Status.Should().Be(GameSessionRollStatus.Rolled);
         roll.StartingPlayer.Should().NotBeNull();
 
@@ -294,7 +294,7 @@ public sealed class InMemoryGroupGameSessionStoreTests
         var (pilot, copilot, lobby) = CreateReadyLobby();
 
         store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
-        var roll = store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
         roll.Status.Should().Be(GameSessionRollStatus.Rolled);
         roll.StartingPlayer.Should().NotBeNull();
 
@@ -340,7 +340,7 @@ public sealed class InMemoryGroupGameSessionStoreTests
         var (pilot, copilot, lobby) = CreateReadyLobby();
 
         store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
-        var roll = store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
         roll.Status.Should().Be(GameSessionRollStatus.Rolled);
         roll.StartingPlayer.Should().NotBeNull();
 
@@ -385,7 +385,7 @@ public sealed class InMemoryGroupGameSessionStoreTests
         var (pilot, copilot, lobby) = CreateReadyLobby();
 
         store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
-        var roll = store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
         roll.Status.Should().Be(GameSessionRollStatus.Rolled);
         roll.StartingPlayer.Should().NotBeNull();
 

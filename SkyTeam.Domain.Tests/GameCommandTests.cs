@@ -121,10 +121,10 @@ public class GameCommandTests
     private static Game CreateGame(GameModule[]? modules = null, Altitude? altitude = null)
     {
         var airport = (Airport)new MontrealAirport();
-        altitude ??= new Altitude();
+        altitude ??= new();
         modules ??= [];
 
-        return new Game(airport, altitude, modules);
+        return new(airport, altitude, modules);
     }
 
     private static void ClearUnusedDice(Game game) => GetState(game).ClearUnusedDice();

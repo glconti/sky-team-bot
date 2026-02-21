@@ -19,7 +19,7 @@ public sealed class InMemoryGroupLobbyStoreTests
         // Assert
         result.Should().BeEquivalentTo(new LobbyCreateResult(
             LobbyCreateStatus.Created,
-            new LobbySnapshot(GroupChatId, Pilot: null, Copilot: null)));
+            new(GroupChatId, Pilot: null, Copilot: null)));
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public sealed class InMemoryGroupLobbyStoreTests
         // Assert
         result.Should().BeEquivalentTo(new LobbyCreateResult(
             LobbyCreateStatus.AlreadyExists,
-            new LobbySnapshot(GroupChatId, Pilot: pilot, Copilot: null)));
+            new(GroupChatId, Pilot: pilot, Copilot: null)));
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public sealed class InMemoryGroupLobbyStoreTests
         // Assert
         result.Should().BeEquivalentTo(new LobbyJoinResult(
             LobbyJoinStatus.JoinedAsPilot,
-            new LobbySnapshot(GroupChatId, Pilot: player, Copilot: null)));
+            new(GroupChatId, Pilot: player, Copilot: null)));
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed class InMemoryGroupLobbyStoreTests
         // Assert
         result.Should().BeEquivalentTo(new LobbyJoinResult(
             LobbyJoinStatus.JoinedAsCopilot,
-            new LobbySnapshot(GroupChatId, Pilot: pilot, Copilot: copilot)));
+            new(GroupChatId, Pilot: pilot, Copilot: copilot)));
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class InMemoryGroupLobbyStoreTests
         // Assert
         result.Should().BeEquivalentTo(new LobbyJoinResult(
             LobbyJoinStatus.Full,
-            new LobbySnapshot(GroupChatId, Pilot: pilot, Copilot: copilot)));
+            new(GroupChatId, Pilot: pilot, Copilot: copilot)));
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public sealed class InMemoryGroupLobbyStoreTests
         // Assert
         result.Should().BeEquivalentTo(new LobbyJoinResult(
             LobbyJoinStatus.AlreadySeated,
-            new LobbySnapshot(GroupChatId, Pilot: player, Copilot: null)));
+            new(GroupChatId, Pilot: player, Copilot: null)));
     }
 
     [Fact]

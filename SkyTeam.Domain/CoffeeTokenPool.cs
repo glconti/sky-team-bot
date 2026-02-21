@@ -19,7 +19,7 @@ readonly record struct CoffeeTokenPool
         if (amount <= 0)
             throw new ArgumentOutOfRangeException(nameof(amount), "Amount must be greater than zero.");
 
-        return new CoffeeTokenPool(Math.Min(Count + amount, MaxCapacity));
+        return new(Math.Min(Count + amount, MaxCapacity));
     }
 
     public CoffeeTokenPool Spend(int amount)
@@ -30,6 +30,6 @@ readonly record struct CoffeeTokenPool
         if (Count < amount)
             throw new InvalidOperationException("Not enough coffee tokens to spend.");
 
-        return new CoffeeTokenPool(Count - amount);
+        return new(Count - amount);
     }
 }

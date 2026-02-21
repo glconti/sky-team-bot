@@ -387,10 +387,10 @@ public class ExecuteCommandTests
     private static Game CreateGame(GameModule[]? modules = null, Altitude? altitude = null, Airport? airport = null)
     {
         airport ??= (Airport)new MontrealAirport();
-        altitude ??= new Altitude();
+        altitude ??= new();
         modules ??= [];
 
-        return new Game(airport, altitude, modules);
+        return new(airport, altitude, modules);
     }
 
     private static void SetUnusedDice(Game game, BlueDie[] blueDice, OrangeDie[] orangeDice)

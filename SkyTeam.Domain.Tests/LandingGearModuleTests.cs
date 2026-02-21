@@ -50,7 +50,7 @@ public class LandingGearModuleTests
             Player.Pilot,
             [BlueDie.FromValue(otherValueInSameSwitch)],
             [],
-            new CoffeeTokenPool()).ToArray();
+            new()).ToArray();
 
         // Assert
         new { module.LandingGearValue, airport.BlueAerodynamicsThreshold, RemainingCommands = remainingCommands.Length }
@@ -124,7 +124,7 @@ public class LandingGearModuleTests
         var module = new LandingGearModule(airport);
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Pilot, [], [], new CoffeeTokenPool()).ToArray();
+        var commands = module.GetAvailableCommands(Player.Pilot, [], [], new()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();
@@ -142,7 +142,7 @@ public class LandingGearModuleTests
         module.AssignBlueDie(BlueDie.FromValue(6));
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], [], new CoffeeTokenPool()).ToArray();
+        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], [], new()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();
@@ -166,11 +166,11 @@ public class LandingGearModuleTests
         };
 
         // Act
-        var pilotCommandIds = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, [], new CoffeeTokenPool())
+        var pilotCommandIds = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, [], new())
             .Select(command => command.CommandId)
             .ToArray();
 
-        var copilotCommandIds = module.GetAvailableCommands(Player.Copilot, unusedBlueDice, [], new CoffeeTokenPool())
+        var copilotCommandIds = module.GetAvailableCommands(Player.Copilot, unusedBlueDice, [], new())
             .Select(command => command.CommandId)
             .ToArray();
 

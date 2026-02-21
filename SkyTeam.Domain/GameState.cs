@@ -60,6 +60,6 @@ sealed class GameState
     {
         ClearUnusedDice();
         CurrentPlayer = Player.Pilot;
-        TokenPool = new CoffeeTokenPool();
+        TokenPool = new();
     }
 }

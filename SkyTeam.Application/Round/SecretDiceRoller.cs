@@ -8,7 +8,7 @@ public static class SecretDiceRoller
         if (dicePerSeat < 1)
             throw new ArgumentOutOfRangeException(nameof(dicePerSeat), dicePerSeat, "Must roll at least one die per seat.");
 
-        return new SecretDiceRoll(
+        return new(
             PilotDice: RollMany(rollDie, dicePerSeat),
             CopilotDice: RollMany(rollDie, dicePerSeat));
     }

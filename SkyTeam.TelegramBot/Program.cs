@@ -11,7 +11,7 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
-internal static class Program
+static class Program
 {
     private const int MaxRecentUpdateIds = 1_000;
 
@@ -20,16 +20,16 @@ internal static class Program
 
     private static readonly ConcurrentDictionary<long, SemaphoreSlim> ChatLocks = new();
 
-    private static readonly object UpdateDedupSync = new();
+    private static readonly Lock UpdateDedupSync = new();
     private static readonly Queue<int> RecentUpdateIds = new();
-    private static readonly HashSet<int> RecentUpdateIdSet = new();
+    private static readonly HashSet<int> RecentUpdateIdSet = [];
 
     public static async Task Main()
     {
         var token = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN");
         if (string.IsNullOrWhiteSpace(token))
         {
-            Console.Error.WriteLine("Missing TELEGRAM_BOT_TOKEN environment variable.");
+            await Console.Error.WriteLineAsync("Missing TELEGRAM_BOT_TOKEN environment variable.");
             return;
         }
 
@@ -45,7 +45,7 @@ internal static class Program
         botClient.StartReceiving(
             updateHandler: HandleUpdateAsync,
             errorHandler: HandlePollingErrorAsync,
-            receiverOptions: new ReceiverOptions { AllowedUpdates = Array.Empty<UpdateType>() },
+            receiverOptions: new() { AllowedUpdates = [] },
             cancellationToken: cts.Token);
 
         var me = await botClient.GetMe(cts.Token);
@@ -67,7 +67,7 @@ internal static class Program
         if (update.Message is not { Text: { } text } message) return;
 
         var lockKey = GetLockKey(message);
-        var gate = ChatLocks.GetOrAdd(lockKey, _ => new SemaphoreSlim(1, 1));
+        var gate = ChatLocks.GetOrAdd(lockKey, _ => new(1, 1));
 
         await gate.WaitAsync(cancellationToken);
         try

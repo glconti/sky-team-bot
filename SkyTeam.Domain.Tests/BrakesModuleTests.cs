@@ -61,7 +61,7 @@ public class BrakesModuleTests
         var module = new BrakesModule();
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(2)], [], new CoffeeTokenPool()).ToArray();
+        var commands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(2)], [], new()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();
@@ -74,7 +74,7 @@ public class BrakesModuleTests
         var module = new BrakesModule();
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], [], new CoffeeTokenPool()).ToArray();
+        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], [], new()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();
@@ -87,7 +87,7 @@ public class BrakesModuleTests
         var module = new BrakesModule();
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Pilot, [], [], new CoffeeTokenPool()).ToArray();
+        var commands = module.GetAvailableCommands(Player.Pilot, [], [], new()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();
@@ -110,7 +110,7 @@ public class BrakesModuleTests
         module.IsFullyDeployed.Should().BeTrue();
         module.BrakingCapability.Should().Be(12);
 
-        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], [], new CoffeeTokenPool()).ToArray();
+        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], [], new()).ToArray();
         commands.Should().BeEmpty();
     }
 
@@ -136,7 +136,7 @@ public class BrakesModuleTests
         var unusedBlueDice = new[] { BlueDie.FromValue(1), BlueDie.FromValue(2) };
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, [], new CoffeeTokenPool()).ToArray();
+        var commands = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, [], new()).ToArray();
 
         // Assert
         commands.Should().ContainSingle();

@@ -111,13 +111,13 @@ public sealed class RoundTurnState
         else
             newCopilotHand = CopilotHand.UseDie(dieIndex, out placedValue);
 
-        placements = placements.Add(new RoundPlacement(placementIndex, player, dieIndex, placedValue, target));
+        placements = placements.Add(new(placementIndex, player, dieIndex, placedValue, target));
 
         var newPhase = placements.Length == MaxPlacementsPerRound
             ? RoundPhase.ReadyToResolve
             : RoundPhase.InProgress;
 
-        return new RoundTurnState(
+        return new(
             RoundNumber,
             StartingPlayer,
             currentPlayer: CurrentPlayer.Other(),
@@ -153,7 +153,7 @@ public sealed class RoundTurnState
 
         var placements = _placements.RemoveAt(_placements.Length - 1);
 
-        return new RoundTurnState(
+        return new(
             RoundNumber,
             StartingPlayer,
             currentPlayer: last.Player,

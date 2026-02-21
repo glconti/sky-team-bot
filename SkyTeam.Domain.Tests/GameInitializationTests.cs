@@ -67,7 +67,7 @@ public class GameInitializationTests
     public void UnusedDiceCollections_ShouldNotBeMutable()
     {
         // Arrange
-        var game = new Game((Airport)new MontrealAirport(), new Altitude(), []);
+        var game = new Game((Airport)new MontrealAirport(), new(), []);
 
         // Act
         var addingBlue = () => ((ICollection<BlueDie>)game.UnusedBlueDice).Add(BlueDie.Roll());

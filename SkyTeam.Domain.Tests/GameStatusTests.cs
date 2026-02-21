@@ -90,13 +90,13 @@ public class GameStatusTests
     {
         // Arrange
         var airport = new Airport([
-            new PathSegment(0),
-            new PathSegment(1),
-            new PathSegment(0),
-            new PathSegment(0),
-            new PathSegment(0),
-            new PathSegment(0),
-            new PathSegment(0)
+            new(0),
+            new(1),
+            new(0),
+            new(0),
+            new(0),
+            new(0),
+            new(0)
         ]);
         airport.AdvanceApproach(6);
 
@@ -354,7 +354,7 @@ public class GameStatusTests
         var enginesModule = new EnginesModule(airport);
         enginesModule.AssignOrangeDie(OrangeDie.FromValue(6));
 
-        var game = new Game(airport, new Altitude(), [enginesModule]);
+        var game = new Game(airport, new(), [enginesModule]);
         SetUnusedDice(game, blueDice: [BlueDie.FromValue(6)], orangeDice: []);
 
         // Act

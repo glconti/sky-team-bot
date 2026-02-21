@@ -15,7 +15,7 @@ record Die
         if (value is < 1 or > 6)
             throw new ArgumentOutOfRangeException(nameof(value), "Die values must be between 1 and 6.");
 
-        return new Die(value);
+        return new(value);
     }
 
     public static implicit operator int(Die die) => die.Value;
