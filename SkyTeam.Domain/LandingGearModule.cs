@@ -82,7 +82,7 @@ sealed class LandingGearModule(Airport airport) : GameModule
         var switchIndex = GetSwitchIndexForValue(effectiveValue);
         if (_isSwitchActivated[switchIndex]) return null;
 
-        return new ActivateLandingGearCommand(rolledValue, effectiveValue, tokenCost, switchIndex + 1);
+        return new ActivateLandingGearCommand(this, rolledValue, effectiveValue, tokenCost, switchIndex + 1);
     }
 
     private static int GetSwitchIndexForValue(int value) => value switch
@@ -94,6 +94,7 @@ sealed class LandingGearModule(Airport airport) : GameModule
     };
 
     private sealed record ActivateLandingGearCommand(
+        LandingGearModule Module,
         int RolledValue,
         int EffectiveValue,
         int TokenCost,
@@ -106,5 +107,19 @@ sealed class LandingGearModule(Airport airport) : GameModule
         public override string DisplayName => TokenCost == 0
             ? $"Landing gear: deploy switch {SwitchNumber} with {RolledValue}"
             : $"Landing gear: deploy switch {SwitchNumber} with {RolledValue} as {EffectiveValue} (cost {TokenCost})";
+
+        internal override void Execute(Game game)
+        {
+            var rolledDie = game.GetUnusedBlueDie(RolledValue);
+
+            if (TokenCost > 0)
+                game.SpendCoffeeTokens(TokenCost);
+
+            var dieForAssignment = TokenCost == 0 ? rolledDie : BlueDie.FromValue(EffectiveValue);
+            Module.AssignBlueDie(dieForAssignment);
+
+            game.RemoveUnusedDie(rolledDie);
+            game.SwitchPlayer();
+        }
     }
 }

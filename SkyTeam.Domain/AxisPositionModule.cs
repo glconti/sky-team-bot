@@ -10,6 +10,8 @@ sealed class AxisPositionModule : GameModule
 
     internal int AxisPosition => _axisPosition;
 
+    internal bool IsRoundComplete => _blueDie is not null && _orangeDie is not null;
+
     public override bool CanAcceptBlueDie(Player player) =>
         player == Player.Pilot && _blueDie is null;
 
@@ -101,7 +103,7 @@ sealed class AxisPositionModule : GameModule
     {
         if (axisPosition is > -LossLimit and < LossLimit) return;
 
-        throw new InvalidOperationException("Axis position out of bounds.");
+        throw new GameRuleLossException("Axis position out of bounds.");
     }
 
     private static IEnumerable<int> GetAdjustedValues(int rolledValue, int availableTokens)
@@ -125,7 +127,7 @@ sealed class AxisPositionModule : GameModule
             ? null
             : CalculateAxisPositionAfterResolution(effectiveValue, (int)_orangeDie);
 
-        return new AssignAxisBlueDieCommand(rolledValue, effectiveValue, tokenCost, resulting);
+        return new AssignAxisBlueDieCommand(this, rolledValue, effectiveValue, tokenCost, resulting);
     }
 
     private GameCommand CreateOrangeCommand(int rolledValue, int effectiveValue, int tokenCost)
@@ -134,10 +136,11 @@ sealed class AxisPositionModule : GameModule
             ? null
             : CalculateAxisPositionAfterResolution((int)_blueDie, effectiveValue);
 
-        return new AssignAxisOrangeDieCommand(rolledValue, effectiveValue, tokenCost, resulting);
+        return new AssignAxisOrangeDieCommand(this, rolledValue, effectiveValue, tokenCost, resulting);
     }
 
     private sealed record AssignAxisBlueDieCommand(
+        AxisPositionModule Module,
         int RolledValue,
         int EffectiveValue,
         int TokenCost,
@@ -148,9 +151,24 @@ sealed class AxisPositionModule : GameModule
             : $"Axis.AssignBlue:{RolledValue}>{EffectiveValue}";
 
         public override string DisplayName => CreateDisplayName("blue", RolledValue, EffectiveValue, TokenCost, ResultingAxisPosition);
+
+        internal override void Execute(Game game)
+        {
+            var rolledDie = game.GetUnusedBlueDie(RolledValue);
+
+            if (TokenCost > 0)
+                game.SpendCoffeeTokens(TokenCost);
+
+            var dieForAssignment = TokenCost == 0 ? rolledDie : BlueDie.FromValue(EffectiveValue);
+            Module.AssignBlueDie(dieForAssignment);
+
+            game.RemoveUnusedDie(rolledDie);
+            game.SwitchPlayer();
+        }
     }
 
     private sealed record AssignAxisOrangeDieCommand(
+        AxisPositionModule Module,
         int RolledValue,
         int EffectiveValue,
         int TokenCost,
@@ -161,6 +179,20 @@ sealed class AxisPositionModule : GameModule
             : $"Axis.AssignOrange:{RolledValue}>{EffectiveValue}";
 
         public override string DisplayName => CreateDisplayName("orange", RolledValue, EffectiveValue, TokenCost, ResultingAxisPosition);
+
+        internal override void Execute(Game game)
+        {
+            var rolledDie = game.GetUnusedOrangeDie(RolledValue);
+
+            if (TokenCost > 0)
+                game.SpendCoffeeTokens(TokenCost);
+
+            var dieForAssignment = TokenCost == 0 ? rolledDie : OrangeDie.FromValue(EffectiveValue);
+            Module.AssignOrangeDie(dieForAssignment);
+
+            game.RemoveUnusedDie(rolledDie);
+            game.SwitchPlayer();
+        }
     }
 
     private static string CreateDisplayName(

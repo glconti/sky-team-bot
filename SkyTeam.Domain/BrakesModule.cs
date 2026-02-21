@@ -33,7 +33,7 @@ sealed class BrakesModule : GameModule
             var tokenCost = Math.Abs(requiredValue - rolledValue);
             if (tokenCost > availableTokens) continue;
 
-            yield return new ActivateBrakesCommand(rolledValue, requiredValue, tokenCost, switchNumber);
+            yield return new ActivateBrakesCommand(this, rolledValue, requiredValue, tokenCost, switchNumber);
         }
     }
 
@@ -53,6 +53,7 @@ sealed class BrakesModule : GameModule
     }
 
     private sealed record ActivateBrakesCommand(
+        BrakesModule Module,
         int RolledValue,
         int RequiredValue,
         int TokenCost,
@@ -65,5 +66,19 @@ sealed class BrakesModule : GameModule
         public override string DisplayName => TokenCost == 0
             ? $"Brakes: activate switch {SwitchNumber} with {RolledValue}"
             : $"Brakes: activate switch {SwitchNumber} with {RolledValue} as {RequiredValue} (cost {TokenCost})";
+
+        internal override void Execute(Game game)
+        {
+            var rolledDie = game.GetUnusedBlueDie(RolledValue);
+
+            if (TokenCost > 0)
+                game.SpendCoffeeTokens(TokenCost);
+
+            var dieForAssignment = TokenCost == 0 ? rolledDie : BlueDie.FromValue(RequiredValue);
+            Module.AssignBlueDie(dieForAssignment);
+
+            game.RemoveUnusedDie(rolledDie);
+            game.SwitchPlayer();
+        }
     }
 }

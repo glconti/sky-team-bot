@@ -49,33 +49,68 @@ class Game
         if (_state.UnusedBlueDice.Count > 0 || _state.UnusedOrangeDice.Count > 0)
             throw new InvalidOperationException("Cannot proceed to next round with unused dice.");
 
-        if (_altitude.IsLanded)
+        try
         {
-            EvaluateLandingOutcome();
-            return;
-        }
-
-        _altitude.Advance();
-        _state.SetCurrentPlayer(_altitude.CurrentPlayer);
-
-        if (_altitude.IsLanded)
-        {
-            _airport.EnterFinalRound();
-
-            if (_airport.CurrentPositionIndex != _airport.SegmentCount - 1)
+            if (_altitude.IsLanded)
             {
-                Status = GameStatus.Lost;
+                EvaluateLandingOutcome();
                 return;
             }
+
+            _altitude.Advance();
+            _state.SetCurrentPlayer(_altitude.CurrentPlayer);
+
+            if (_altitude.IsLanded)
+            {
+                _airport.EnterFinalRound();
+
+                if (_airport.CurrentPositionIndex != _airport.SegmentCount - 1)
+                {
+                    Status = GameStatus.Lost;
+                    return;
+                }
+            }
+
+            foreach (var module in _modules)
+                module.ResetRound();
+
+            RollDice();
         }
-
-        foreach (var module in _modules)
-            module.ResetRound();
-
-        RollDice();
+        catch (GameRuleLossException)
+        {
+            Status = GameStatus.Lost;
+            throw;
+        }
     }
 
     public void SwitchPlayer() => _state.SwitchPlayer();
+
+    private ConcentrationModule? Concentration => _modules.OfType<ConcentrationModule>().SingleOrDefault();
+
+    internal CoffeeTokenPool TokenPool => Concentration?.TokenPool ?? new CoffeeTokenPool();
+
+    internal void SpendCoffeeTokens(int amount)
+    {
+        var concentration = Concentration
+            ?? throw new InvalidOperationException("Cannot spend coffee tokens without a Concentration module.");
+
+        concentration.SpendCoffeeTokens(amount);
+    }
+
+    internal BlueDie GetUnusedBlueDie(int targetValue)
+    {
+        var die = _state.UnusedBlueDice.FirstOrDefault(d => (int)d == targetValue);
+        return die ?? throw new InvalidOperationException($"No unused blue die found with value {targetValue}.");
+    }
+
+    internal OrangeDie GetUnusedOrangeDie(int targetValue)
+    {
+        var die = _state.UnusedOrangeDice.FirstOrDefault(d => (int)d == targetValue);
+        return die ?? throw new InvalidOperationException($"No unused orange die found with value {targetValue}.");
+    }
+
+    internal void RemoveUnusedDie(BlueDie die) => _state.RemoveBlueDie(die);
+    internal void RemoveUnusedDie(OrangeDie die) => _state.RemoveOrangeDie(die);
 
 
     /// <summary>
@@ -91,10 +126,7 @@ class Game
             yield break;
         }
 
-        var tokenPool = _modules
-            .OfType<ConcentrationModule>()
-            .SingleOrDefault()?
-            .TokenPool ?? new CoffeeTokenPool();
+        var tokenPool = TokenPool;
 
         foreach (var gameCommand in _modules.SelectMany(module =>
                      module.GetAvailableCommands(_state.CurrentPlayer, _state.UnusedBlueDice, _state.UnusedOrangeDice, tokenPool)))
@@ -102,7 +134,7 @@ class Game
     }
 
     /// <summary>
-    ///     Executes a command by placing a die on the specified module.
+    ///     Executes a command by resolving it from the available command set and executing it.
     /// </summary>
     public void ExecuteCommand(string commandId)
     {
@@ -111,184 +143,19 @@ class Game
         if (Status != GameStatus.InProgress)
             throw new InvalidOperationException("Cannot execute commands after the game has ended.");
 
-        var availableCommandIds = GetAvailableCommands()
-            .Select(command => command.CommandId)
-            .ToHashSet(StringComparer.Ordinal);
+        var command = GetAvailableCommands().SingleOrDefault(c => c.CommandId == commandId);
 
-        if (!availableCommandIds.Contains(commandId))
+        if (command is null)
             throw new InvalidOperationException($"Command '{commandId}' is not currently available.");
-
-        if (commandId == NextRoundCommand.Instance.CommandId)
-        {
-            NextRound();
-            return;
-        }
-
-        var parts = commandId.Split(':', 2);
-        if (parts.Length != 2)
-            throw new InvalidOperationException($"Invalid command id '{commandId}'.");
-
-        var prefix = parts[0];
-
-        var valuePart = parts[1];
-        var valueParts = valuePart.Split('>', 2);
-
-        if (!int.TryParse(valueParts[0], out var rolledValue))
-            throw new InvalidOperationException($"Invalid command id '{commandId}'.");
-
-        var effectiveValue = rolledValue;
-
-        if (valueParts.Length == 2)
-        {
-            if (!int.TryParse(valueParts[1], out effectiveValue))
-                throw new InvalidOperationException($"Invalid command id '{commandId}'.");
-        }
-
-        var tokenCost = Math.Abs(effectiveValue - rolledValue);
-
-        AxisPositionModule Axis() => GetRequiredModule<AxisPositionModule>("Axis");
-        EnginesModule Engines() => GetRequiredModule<EnginesModule>("Engines");
-        BrakesModule Brakes() => GetRequiredModule<BrakesModule>("Brakes");
-        FlapsModule Flaps() => GetRequiredModule<FlapsModule>("Flaps");
-        LandingGearModule LandingGear() => GetRequiredModule<LandingGearModule>("LandingGear");
-        RadioModule Radio() => GetRequiredModule<RadioModule>("Radio");
-        ConcentrationModule Concentration() => GetRequiredModule<ConcentrationModule>("Concentration");
-
-        BlueDie GetUnusedBlueDie(int targetValue)
-        {
-            var die = _state.UnusedBlueDice.FirstOrDefault(d => (int)d == targetValue);
-            return die ?? throw new InvalidOperationException($"No unused blue die found with value {targetValue}.");
-        }
-
-        OrangeDie GetUnusedOrangeDie(int targetValue)
-        {
-            var die = _state.UnusedOrangeDice.FirstOrDefault(d => (int)d == targetValue);
-            return die ?? throw new InvalidOperationException($"No unused orange die found with value {targetValue}.");
-        }
-
-        void SpendTokensIfNeeded()
-        {
-            if (tokenCost == 0) return;
-
-            Concentration().SpendTokens(tokenCost);
-        }
-
-        BlueDie GetBlueDieForAssignment(BlueDie rolledDie) => tokenCost == 0
-            ? rolledDie
-            : BlueDie.FromValue(effectiveValue);
-
-        OrangeDie GetOrangeDieForAssignment(OrangeDie rolledDie) => tokenCost == 0
-            ? rolledDie
-            : OrangeDie.FromValue(effectiveValue);
 
         try
         {
-            switch (prefix)
-            {
-            case "Axis.AssignBlue":
-            {
-                var rolledDie = GetUnusedBlueDie(rolledValue);
-                SpendTokensIfNeeded();
-                Axis().AssignBlueDie(GetBlueDieForAssignment(rolledDie));
-                _state.RemoveBlueDie(rolledDie);
-                break;
-            }
-            case "Axis.AssignOrange":
-            {
-                var rolledDie = GetUnusedOrangeDie(rolledValue);
-                SpendTokensIfNeeded();
-                Axis().AssignOrangeDie(GetOrangeDieForAssignment(rolledDie));
-                _state.RemoveOrangeDie(rolledDie);
-                break;
-            }
-            case "Engines.AssignBlue":
-            {
-                var rolledDie = GetUnusedBlueDie(rolledValue);
-                SpendTokensIfNeeded();
-                Engines().AssignBlueDie(GetBlueDieForAssignment(rolledDie));
-                _state.RemoveBlueDie(rolledDie);
-                break;
-            }
-            case "Engines.AssignOrange":
-            {
-                var rolledDie = GetUnusedOrangeDie(rolledValue);
-                SpendTokensIfNeeded();
-                Engines().AssignOrangeDie(GetOrangeDieForAssignment(rolledDie));
-                _state.RemoveOrangeDie(rolledDie);
-                break;
-            }
-            case "Brakes.AssignBlue":
-            {
-                var rolledDie = GetUnusedBlueDie(rolledValue);
-                SpendTokensIfNeeded();
-                Brakes().AssignBlueDie(GetBlueDieForAssignment(rolledDie));
-                _state.RemoveBlueDie(rolledDie);
-                break;
-            }
-            case "Flaps.AssignOrange":
-            {
-                var rolledDie = GetUnusedOrangeDie(rolledValue);
-                SpendTokensIfNeeded();
-                Flaps().AssignOrangeDie(GetOrangeDieForAssignment(rolledDie));
-                _state.RemoveOrangeDie(rolledDie);
-                break;
-            }
-            case "LandingGear.AssignBlue":
-            {
-                var rolledDie = GetUnusedBlueDie(rolledValue);
-                SpendTokensIfNeeded();
-                LandingGear().AssignBlueDie(GetBlueDieForAssignment(rolledDie));
-                _state.RemoveBlueDie(rolledDie);
-                break;
-            }
-            case "Radio.AssignBlue":
-            {
-                var rolledDie = GetUnusedBlueDie(rolledValue);
-                SpendTokensIfNeeded();
-                Radio().AssignBlueDie(GetBlueDieForAssignment(rolledDie));
-                _state.RemoveBlueDie(rolledDie);
-                break;
-            }
-            case "Radio.AssignOrange":
-            {
-                var rolledDie = GetUnusedOrangeDie(rolledValue);
-                SpendTokensIfNeeded();
-                Radio().AssignOrangeDie(GetOrangeDieForAssignment(rolledDie));
-                _state.RemoveOrangeDie(rolledDie);
-                break;
-            }
-            case "Concentration.AssignBlue":
-            {
-                var rolledDie = GetUnusedBlueDie(rolledValue);
-                SpendTokensIfNeeded();
-                Concentration().AssignBlueDie(GetBlueDieForAssignment(rolledDie));
-                _state.RemoveBlueDie(rolledDie);
-                break;
-            }
-            case "Concentration.AssignOrange":
-            {
-                var rolledDie = GetUnusedOrangeDie(rolledValue);
-                SpendTokensIfNeeded();
-                Concentration().AssignOrangeDie(GetOrangeDieForAssignment(rolledDie));
-                _state.RemoveOrangeDie(rolledDie);
-                break;
-            }
-            default:
-                throw new InvalidOperationException($"Invalid command id '{commandId}'.");
-            }
-
-            _state.SwitchPlayer();
+            command.Execute(this);
         }
-        catch
+        catch (GameRuleLossException)
         {
             Status = GameStatus.Lost;
             throw;
-        }
-
-        TModule GetRequiredModule<TModule>(string name) where TModule : GameModule
-        {
-            var module = _modules.OfType<TModule>().SingleOrDefault();
-            return module ?? throw new InvalidOperationException($"{name} module is not present.");
         }
     }
 
@@ -343,5 +210,5 @@ sealed record NextRoundCommand : GameCommand
     public override string DisplayName => "Proceed to Next Round";
     public static NextRoundCommand Instance { get; } = new();
 
-    public static void Execute(Game game) => game.NextRound();
+    internal override void Execute(Game game) => game.NextRound();
 }
