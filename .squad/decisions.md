@@ -489,3 +489,51 @@ record CoffeeTokenPool
 **Rationale:** Comprehensive spec ensures clarity + secrecy. Concrete examples enable deterministic testing. Token UX is button-driven, not command-based (minimum friction). Rule compliance is validated in every decision branch.
 
 ---
+
+## 2026-02-21T09:08:13Z: Group-chat-first UX for Telegram (Gianluigi Conti)
+
+**By:** Gianluigi Conti  
+**Decision:** Keep UX group-chat-first; start the game in the group chat, and use private messages only when needed for secret dice/placements (after onboarding).  
+**Rationale:** User clarification — captured for team memory.
+
+---
+
+## 2026-02-21T09:09:14Z: Round interaction model — strict alternation (Gianluigi Conti)
+
+**By:** Gianluigi Conti  
+**Decision:** Strict alternation one die placement at a time (Pilot places 1 die, then Copilot, repeat).  
+**Rationale:** User choice — captured for team memory.
+
+---
+
+## 2026-02-21T09:10:08Z: UX interaction preference — inline buttons primary (Gianluigi Conti)
+
+**By:** Gianluigi Conti  
+**Decision:** Primarily inline buttons/menus (typed commands optional, not required for parity).  
+**Rationale:** User choice — captured for team memory.
+
+---
+
+## 2026-02-21T09:10:26Z: MVP persistence — in-memory session store (Gianluigi Conti)
+
+**By:** Gianluigi Conti  
+**Decision:** In-memory session store is acceptable for MVP (sessions reset on bot restart).  
+**Rationale:** User choice — captured for team memory.
+
+---
+
+## 2026-02-21T09:11:20Z: Group spectators and 2-player enforcement (Gianluigi Conti)
+
+**By:** Gianluigi Conti  
+**Decision:** Group chats may have spectators, but the game enforces exactly 2 seated players (Pilot + Copilot).  
+**Rationale:** User choice — captured for team memory.
+
+---
+
+## 2026-02-21T09:12:32Z: Undo placement — pre-other-player-action (Gianluigi Conti)
+
+**By:** Gianluigi Conti  
+**Decision:** Allow undo last placement, but only before the other player takes an action.  
+**Rationale:** User choice — captured for team memory.
+
+---
