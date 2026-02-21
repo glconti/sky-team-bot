@@ -1945,3 +1945,34 @@ These will require a domain snapshot/broadcast model and/or an application servi
 5. Reroll/mulligan mechanics
 
 ---
+
+---
+
+## 2026-02-22T00:10:56Z: Telegram UX interview — group chat & DM placement (Sully)
+
+**By:** Sully (Architect)  
+**Decision:** Three UX patterns confirmed for Telegram MVP and child issues #49/#52/#54.
+
+### 1. Group Chat UX is a Single Cockpit Message
+- The bot maintains **one cockpit message per group chat**.
+- All state changes **edit this message** (no chat spam).
+- Cockpit contains: seat assignments, current round state, button actions.
+
+### 2. Group Cockpit Buttons are Pressable by Anyone
+- Buttons are visible to all group members.
+- **Anyone may press** a group button (not restricted by role/seat).
+- Server enforces seating, turn rules, and permissions.
+- Invalid presses → **no-op + toast** (fail gracefully; user sees why action was rejected).
+
+### 3. "Placement from Group Cockpit" Drives Private DM UI
+- Group cockpit includes a **"Place (DM)" action button**.
+- Pressing it **triggers/refreshes the user's private DM placement UI**.
+- Private placement menu lives **in DM only** — no secret dice and no command IDs leak to group chat.
+- Callback routing/validation binds actions to pressing user + current game state.
+
+**Rationale:** Separation of concerns (group visibility vs. private gameplay) reduces UX friction and prevents information leaks.
+
+**Implications:**
+- Callback routing must bind actions to the pressing user.
+- Any payload/state that would reveal private information stays server-side or DM-only.
+- Group cockpit acts as a "control hub"; sensitive operations delegate to DM.
