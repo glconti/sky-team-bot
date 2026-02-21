@@ -110,3 +110,13 @@
 - Aloha integrates test harness with implementation phases
 
 ---
+
+### Session 4: Issue #31 Landing + Multi-Token Spend (2026-02-21)
+**Outcome:** Implemented final landing win/loss criteria per `.squad/decisions.md` and added coffee-token multi-spend die adjustment end-to-end (command surfacing + execution + tests).
+
+**Key Learnings:**
+- Landing outcome must validate multiple independent thresholds (axis range, engines/brakes/flaps/gear, approach cleared); keeping them explicit in `Game.EvaluateLandingOutcome()` prevents regressions.
+- Coffee token adjustment is simplest when encoded in command ids as `Rolled>Effective`, consuming the rolled die but assigning an effective-value die to modules.
+- Centralizing the token budget at `Game.GetAvailableCommands()` (via `ConcentrationModule.TokenPool`) keeps modules token-aware without introducing infrastructure concerns.
+
+---
