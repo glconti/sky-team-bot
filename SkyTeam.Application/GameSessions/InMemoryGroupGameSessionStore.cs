@@ -28,6 +28,14 @@ public sealed record GameRoundSnapshot(int RoundNumber, GameRoundStatus Status)
 
 public sealed record GameSessionSnapshot(long GroupChatId, LobbyPlayer Pilot, LobbyPlayer Copilot, GameRoundSnapshot Round);
 
+public sealed record GameSessionPublicState(
+    GameSessionSnapshot Session,
+    GameStatePublicSnapshot Cockpit,
+    string GameStatus,
+    PlayerSeat? CurrentPlayer,
+    int? PlacementsMade,
+    int? PlacementsRemaining);
+
 public readonly record struct GameSessionStartResult(GameSessionStartStatus Status, GameSessionSnapshot? Snapshot);
 
 public enum GameSessionRollStatus
@@ -94,6 +102,32 @@ public readonly record struct GamePlacementResult(
     GameRoundResolutionPublicInfo? ResolutionInfo,
     string? ErrorMessage);
 
+public enum GameUndoStatus
+{
+    Undone,
+    NoActiveSession,
+    NotSeated,
+    RoundNotRolled,
+    UndoNotAllowed,
+    DomainError
+}
+
+public sealed record GameUndoPublicInfo(
+    long GroupChatId,
+    LobbyPlayer Player,
+    PlayerSeat Seat,
+    int UndonePlacementIndex,
+    DieValue Value,
+    string CommandId,
+    string CommandDisplayName,
+    PlayerSeat NextPlayer,
+    int PlacementsRemaining);
+
+public readonly record struct GameUndoResult(
+    GameUndoStatus Status,
+    GameUndoPublicInfo? PublicInfo,
+    string? ErrorMessage);
+
 public enum GameHandStatus
 {
     Ok,
@@ -158,6 +192,23 @@ public sealed class InMemoryGroupGameSessionStore
     {
         lock (_sync)
             return _groupChatIdByUserId.TryGetValue(userId, out groupChatId);
+    }
+
+    public GameSessionPublicState? GetPublicState(long groupChatId)
+    {
+        lock (_sync)
+        {
+            if (!_sessions.TryGetValue(groupChatId, out var session))
+                return null;
+
+            return new GameSessionPublicState(
+                Session: session.ToSnapshot(),
+                Cockpit: session.CreateStateSnapshot(),
+                GameStatus: session.DomainGame.Status.ToString(),
+                CurrentPlayer: session.TurnState?.CurrentPlayer,
+                PlacementsMade: session.TurnState?.PlacementsMade,
+                PlacementsRemaining: session.TurnState?.PlacementsRemaining);
+        }
     }
 
     public GameSessionRollResult RegisterRoll(long groupChatId, SecretDiceRoll roll, PlayerSeat startingPlayer = PlayerSeat.Pilot)
@@ -269,6 +320,7 @@ public sealed class InMemoryGroupGameSessionStore
                 return new GamePlacementResult(GamePlacementStatus.DomainError, PublicInfo: null, ResolutionInfo: null, ErrorMessage: exception.Message);
             }
 
+            session.LogPlacement(command.CommandId, command.DisplayName);
             session.TurnState = session.TurnState.RegisterPlacement(seat, dieIndex, commandId);
 
             var placed = session.TurnState.Placements[^1];
@@ -292,6 +344,51 @@ public sealed class InMemoryGroupGameSessionStore
                 PlacementsRemaining: placementsRemaining);
 
             return new GamePlacementResult(GamePlacementStatus.Placed, publicInfo, resolutionInfo, ErrorMessage: null);
+        }
+    }
+
+    public GameUndoResult UndoLastPlacement(long requestingUserId)
+    {
+        lock (_sync)
+        {
+            if (!TryGetSessionByUserId(requestingUserId, out var session))
+                return new GameUndoResult(GameUndoStatus.NoActiveSession, PublicInfo: null, ErrorMessage: null);
+
+            if (!session.TryGetSeat(requestingUserId, out var seat, out var player))
+                return new GameUndoResult(GameUndoStatus.NotSeated, PublicInfo: null, ErrorMessage: null);
+
+            if (session.TurnState is null)
+                return new GameUndoResult(GameUndoStatus.RoundNotRolled, PublicInfo: null, ErrorMessage: null);
+
+            if (!session.TurnState.CanUndoLastPlacement(seat))
+                return new GameUndoResult(GameUndoStatus.UndoNotAllowed, PublicInfo: null, ErrorMessage: null);
+
+            var last = session.TurnState.Placements[^1];
+
+            try
+            {
+                var logged = session.RemoveLastLoggedPlacement();
+
+                session.TurnState = session.TurnState.UndoLastPlacement(seat);
+                session.RebuildDomainGameFromLogs();
+
+                var publicInfo = new GameUndoPublicInfo(
+                    session.GroupChatId,
+                    player!,
+                    seat,
+                    last.Index,
+                    last.Value,
+                    logged.CommandId,
+                    logged.CommandDisplayName,
+                    NextPlayer: session.TurnState.CurrentPlayer,
+                    PlacementsRemaining: session.TurnState.PlacementsRemaining);
+
+                return new GameUndoResult(GameUndoStatus.Undone, publicInfo, ErrorMessage: null);
+            }
+            catch (Exception exception)
+            {
+                return new GameUndoResult(GameUndoStatus.DomainError, PublicInfo: null, ErrorMessage: exception.Message);
+            }
         }
     }
 
@@ -321,14 +418,36 @@ public sealed class InMemoryGroupGameSessionStore
 
     private sealed class GameSession
     {
-        private readonly Airport _airport;
-        private readonly AxisPositionModule _axis;
-        private readonly EnginesModule _engines;
-        private readonly BrakesModule _brakes;
-        private readonly FlapsModule _flaps;
-        private readonly LandingGearModule _landingGear;
-        private readonly RadioModule _radio;
-        private readonly ConcentrationModule _concentration;
+        private sealed record LoggedPlacement(string CommandId, string CommandDisplayName);
+
+        private sealed class RoundLog
+        {
+            public RoundLog(int roundNumber, IReadOnlyList<int> pilotDice, IReadOnlyList<int> copilotDice)
+            {
+                RoundNumber = roundNumber;
+                PilotDice = pilotDice.ToArray();
+                CopilotDice = copilotDice.ToArray();
+            }
+
+            public int RoundNumber { get; }
+            public int[] PilotDice { get; }
+            public int[] CopilotDice { get; }
+            public List<LoggedPlacement> Placements { get; } = new();
+            public bool IsCompleted { get; set; }
+        }
+
+        private Airport _airport = null!;
+        private Altitude _altitude = null!;
+
+        private AxisPositionModule _axis = null!;
+        private EnginesModule _engines = null!;
+        private BrakesModule _brakes = null!;
+        private FlapsModule _flaps = null!;
+        private LandingGearModule _landingGear = null!;
+        private RadioModule _radio = null!;
+        private ConcentrationModule _concentration = null!;
+
+        private readonly List<RoundLog> _roundLogs = new();
 
         public GameSession(long groupChatId, LobbyPlayer pilot, LobbyPlayer copilot)
         {
@@ -336,28 +455,14 @@ public sealed class InMemoryGroupGameSessionStore
             Pilot = pilot;
             Copilot = copilot;
 
-            _airport = (Airport)new MontrealAirport();
-            var altitude = new Altitude();
-
-            _axis = new AxisPositionModule();
-            _engines = new EnginesModule(_airport);
-            _brakes = new BrakesModule();
-            _flaps = new FlapsModule(_airport);
-            _landingGear = new LandingGearModule(_airport);
-            _radio = new RadioModule(_airport);
-            _concentration = new ConcentrationModule();
-
-            DomainGame = new Game(
-                _airport,
-                altitude,
-                [_axis, _engines, _brakes, _flaps, _landingGear, _radio, _concentration]);
+            InitializeNewDomainGame();
         }
 
         public long GroupChatId { get; }
         public LobbyPlayer Pilot { get; }
         public LobbyPlayer Copilot { get; }
 
-        public Game DomainGame { get; }
+        public Game DomainGame { get; private set; } = null!;
 
         public GameRoundSnapshot Round { get; set; } = GameRoundSnapshot.StartNew(roundNumber: 1);
         public RoundTurnState? TurnState { get; set; }
@@ -387,7 +492,10 @@ public sealed class InMemoryGroupGameSessionStore
 
         public PlayerSeat InitializeRoundFromRoll(SecretDiceRoll roll, PlayerSeat startingPlayer)
         {
+            ArgumentNullException.ThrowIfNull(roll);
+
             DomainGame.SetRoundDice(roll.PilotDice, roll.CopilotDice);
+            _roundLogs.Add(new RoundLog(Round.RoundNumber, roll.PilotDice, roll.CopilotDice));
 
             var actualStartingPlayer = ToSeat(DomainGame.CurrentPlayer);
 
@@ -402,6 +510,61 @@ public sealed class InMemoryGroupGameSessionStore
             return actualStartingPlayer;
         }
 
+        public void LogPlacement(string commandId, string commandDisplayName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(commandId);
+            ArgumentException.ThrowIfNullOrWhiteSpace(commandDisplayName);
+
+            if (_roundLogs.Count == 0)
+                throw new InvalidOperationException("Cannot log a placement before the round has been rolled.");
+
+            _roundLogs[^1].Placements.Add(new LoggedPlacement(commandId, commandDisplayName));
+        }
+
+        public (string CommandId, string CommandDisplayName) RemoveLastLoggedPlacement()
+        {
+            if (_roundLogs.Count == 0)
+                throw new InvalidOperationException("Cannot remove placements before the round has been rolled.");
+
+            var placements = _roundLogs[^1].Placements;
+            if (placements.Count == 0)
+                throw new InvalidOperationException("Cannot remove a placement when no placements have been logged.");
+
+            var lastIndex = placements.Count - 1;
+            var last = placements[lastIndex];
+            placements.RemoveAt(lastIndex);
+
+            return (last.CommandId, last.CommandDisplayName);
+        }
+
+        public void RebuildDomainGameFromLogs()
+        {
+            InitializeNewDomainGame();
+
+            foreach (var round in _roundLogs)
+            {
+                DomainGame.SetRoundDice(round.PilotDice, round.CopilotDice);
+
+                foreach (var placement in round.Placements)
+                    ExecutePlacementCommand(placement.CommandId);
+
+                if (round.IsCompleted && DomainGame.Status == GameStatus.InProgress)
+                    DomainGame.ExecuteCommand("NextRound");
+            }
+        }
+
+        private void ExecutePlacementCommand(string commandId)
+        {
+            try
+            {
+                DomainGame.ExecuteCommand(commandId);
+            }
+            catch (InvalidOperationException) when (DomainGame.Status == GameStatus.Lost)
+            {
+                // Replaying a placement that caused a loss should still restore the terminal state.
+            }
+        }
+
         public GameRoundResolutionPublicInfo ResolveRoundAndAdvance()
         {
             var resolvedRoundNumber = Round.RoundNumber;
@@ -410,6 +573,9 @@ public sealed class InMemoryGroupGameSessionStore
 
             int? nextRoundNumber = null;
             PlayerSeat? nextStartingPlayer = null;
+
+            if (_roundLogs.Count > 0)
+                _roundLogs[^1].IsCompleted = true;
 
             if (DomainGame.Status == GameStatus.InProgress)
             {
@@ -436,7 +602,7 @@ public sealed class InMemoryGroupGameSessionStore
                 nextStartingPlayer);
         }
 
-        private GameStatePublicSnapshot CreateStateSnapshot()
+        public GameStatePublicSnapshot CreateStateSnapshot()
         {
             var totalPlanes = _airport.PathSegments.Sum(segment => segment.PlaneTokens);
 
@@ -453,6 +619,25 @@ public sealed class InMemoryGroupGameSessionStore
                 LandingGearValue: _landingGear.LandingGearValue,
                 BlueAerodynamicsThreshold: _airport.BlueAerodynamicsThreshold,
                 OrangeAerodynamicsThreshold: _airport.OrangeAerodynamicsThreshold);
+        }
+
+        private void InitializeNewDomainGame()
+        {
+            _airport = (Airport)new MontrealAirport();
+            _altitude = new Altitude();
+
+            _axis = new AxisPositionModule();
+            _engines = new EnginesModule(_airport);
+            _brakes = new BrakesModule();
+            _flaps = new FlapsModule(_airport);
+            _landingGear = new LandingGearModule(_airport);
+            _radio = new RadioModule(_airport);
+            _concentration = new ConcentrationModule();
+
+            DomainGame = new Game(
+                _airport,
+                _altitude,
+                [_axis, _engines, _brakes, _flaps, _landingGear, _radio, _concentration]);
         }
 
         private static PlayerSeat ToSeat(Player player) => player == Player.Pilot

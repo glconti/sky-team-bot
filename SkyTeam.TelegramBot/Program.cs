@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 
 using SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
+using SkyTeam.Application.Presentation;
 using SkyTeam.Application.Round;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
@@ -116,10 +117,14 @@ internal static class Program
                     await HandleSkyPlaceAsync(botClient, message, args.Skip(1).ToArray(), cancellationToken);
                     return;
 
+                case "undo":
+                    await HandleSkyUndoAsync(botClient, message, cancellationToken);
+                    return;
+
                 default:
                     await botClient.SendMessage(
                         chatId: message.Chat.Id,
-                        text: "In a group chat, try: /sky new\n\nIn private chat: /sky hand | /sky place <dieIndex> <commandId>",
+                        text: "In a group chat, try: /sky new\n\nIn private chat: /sky hand | /sky place <dieIndex> <commandId> | /sky undo",
 
                         cancellationToken: cancellationToken);
                     return;
@@ -162,6 +167,13 @@ internal static class Program
                 await botClient.SendMessage(
                     chatId: message.Chat.Id,
                     text: "Use /sky hand and /sky place in a private chat with me.",
+                    cancellationToken: cancellationToken);
+                return;
+
+            case "undo":
+                await botClient.SendMessage(
+                    chatId: message.Chat.Id,
+                    text: "Use /sky undo in a private chat with me.",
                     cancellationToken: cancellationToken);
                 return;
 
@@ -232,6 +244,16 @@ internal static class Program
 
     private static async Task HandleSkyStateAsync(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
     {
+        var inGame = GameSessionStore.GetPublicState(message.Chat.Id);
+        if (inGame is not null)
+        {
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: GroupChatCockpitRenderer.RenderInGame(inGame),
+                cancellationToken: cancellationToken);
+            return;
+        }
+
         var snapshot = LobbyStore.GetSnapshot(message.Chat.Id);
         if (snapshot is null)
         {
@@ -387,7 +409,7 @@ internal static class Program
         {
             await botClient.SendMessage(
                 chatId: message.Chat.Id,
-                text: "Usage: /sky place <dieIndex> <commandId>",
+                text: "Usage: /sky place <dieIndex> <commandId>\nTip: /sky undo",
                 cancellationToken: cancellationToken);
             return;
         }
@@ -466,6 +488,62 @@ internal static class Program
             cancellationToken: cancellationToken);
     }
 
+    private static async Task HandleSkyUndoAsync(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+    {
+        if (message.From is null)
+        {
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: "Cannot identify you in this chat.",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        var result = GameSessionStore.UndoLastPlacement(message.From.Id);
+        if (result.Status != GameUndoStatus.Undone)
+        {
+            var hand = GameSessionStore.GetHand(message.From.Id);
+            var currentTurnText = hand.Status == GameHandStatus.Ok
+                ? $" Current turn: {hand.CurrentPlayer}."
+                : string.Empty;
+
+            var errorText = result.Status switch
+            {
+                GameUndoStatus.NoActiveSession => "No active game session found for you. Start a game in a group chat first.",
+                GameUndoStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
+                GameUndoStatus.RoundNotRolled => "This round has not been rolled yet. In the group chat, run: /sky roll",
+                GameUndoStatus.UndoNotAllowed => "Undo not allowed. You can only undo your last placement before the other player places." + currentTurnText,
+                GameUndoStatus.DomainError => result.ErrorMessage ?? "Cannot undo (domain error).",
+                _ => "Cannot undo."
+            };
+
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: errorText,
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        var info = result.PublicInfo!;
+
+        var groupText = $"{info.Player.DisplayName} ({info.Seat}) undid placement {info.Value.Value}: {info.CommandDisplayName}.\nNext: {info.NextPlayer}. Remaining placements: {info.PlacementsRemaining}.";
+
+        await botClient.SendMessage(
+            chatId: info.GroupChatId,
+            text: groupText,
+            cancellationToken: cancellationToken);
+
+        var updatedHand = GameSessionStore.GetHand(message.From.Id);
+        var dmText = updatedHand.Status == GameHandStatus.Ok
+            ? $"Undo recorded: {info.CommandDisplayName} ({info.CommandId})\n\nYour hand:\n{RenderHand(updatedHand.Hand!)}\n\nCurrent turn: {updatedHand.CurrentPlayer}\n\nPlacements remaining: {updatedHand.PlacementsRemaining}\n\nAvailable commands:\n{RenderCommands(updatedHand.AvailableCommands!)}"
+            : $"Undo recorded: {info.CommandDisplayName} ({info.CommandId})";
+
+        await botClient.SendMessage(
+            chatId: message.Chat.Id,
+            text: dmText,
+            cancellationToken: cancellationToken);
+    }
+
     private static string RenderHand(SecretDiceHand hand)
         => string.Join("\n", hand.Dice.Select(die => $"{die.Index}:{die.Value.Value}{(die.IsUsed ? " (used)" : string.Empty)}"));
 
@@ -478,27 +556,7 @@ internal static class Program
     }
 
     private static string RenderResolution(GameRoundResolutionPublicInfo info)
-    {
-        var s = info.ResolvedState;
-
-        var text = $"Round {info.ResolvedRoundNumber} resolved.\n" +
-                   $"Axis: {s.AxisPosition}\n" +
-                   $"Engines speed: {(s.EnginesSpeed is null ? "-" : s.EnginesSpeed.ToString())}\n" +
-                   $"Approach: {s.ApproachPositionIndex + 1}/{s.ApproachSegmentCount} (planes remaining: {s.TotalPlanesRemaining})\n" +
-                   $"Brakes: {s.BrakesActivatedSwitchCount}/3 (capability: {s.BrakesCapability})\n" +
-                   $"Flaps: {s.FlapsValue}/4\n" +
-                   $"Landing gear: {s.LandingGearValue}/3\n" +
-                   $"Coffee tokens: {s.CoffeeTokens}\n" +
-                   $"Aerodynamics thresholds: blue {s.BlueAerodynamicsThreshold}, orange {s.OrangeAerodynamicsThreshold}\n" +
-                   $"Game status: {info.GameStatus}";
-
-        if (info.NextRoundNumber is not null)
-        {
-            text += $"\n\nNext: round {info.NextRoundNumber} starts with {info.NextStartingPlayer}. In the group chat, run: /sky roll";
-        }
-
-        return text;
-    }
+        => GroupChatCockpitRenderer.RenderRoundResolution(info);
 
     private static async Task<bool> TrySendSecretDiceAsync(
         ITelegramBotClient botClient,
@@ -516,7 +574,7 @@ internal static class Program
             ? "It's your turn to place first."
             : "Wait for the other player to place first.";
 
-        var messageText = $"{seat} secret dice: {diceText}\n\n{turnText}\n\nCommands:\n/sky hand\n/sky place <dieIndex> <commandId>";
+        var messageText = $"{seat} secret dice: {diceText}\n\n{turnText}\n\nCommands:\n/sky hand\n/sky place <dieIndex> <commandId>\n/sky undo";
 
         try
         {
@@ -535,13 +593,7 @@ internal static class Program
     }
 
     private static string RenderLobby(LobbySnapshot snapshot)
-    {
-        var pilot = snapshot.Pilot?.DisplayName ?? "(empty)";
-        var copilot = snapshot.Copilot?.DisplayName ?? "(empty)";
-        var ready = snapshot.IsReady ? "Yes" : "No";
-
-        return $"Lobby state:\nPilot: {pilot}\nCopilot: {copilot}\nReady: {ready}";
-    }
+        => GroupChatCockpitRenderer.RenderLobby(snapshot);
 
     private static long GetLockKey(Message message)
     {
