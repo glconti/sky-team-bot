@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="SkyTeam.Domain.Tests"/>
+    <InternalsVisibleTo Include="SkyTeam.Application"/>
   </ItemGroup>
 
 </Project>

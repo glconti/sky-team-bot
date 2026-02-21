@@ -203,6 +203,26 @@ class Game
             _state.AddOrangeDie(OrangeDie.Roll());
         }
     }
+
+    internal void SetRoundDice(IReadOnlyList<int> blueDice, IReadOnlyList<int> orangeDice)
+    {
+        ArgumentNullException.ThrowIfNull(blueDice);
+        ArgumentNullException.ThrowIfNull(orangeDice);
+
+        if (blueDice.Count != 4)
+            throw new ArgumentException("Expected exactly 4 blue dice.", nameof(blueDice));
+
+        if (orangeDice.Count != 4)
+            throw new ArgumentException("Expected exactly 4 orange dice.", nameof(orangeDice));
+
+        _state.ClearUnusedDice();
+
+        foreach (var value in blueDice)
+            _state.AddBlueDie(BlueDie.FromValue(value));
+
+        foreach (var value in orangeDice)
+            _state.AddOrangeDie(OrangeDie.FromValue(value));
+    }
 }
 
 sealed record NextRoundCommand : GameCommand
