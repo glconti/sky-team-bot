@@ -1,5 +1,6 @@
 namespace SkyTeam.TelegramBot;
 
+using SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
 using SkyTeam.Application.Round;
 using Telegram.Bot;
@@ -10,6 +11,7 @@ using Telegram.Bot.Types.Enums;
 internal static class Program
 {
     private static readonly InMemoryGroupLobbyStore LobbyStore = new();
+    private static readonly InMemoryGroupGameSessionStore GameSessionStore = new();
 
     public static async Task Main()
     {
@@ -102,6 +104,10 @@ internal static class Program
                 await HandleSkyStateAsync(botClient, message, cancellationToken);
                 return;
 
+            case "start":
+                await HandleSkyStartAsync(botClient, message, cancellationToken);
+                return;
+
             case "roll":
                 await HandleSkyRollAsync(botClient, message, cancellationToken);
                 return;
@@ -109,7 +115,7 @@ internal static class Program
             default:
                 await botClient.SendMessage(
                     chatId: message.Chat.Id,
-                    text: "Usage: /sky new | /sky join | /sky state | /sky roll",
+                    text: "Usage: /sky new | /sky join | /sky state | /sky start | /sky roll",
                     cancellationToken: cancellationToken);
                 return;
         }
@@ -186,6 +192,36 @@ internal static class Program
         await botClient.SendMessage(
             chatId: message.Chat.Id,
             text: RenderLobby(snapshot),
+            cancellationToken: cancellationToken);
+    }
+
+    private static async Task HandleSkyStartAsync(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+    {
+        if (message.From is null)
+        {
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: "Cannot identify you in this chat.",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        var lobbySnapshot = LobbyStore.GetSnapshot(message.Chat.Id);
+        var result = GameSessionStore.Start(message.Chat.Id, lobbySnapshot, message.From.Id);
+
+        var text = result.Status switch
+        {
+            GameSessionStartStatus.NoLobby => "No lobby yet. Create one with /sky new",
+            GameSessionStartStatus.LobbyNotReady => "Lobby is not ready yet. Two players must /sky join before starting.",
+            GameSessionStartStatus.NotSeated => "Only seated players (Pilot/Copilot) can start the game. Join with /sky join",
+            GameSessionStartStatus.AlreadyStarted => "Game already started. Next: /sky roll",
+            GameSessionStartStatus.Started => "Game started. Round 1 initialized (no placements yet).\n\nNext: /sky roll",
+            _ => "Cannot start game."
+        };
+
+        await botClient.SendMessage(
+            chatId: message.Chat.Id,
+            text: text,
             cancellationToken: cancellationToken);
     }
 
