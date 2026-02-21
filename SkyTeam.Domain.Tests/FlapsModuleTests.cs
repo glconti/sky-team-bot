@@ -98,7 +98,7 @@ public class FlapsModuleTests
         };
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Copilot, [], unusedOrangeDice).ToArray();
+        var commands = module.GetAvailableCommands(Player.Copilot, [], unusedOrangeDice, new CoffeeTokenPool()).ToArray();
 
         // Assert
         commands.Select(command => command.CommandId)
@@ -114,7 +114,7 @@ public class FlapsModuleTests
         var unusedOrangeDice = new[] { OrangeDie.FromValue(1), OrangeDie.FromValue(2) };
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Pilot, [], unusedOrangeDice).ToArray();
+        var commands = module.GetAvailableCommands(Player.Pilot, [], unusedOrangeDice, new CoffeeTokenPool()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();
@@ -147,7 +147,7 @@ public class FlapsModuleTests
         var module = new FlapsModule(airport);
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Copilot, [], []).ToArray();
+        var commands = module.GetAvailableCommands(Player.Copilot, [], [], new CoffeeTokenPool()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();
@@ -166,7 +166,7 @@ public class FlapsModuleTests
         module.AssignOrangeDie(OrangeDie.FromValue(5));
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Copilot, [], [OrangeDie.FromValue(6)]).ToArray();
+        var commands = module.GetAvailableCommands(Player.Copilot, [], [OrangeDie.FromValue(6)], new CoffeeTokenPool()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();

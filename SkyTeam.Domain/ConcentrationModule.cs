@@ -9,6 +9,8 @@ sealed class ConcentrationModule : GameModule
 
     internal CoffeeTokenPool TokenPool => _tokenPool;
 
+    internal void SpendCoffeeTokens(int amount) => _tokenPool = _tokenPool.Spend(amount);
+
     public override bool CanAcceptBlueDie(Player player) =>
         player == Player.Pilot && _slotsUsed < SlotsPerRound;
 
@@ -20,22 +22,35 @@ sealed class ConcentrationModule : GameModule
     public override IEnumerable<GameCommand> GetAvailableCommands(
         Player currentPlayer,
         IReadOnlyList<BlueDie> unusedBlueDice,
-        IReadOnlyList<OrangeDie> unusedOrangeDice)
+        IReadOnlyList<OrangeDie> unusedOrangeDice,
+        CoffeeTokenPool tokenPool)
     {
         if (_slotsUsed >= SlotsPerRound) yield break;
 
+        var availableTokens = tokenPool.Count;
+
         if (currentPlayer == Player.Pilot)
         {
-            foreach (var value in unusedBlueDice.Select(die => (int)die).Distinct().Order())
-                yield return new AssignConcentrationBlueDieCommand(value);
+            foreach (var rolledValue in unusedBlueDice.Select(die => (int)die).Distinct().Order())
+            {
+                yield return new AssignConcentrationBlueDieCommand(this, rolledValue, rolledValue, TokenCost: 0);
+
+                foreach (var effectiveValue in GetAdjustedValues(rolledValue, availableTokens))
+                    yield return new AssignConcentrationBlueDieCommand(this, rolledValue, effectiveValue, TokenCost: Math.Abs(effectiveValue - rolledValue));
+            }
 
             yield break;
         }
 
         if (currentPlayer != Player.Copilot) yield break;
 
-        foreach (var value in unusedOrangeDice.Select(die => (int)die).Distinct().Order())
-            yield return new AssignConcentrationOrangeDieCommand(value);
+        foreach (var rolledValue in unusedOrangeDice.Select(die => (int)die).Distinct().Order())
+        {
+            yield return new AssignConcentrationOrangeDieCommand(this, rolledValue, rolledValue, TokenCost: 0);
+
+            foreach (var effectiveValue in GetAdjustedValues(rolledValue, availableTokens))
+                yield return new AssignConcentrationOrangeDieCommand(this, rolledValue, effectiveValue, TokenCost: Math.Abs(effectiveValue - rolledValue));
+        }
     }
 
     public void AssignBlueDie(BlueDie die)
@@ -62,15 +77,76 @@ sealed class ConcentrationModule : GameModule
 
     public override void ResetRound() => _slotsUsed = 0;
 
-    private sealed record AssignConcentrationBlueDieCommand(int Value) : GameCommand
+    private static IEnumerable<int> GetAdjustedValues(int rolledValue, int availableTokens)
     {
-        public override string CommandId => $"Concentration.AssignBlue:{Value}";
-        public override string DisplayName => $"Concentration: place blue {Value}";
+        if (availableTokens <= 0) yield break;
+
+        var min = Math.Max(1, rolledValue - availableTokens);
+        var max = Math.Min(6, rolledValue + availableTokens);
+
+        for (var value = min; value <= max; value++)
+        {
+            if (value == rolledValue) continue;
+
+            yield return value;
+        }
     }
 
-    private sealed record AssignConcentrationOrangeDieCommand(int Value) : GameCommand
+    private sealed record AssignConcentrationBlueDieCommand(
+        ConcentrationModule Module,
+        int RolledValue,
+        int EffectiveValue,
+        int TokenCost) : GameCommand
     {
-        public override string CommandId => $"Concentration.AssignOrange:{Value}";
-        public override string DisplayName => $"Concentration: place orange {Value}";
+        public override string CommandId => TokenCost == 0
+            ? $"Concentration.AssignBlue:{RolledValue}"
+            : $"Concentration.AssignBlue:{RolledValue}>{EffectiveValue}";
+
+        public override string DisplayName => TokenCost == 0
+            ? $"Concentration: place blue {RolledValue}"
+            : $"Concentration: place blue {RolledValue} as {EffectiveValue} (cost {TokenCost})";
+
+        internal override void Execute(Game game)
+        {
+            var rolledDie = game.GetUnusedBlueDie(RolledValue);
+
+            if (TokenCost > 0)
+                game.SpendCoffeeTokens(TokenCost);
+
+            var dieForAssignment = TokenCost == 0 ? rolledDie : BlueDie.FromValue(EffectiveValue);
+            Module.AssignBlueDie(dieForAssignment);
+
+            game.RemoveUnusedDie(rolledDie);
+            game.SwitchPlayer();
+        }
+    }
+
+    private sealed record AssignConcentrationOrangeDieCommand(
+        ConcentrationModule Module,
+        int RolledValue,
+        int EffectiveValue,
+        int TokenCost) : GameCommand
+    {
+        public override string CommandId => TokenCost == 0
+            ? $"Concentration.AssignOrange:{RolledValue}"
+            : $"Concentration.AssignOrange:{RolledValue}>{EffectiveValue}";
+
+        public override string DisplayName => TokenCost == 0
+            ? $"Concentration: place orange {RolledValue}"
+            : $"Concentration: place orange {RolledValue} as {EffectiveValue} (cost {TokenCost})";
+
+        internal override void Execute(Game game)
+        {
+            var rolledDie = game.GetUnusedOrangeDie(RolledValue);
+
+            if (TokenCost > 0)
+                game.SpendCoffeeTokens(TokenCost);
+
+            var dieForAssignment = TokenCost == 0 ? rolledDie : OrangeDie.FromValue(EffectiveValue);
+            Module.AssignOrangeDie(dieForAssignment);
+
+            game.RemoveUnusedDie(rolledDie);
+            game.SwitchPlayer();
+        }
     }
 }

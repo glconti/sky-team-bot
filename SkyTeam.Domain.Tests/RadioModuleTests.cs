@@ -172,7 +172,7 @@ public class RadioModuleTests
         };
 
         // Act
-        var commandIds = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, [])
+        var commandIds = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, [], new CoffeeTokenPool())
             .Select(command => command.CommandId)
             .ToArray();
 
@@ -197,7 +197,7 @@ public class RadioModuleTests
         };
 
         // Act
-        var commandIds = module.GetAvailableCommands(Player.Copilot, [], unusedOrangeDice)
+        var commandIds = module.GetAvailableCommands(Player.Copilot, [], unusedOrangeDice, new CoffeeTokenPool())
             .Select(command => command.CommandId)
             .ToArray();
 
@@ -213,8 +213,8 @@ public class RadioModuleTests
         var module = new RadioModule(airport);
 
         // Act
-        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)]).ToArray();
-        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], []).ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)], new CoffeeTokenPool()).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [], new CoffeeTokenPool()).ToArray();
 
         // Assert
         pilotCommands.Should().BeEmpty();
@@ -231,7 +231,7 @@ public class RadioModuleTests
         module.AssignBlueDie(BlueDie.FromValue(1));
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], []).ToArray();
+        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], [], new CoffeeTokenPool()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();
@@ -248,7 +248,7 @@ public class RadioModuleTests
         module.AssignOrangeDie(OrangeDie.FromValue(2));
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Copilot, [], [OrangeDie.FromValue(3)]).ToArray();
+        var commands = module.GetAvailableCommands(Player.Copilot, [], [OrangeDie.FromValue(3)], new CoffeeTokenPool()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();

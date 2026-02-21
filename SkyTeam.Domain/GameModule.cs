@@ -20,7 +20,8 @@ abstract class GameModule
     public abstract IEnumerable<GameCommand> GetAvailableCommands(
         Player currentPlayer,
         IReadOnlyList<BlueDie> unusedBlueDice,
-        IReadOnlyList<OrangeDie> unusedOrangeDice);
+        IReadOnlyList<OrangeDie> unusedOrangeDice,
+        CoffeeTokenPool tokenPool);
 
     public virtual void ResetRound()
     {

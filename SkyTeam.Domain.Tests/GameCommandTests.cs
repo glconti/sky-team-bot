@@ -150,12 +150,18 @@ public class GameCommandTests
         public override IEnumerable<GameCommand> GetAvailableCommands(
             Player currentPlayer,
             IReadOnlyList<BlueDie> unusedBlueDice,
-            IReadOnlyList<OrangeDie> unusedOrangeDice) => _commands;
+            IReadOnlyList<OrangeDie> unusedOrangeDice,
+            CoffeeTokenPool tokenPool) => _commands;
     }
 
     private sealed record TestCommand(string Id) : GameCommand
     {
         public override string CommandId => Id;
         public override string DisplayName => Id;
+
+        internal override void Execute(Game game)
+        {
+            // No-op for testing
+        }
     }
 }

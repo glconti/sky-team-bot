@@ -75,53 +75,61 @@
 - ✅ Skiles unblocked for Phase 1 (GameState + ExecuteCommand)
 - ✅ Aloha can begin test harness preparation (tokens, secret placement, module boundaries)
 
-### Session 4: Telegram Architecture + MVP Backlog Sprint (2026-02-21)
-**Outcome:** Four agents drafted comprehensive Telegram bot architecture, UX specification, implementation plan; Sully produced 5-layer architecture + 7-Epic backlog + 8 user interview questions; Tenerife specified full Telegram UX (570+ lines, 7 transcripts); Skiles created `SkyTeam.TelegramBot` project.
+### Session 5: Issue #31 Completion Round (2026-02-21T10:21:03Z)
+**Outcome:** Tenerife finalized comprehensive 500+ line spec documenting all 7 modules, landing win/loss criteria, resolution order, and edge cases. Skiles delivered draft PR #37 with all 7 module implementations and coffee-token multi-spend. Aloha created draft PR #38 with test coverage for boundaries, landing outcomes, and token mechanics.
 
-**Key Decisions (Tenerife's UX Spec Input):**
-- **Secret Placement:** DM-based dice assignments (inline keyboards, ephemeral rendering, no group visibility)
-- **Public Reveal:** Bot announces outcomes in group chat after both players ready (full module resolutions, state updates)
-- **Token Mechanics (Button-Driven):** Show token-cost options as distinct buttons (e.g., `[Axis]` vs `[Axis] 💰2`); spend declaration announced publicly (not secret); gain +1 per Concentration placement (capped at 3)
-- **Round Flow:** 5 phases — Roll → Assign (secret) → Reveal & Resolve (public) → Altitude Descent → Win/Loss Check
-- **Commands (Minimal):** Setup only (`/start_game`, `/join`, `/rules`, `/state`); in-game actions via buttons (no typed commands during rounds)
-- **Turn Discipline:** Alternating players; 60-second timeout; bot pings at 30s, auto-skips at 120s
+**Tenerife's Deliverables:**
+- **Spec document:** Issue #31 specification (tenerife-issue31-spec.md) covering modules 1–7 with detailed state, placement rules, resolution timing, landing criteria per module, edge cases, and 10-section verification checklist
+- **Module Order:** Axis → Engines → Brakes → Flaps → Landing Gear → Radio → Concentration (fixed, documented)
+- **Landing Criteria:** 6 conditions (all must pass for win: axis [-2,+2], engines ≥9, brakes ==3 and >speed, flaps ==4, gear ==3, approach clear)
+- **Loss Conditions:** Axis imbalance (immediate), altitude exhausted (final round), landing failure (any criterion fails)
+- **Clarifications:** Brakes criterion, Engines final round suppression, Landing Gear idempotence, multi-token spend bounds, token pool scoping, net token change (spend + concentration), reroll out-of-scope
 
-**7 Example Transcripts (Deterministic Test Cases):**
-1. Simple round, no tokens, both cooperate
-2. Token spend (multi-token adjustment)
-3. Reroll declaration + new dice
-4. Landing & victory (all criteria pass)
-5. Collision loss (approach track full)
-6. Axis imbalance loss at landing
-7. Concentration token spend + earn (net zero)
+**Aloha's Findings:**
+- **Spec Mismatch #1:** Brakes landing criterion inconsistent — spec says `BrakesValue == 3 AND BrakesValue > LastSpeed` but BrakesValue is switch count (0–3); if LastSpeed ≥ 9, condition is impossible
+- **Spec Mismatch #2:** Current code treats BrakesValue as last activated value (2/4/6) and checks `BrakesValue >= 6` without speed comparison
+- **Recommendation:** Clarify intended landing check before finalizing tests
+- **Token-Adjusted Commands:** Validated design surface (e.g., `Axis.AssignBlue:1>3`); tests confirm command surfacing, spend behavior, pool/die bounds
 
-**Edge Cases Specified:**
-- Token pool 0 & spend attempt → buttons disable options (gray out)
-- No reroll available → prevent button click
-- Concentration placed + die pre-adjusted → net zero token change
-- Pilot bad roll (all 1s) → Copilot sees "Pilot thinking…" up to 120 sec
-- Radio clears all planes → "Approach track cleared! ✅" (no error, capped at 0)
-- Altitude at 6000 ft round 7 → no landing check (only at 0)
+**Skiles' Implementations:**
+- All 7 modules working in draft PR #37
+- Landing validation logic complete
+- Command ID surface for token-adjusted placements operational
+- GameState refactor complete; ExecuteCommand dispatcher wired
 
-**Implementation Hooks:**
-- **Bot:** Ephemeral keyboard rendering (only to active player), session state management, broadcast & reveal after both ready
-- **Domain:** Accept `PlaceDieCommand`, fixed module resolution order (Axis → Engines → Brakes → Flaps → Landing Gear → Radio → Concentration), landing check (6 criteria)
-- **Presentation:** Chat UI models (`ChatMessage`, `ChatKeyboard`, `ChatUiEvent`) transport-agnostic
+**Cross-Agent Dependencies:**
+- Awaiting Sully code review (module design, command dispatcher, aggregate cohesion)
+- Awaiting user clarification on Brakes landing criterion semantics
+- Concentration token design complete; ready for Telegram adapter once Epic B baseline established
 
-**Delivered Artifacts:**
-- `.squad/orchestration-log/2026-02-21T08-22-32Z-tenerife.md` — UX orchestration log
-- `.squad/log/2026-02-21T08-22-00Z-telegram-bot-backlog.md` — Session log
-- `.squad/decisions.md` — Merged Tenerife UX spec (2026-02-21T08:20:30Z)
+**Delivered Artifacts (Session 5):**
+- `.squad/orchestration-log/2026-02-21T10-21-03Z-skiles.md` — Skiles orchestration log
+- `.squad/orchestration-log/2026-02-21T10-21-03Z-tenerife.md` — Tenerife orchestration log
+- `.squad/orchestration-log/2026-02-21T10-21-03Z-aloha.md` — Aloha orchestration log
+- `.squad/log/2026-02-21T10-21-03Z-ralph-round.md` — Session log
+- `.squad/decisions.md` — Merged Tenerife spec + Aloha findings + user directive (placement undo)
+- Updated agent histories (Tenerife, Skiles, Aloha)
 
-**Team Alignment:**
-- **Sully → Tenerife:** Architecture validates UX (secret placement fits DDD, token spend as command parameter, domain UI-agnostic)
-- **Sully → Skiles:** Epic roadmap provides implementation skeleton (A–G); interview questions clarify UX tradeoffs before code lockdown
-- **Tenerife → Skiles:** 7 example transcripts + edge cases provide binding contract for Telegram adapter (button rendering, state display, message formats)
-- **Tenerife → Aloha:** UX spec + transcripts enable deterministic testing (E2E scenarios, edge cases, rule validation)
+**Pending Escalations:**
+1. **Brakes Landing Criterion:** Reconcile spec vs. code semantics before finalizing tests
+2. **Token-Adjusted Command IDs:** Await Telegram button rendering spec (Sully + Tenerife)
+
+### Session 6: PR #37 Unblock & Loss Semantics Finalization (2026-02-21T18:06:26Z)
+**Outcome:** Sully fixed token pool wiring in PR #37. Tenerife produced comprehensive loss condition checklist (15 explicit losses, 8 invalid-move categories, 3 TODOs). Aloha added ExecuteCommand smoke tests. Scribe logged all work and merged decisions.
+
+**Key Contributions:**
+- Finalized loss-condition semantics with decision checklist (explicit losses vs. invalid moves)
+- Documented all bug findings: axis landing check, speed comparison, altitude exhaustion, reroll mechanics
+- Provided implementation validation checklist (15 must-have loss conditions, 8 prevent-via-validation categories)
+- Ready for Skiles to validate against current PR #37 code and address identified bugs
+
+**Delivered Artifacts (Session 6):**
+- `.squad/orchestration-log/2026-02-21T18-06-26Z-tenerife.md` — Loss semantics orchestration log
+- `.squad/decisions.md` — Merged loss condition checklist (comprehensive taxonomy + bug findings)
 
 **Pending Actions:**
-- User answers Sully's 8 interview questions (UX clarifications: DM onboarding, turn discipline, persistence, undo/cancel, etc.)
-- Skiles begins Phase 1: GameState + ExecuteCommand (critical path for all downstream Epics B–G)
-- Aloha prepares test harness per Tenerife's 7 example transcripts (deterministic E2E tests)
+- Sully validates PR #37 fixes against loss semantics checklist
+- Skiles addresses identified bugs (axis check, speed comparison, altitude exhaustion)
+- Aloha finalizes test coverage once bugs clarified
 
 ---

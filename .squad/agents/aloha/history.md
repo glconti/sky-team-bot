@@ -35,4 +35,84 @@
 - Skiles implements Phase 1 (test framework integration points)
 - Aloha begins E2E test harness prep (Tenerife's 7 transcripts as golden tests)
 
+### Session 3: Issue #31 Completion Round (2026-02-21T10:21:03Z)
+**Outcome:** Prepared draft PR #38 (squad/31-domain-tests) with comprehensive test coverage for all 7 modules per Tenerife's final spec. Identified spec mismatches and working assumptions that require reconciliation.
+
+**Test Coverage Added:**
+- **Axis:** Out-of-bounds immediate resolution (< -2 or > +2), boundary positions (-2, +2)
+- **Landing Outcome Matrix:** 1 passing WIN case + 1 focused LOSS case per criterion
+  - Axis out-of-bounds at landing
+  - Engines thrust < 9
+  - Brakes not fully deployed (< 3 switches)
+  - Flaps not fully deployed (< 4 switches)
+  - Landing Gear not fully deployed (< 3 switches)
+  - Approach track not fully cleared (planes remain)
+- **Concentration / Coffee Tokens:**
+  - Token pool ctor bounds (0–3)
+  - Earn/Spend transitions (including multi-token k=1, k=2)
+  - Die value bounds (1–6, no wraparound)
+  - Spend availability guard (cannot spend if pool == 0)
+
+**Spec Mismatches Identified:**
+
+1. **Brakes Landing Criterion Inconsistency** (Critical blocker for test finalization)
+   - Tenerife spec states: `BrakesValue == 3 AND BrakesValue > LastSpeed`
+   - Problem: BrakesValue is switch count (0–3); if LastSpeed ≥ 9 (requirement for Engines), condition `BrakesValue > LastSpeed` is mathematically unsatisfiable (3 ≯ 9)
+   - Current implementation: Treats BrakesValue as last activated required value (2/4/6) and checks `BrakesValue >= 6` without speed comparison
+   - **Recommendation:** Clarify intended landing check before finalizing tests:
+     - Option A: All 3 switches deployed, no speed comparison (landing check only validates switch count == 3)
+     - Option B: Sum/magnitude of switches (switch values 2+4+6 = 12) compared to speed (allowing BrakesValue > LastSpeed)
+     - Option C: Different Brakes representation (e.g., sequential switch values as separate condition)
+
+2. **Coffee-Token Die Adjustment Implementation**
+   - `Game.GetAvailableCommands()` surfaces token-adjusted command IDs like `Axis.AssignBlue:1>3` when tokens available
+   - Cost: `k = |effective - rolled|` tokens (supports multi-token spend)
+   - `Game.ExecuteCommand()` spends required tokens, consumes rolled die, assigns effective value (bounded to 1–6, no wraparound)
+   - Tests validate command surfacing, spend behavior, pool bounds (0–3), die-value bounds (1–6)
+   - Design is validated and working; awaiting Telegram button rendering spec (how to surface token-adjusted options to user)
+
+**Test Framework & Organization:**
+- xUnit + FluentAssertions, AAA pattern
+- Separate `SkyTeam.Domain.Tests` assembly (appropriate separation from `SkyTeam.Application.Tests`)
+- Test method naming: `[Module]_[Behavior]_[Condition]` (e.g., `Axis_ImmediatelyLoses_WhenOutOfBounds`)
+
+**Blockers:**
+- **Brakes Landing Criterion:** Awaiting clarification from Tenerife/Skiles before finalizing test suite
+- **Token-Adjusted Command Rendering:** Awaiting Telegram UX spec (Sully/Tenerife) on button options/display
+
+**Pending Actions:**
+- Tenerife + Skiles reconcile Brakes landing criterion semantics (switch count vs. magnitude vs. speed comparison)
+- Sully provides Telegram button rendering spec for token-adjusted options
+- Finalize PR #38 tests once Brakes criterion is clarified
+- Merge PRs #37 + #38 after reviews pass
+
+**Cross-Team Coordination:**
+- **Tenerife:** Spec complete; awaiting reconciliation on Brakes landing criterion
+- **Skiles:** PR #37 implemented; code supports both Brakes interpretations (currently checks >= 6)
+- **Sully:** Awaiting code review of PR #37/38 for module design + command dispatcher + token UX surface
+
+### Session 4: PR #37 Unblock & Loss Semantics Finalization (2026-02-21T18:06:26Z)
+**Outcome:** Sully fixed token pool wiring in PR #37. Tenerife produced comprehensive loss condition checklist. Added ExecuteCommand smoke tests. Scribe logged all work and merged decisions.
+
+**ExecuteCommand Smoke Tests Added:**
+- Base-scenario coverage: valid command execution, token spend, invalid rejection
+- AAA pattern, FluentAssertions, data-driven matrix
+- Tests green; ready for broader integration suite
+- Command validation: token availability, die placement legality, module state transitions
+
+**Test Quality Improvements:**
+- Deterministic test cases with mock dependency injection
+- Isolated test per concern (token spend, command availability, die management)
+- Edge case coverage: token exhaustion, invalid die placements, state desync detection
+- Ready to merge with PR #37 once Sully validation complete
+
+**Delivered Artifacts (Session 4):**
+- `.squad/orchestration-log/2026-02-21T18-06-26Z-aloha.md` — ExecuteCommand smoke tests orchestration log
+- `.squad/decisions.md` — Merged loss condition checklist (comprehensive taxonomy + bug findings)
+
+**Pending Actions:**
+- Validate ExecuteCommand implementation against smoke test suite
+- Merge PR #37 + test PR once Sully approves
+- Extend test coverage for reroll mechanics (blocked on implementation)
+
 ---

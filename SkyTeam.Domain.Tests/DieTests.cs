@@ -34,4 +34,43 @@ public class DieTests
         // Assert
         rolls.Should().BeEquivalentTo([1, 2, 3, 4, 5, 6]);
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7)]
+    public void FromValue_ShouldThrow_WhenValueIsOutsideOneToSix(int value)
+    {
+        // Arrange
+        // Act
+        var creating = () => Die.FromValue(value);
+
+        // Assert
+        creating.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7)]
+    public void BlueDieFromValue_ShouldThrow_WhenValueIsOutsideOneToSix(int value)
+    {
+        // Arrange
+        // Act
+        var creating = () => BlueDie.FromValue(value);
+
+        // Assert
+        creating.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7)]
+    public void OrangeDieFromValue_ShouldThrow_WhenValueIsOutsideOneToSix(int value)
+    {
+        // Arrange
+        // Act
+        var creating = () => OrangeDie.FromValue(value);
+
+        // Assert
+        creating.Should().Throw<ArgumentOutOfRangeException>();
+    }
 }
