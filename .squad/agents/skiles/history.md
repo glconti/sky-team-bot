@@ -75,4 +75,38 @@
 - **Sully** confirmed architecture fit — minimal changes needed
 - **Aloha** can now write token-specific test suite
 
+### Session 3: Telegram Architecture + MVP Backlog Sprint (2026-02-21)
+**Outcome:** Four agents drafted comprehensive Telegram bot architecture, UX specification, implementation plan; Skiles created `SkyTeam.TelegramBot` project; Sully produced 5-layer architecture + 7-Epic backlog + 8 user interview questions; Tenerife specified full Telegram UX (570+ lines, 7 transcripts).
+
+**Key Decisions:**
+- **Project Created:** `SkyTeam.TelegramBot` console app (references `SkyTeam.Domain` directly; adapter/application/presentation layers TBD per Sully architecture)
+- **Architecture Drafted:** Domain → Application → Presentation → Telegram Adapter → Bot Host (5-layer clean separation)
+- **Core Ports Defined:** `IChatGateway`, `IGameSessionRepository`, `IDiceRoller` (application-level contracts)
+- **MVP Backlog Structured:** Epics A–G (foundation → transport → session → round interaction → domain completion → presentation → hardening)
+- **UX Specification Locked:** Secret placement (DM-based), public reveal (group), button-driven token mechanics, 7 example transcripts
+
+**Interview Questions for User (prioritized):**
+1. DM onboarding required (players must `/start` bot privately)?
+2. Strict alternation (one placement at a time) vs. submit-all?
+3. Button/inline keyboard UX vs. typed commands?
+4. Token transparency (announce immediately vs. round-end reveal)?
+5. Persistence required across bot restart?
+6. Undo policy (undo-last vs. cancel-round-only)?
+7. 2+ humans in group: enforce 2 seated + spectators?
+8. Must-have non-base-game UX (pin cockpit, auto-advance, reminders)?
+
+**Delivered Artifacts:**
+- `.squad/orchestration-log/2026-02-21T08-22-30Z-sully.md` — Architecture orchestration log
+- `.squad/orchestration-log/2026-02-21T08-22-31Z-skiles.md` — Project orchestration log
+- `.squad/orchestration-log/2026-02-21T08-22-32Z-tenerife.md` — UX orchestration log
+- `.squad/orchestration-log/2026-02-21T08-22-33Z-aloha.md` — QA orchestration log
+- `.squad/log/2026-02-21T08-22-00Z-telegram-bot-backlog.md` — Session log
+- `.squad/decisions.md` — Merged 4 new decisions (user directive, architecture, project, UX spec)
+
+**Pending Actions:**
+- User answers interview questions (UX clarifications)
+- Skiles begins Phase 1: GameState + ExecuteCommand (unblocks all downstream Epics)
+- Tenerife validates module implementations vs. UX spec
+- Aloha integrates test harness with implementation phases
+
 ---

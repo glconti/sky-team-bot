@@ -58,4 +58,33 @@
 - ✅ Skiles can implement Phase 1 with confidence in token model and command shape
 - ✅ Aloha can test multi-token flows (1-token, 2-token, 3-token, insufficient tokens edge cases)
 
+### Session 4: Telegram Architecture + MVP Backlog Sprint (2026-02-21)
+**Outcome:** Four agents drafted comprehensive Telegram bot architecture, UX specification, implementation plan, and test strategy; produced 4 orchestration logs + session log + merged decisions.
+
+**Key Decisions:**
+- **Sully:** 5-layer architecture (Domain → Application → Presentation → Telegram Adapter → Bot Host); 7 Epic MVP backlog (A–G) with vertical slices; 8 user interview questions
+- **Skiles:** Created `SkyTeam.TelegramBot` console project + integrated into solution (`.slnx`)
+- **Tenerife:** Comprehensive Telegram UX specification (570+ lines, 7 example transcripts, secret placement + button-driven token mechanics)
+- **Aloha:** Test-backlog recommendations (verbal; integrated into decisions if formal artifact needed)
+
+**Delivered Artifacts:**
+- `.squad/orchestration-log/2026-02-21T08-22-30Z-sully.md` — Architecture + MVP backlog orchestration log
+- `.squad/orchestration-log/2026-02-21T08-22-31Z-skiles.md` — Project initialization orchestration log
+- `.squad/orchestration-log/2026-02-21T08-22-32Z-tenerife.md` — UX specification orchestration log
+- `.squad/orchestration-log/2026-02-21T08-22-33Z-aloha.md` — QA recommendations orchestration log
+- `.squad/log/2026-02-21T08-22-00Z-telegram-bot-backlog.md` — Session log
+- `.squad/decisions.md` — Merged 4 new decision entries (user directive, Sully architecture, Skiles project, Tenerife UX)
+
+**Team Synchronization:**
+- **Sully → Skiles:** Epic roadmap defines implementation phases (A–G); 8 interview questions clarify UX tradeoffs
+- **Tenerife → Skiles:** UX spec provides binding contract for Telegram adapter (button rendering, state display, message formats)
+- **Sully ↔ Tenerife:** Architecture/UX alignment on secret placement (DM-based), public reveal (group broadcast), token UX (buttons, not commands)
+- **Aloha → Team:** Test recommendations ready for Epic-by-Epic implementation (unit → integration → E2E)
+
+**Pending Actions:**
+- User answers Sully's 8 interview questions (UX clarifications: DM onboarding, turn discipline, persistence, undo/cancel policy, etc.)
+- Skiles begins Phase 1: GameState aggregate + ExecuteCommand dispatcher (critical path for all Epics B–G)
+- Tenerife validates module implementations against UX spec (readiness gate per Epic D–F)
+- Aloha integrates test harness with Skiles' implementation phases
+
 ---
