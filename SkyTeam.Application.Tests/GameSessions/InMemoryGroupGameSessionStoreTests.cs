@@ -246,6 +246,47 @@ public sealed class InMemoryGroupGameSessionStoreTests
     }
 
     [Fact]
+    public void PlaceDie_ShouldNotConsumeDieOrAdvanceTurn_WhenCommandDoesNotMatchDie()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        var (pilot, copilot, lobby) = CreateReadyLobby();
+
+        store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
+        var roll = store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        roll.Status.Should().Be(GameSessionRollStatus.Rolled);
+        roll.StartingPlayer.Should().NotBeNull();
+
+        var startingPlayerSeat = roll.StartingPlayer!.Value;
+        var startingPlayerUserId = startingPlayerSeat == PlayerSeat.Pilot ? pilot.UserId : copilot.UserId;
+
+        var handBefore = store.GetHand(startingPlayerUserId);
+        handBefore.Status.Should().Be(GameHandStatus.Ok);
+
+        const int dieIndex = 0;
+
+        // Act
+        var result = store.PlaceDie(startingPlayerUserId, dieIndex, commandId: "Axis.AssignBlue:999");
+
+        var handAfter = store.GetHand(startingPlayerUserId);
+
+        // Assert
+        new
+        {
+            result.Status,
+            DieUsed = handAfter.Hand!.Dice[dieIndex].IsUsed,
+            CurrentPlayer = handAfter.CurrentPlayer!.Value
+        }
+        .Should()
+        .BeEquivalentTo(new
+        {
+            Status = GamePlacementStatus.CommandDoesNotMatchDie,
+            DieUsed = false,
+            CurrentPlayer = startingPlayerSeat
+        });
+    }
+
+    [Fact]
     public void PlaceDie_ShouldResolveAndAdvanceToNextRound_WhenEighthPlacementIsMade()
     {
         // Arrange
