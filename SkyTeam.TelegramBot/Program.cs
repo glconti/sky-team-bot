@@ -80,6 +80,29 @@ internal static class Program
 
     private static async Task HandleSkyAsync(ITelegramBotClient botClient, Message message, string[] args, CancellationToken cancellationToken)
     {
+        var subcommand = args.FirstOrDefault()?.Trim().ToLowerInvariant();
+
+        if (message.Chat.Type == ChatType.Private)
+        {
+            switch (subcommand)
+            {
+                case "hand":
+                    await HandleSkyHandAsync(botClient, message, cancellationToken);
+                    return;
+
+                case "place":
+                    await HandleSkyPlaceAsync(botClient, message, args.Skip(1).ToArray(), cancellationToken);
+                    return;
+
+                default:
+                    await botClient.SendMessage(
+                        chatId: message.Chat.Id,
+                        text: "In a group chat, try: /sky new\n\nIn private chat: /sky hand | /sky place <dieIndex> <module/slot>",
+                        cancellationToken: cancellationToken);
+                    return;
+            }
+        }
+
         if (message.Chat.Type is not (ChatType.Group or ChatType.Supergroup))
         {
             await botClient.SendMessage(
@@ -89,7 +112,6 @@ internal static class Program
             return;
         }
 
-        var subcommand = args.FirstOrDefault()?.Trim().ToLowerInvariant();
         switch (subcommand)
         {
             case "new":
@@ -110,6 +132,14 @@ internal static class Program
 
             case "roll":
                 await HandleSkyRollAsync(botClient, message, cancellationToken);
+                return;
+
+            case "hand":
+            case "place":
+                await botClient.SendMessage(
+                    chatId: message.Chat.Id,
+                    text: "Use /sky hand and /sky place in a private chat with me.",
+                    cancellationToken: cancellationToken);
                 return;
 
             default:
@@ -246,18 +276,37 @@ internal static class Program
             return;
         }
 
+        if (GameSessionStore.GetSnapshot(message.Chat.Id) is null)
+        {
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: "Game is not started yet. Run /sky start first.",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
         var roll = SecretDiceRoller.Roll(() => Random.Shared.Next(1, 7));
+        var rollResult = GameSessionStore.RegisterRoll(message.Chat.Id, roll, startingPlayer: PlayerSeat.Pilot);
+
+        if (rollResult.Status == GameSessionRollStatus.RoundNotAwaitingRoll)
+        {
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: "This round has already been rolled. Place dice with /sky place (in private chat).",
+                cancellationToken: cancellationToken);
+            return;
+        }
 
         var failedRecipients = new List<string>(capacity: 2);
 
-        if (!await TrySendSecretDiceAsync(botClient, snapshot.Pilot!, "Pilot", roll.PilotDice, cancellationToken))
+        if (!await TrySendSecretDiceAsync(botClient, snapshot.Pilot!, "Pilot", roll.PilotDice, isYourTurn: true, cancellationToken))
             failedRecipients.Add(snapshot.Pilot!.DisplayName);
 
-        if (!await TrySendSecretDiceAsync(botClient, snapshot.Copilot!, "Copilot", roll.CopilotDice, cancellationToken))
+        if (!await TrySendSecretDiceAsync(botClient, snapshot.Copilot!, "Copilot", roll.CopilotDice, isYourTurn: false, cancellationToken))
             failedRecipients.Add(snapshot.Copilot!.DisplayName);
 
         var groupText = failedRecipients.Count == 0
-            ? "Dice rolled and sent privately to seated players."
+            ? "Dice rolled and sent privately to seated players. Pilot places first (use /sky place in private chat)."
             : $"Dice rolled, but I couldn't DM: {string.Join(", ", failedRecipients)}. Each seated player must /start me in a private chat first.";
 
         await botClient.SendMessage(
@@ -266,23 +315,146 @@ internal static class Program
             cancellationToken: cancellationToken);
     }
 
+    private static async Task HandleSkyHandAsync(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+    {
+        if (message.From is null)
+        {
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: "Cannot identify you in this chat.",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        var result = GameSessionStore.GetHand(message.From.Id);
+
+        var text = result.Status switch
+        {
+            GameHandStatus.NoActiveSession => "No active game session found for you. Start a game in a group chat first.",
+            GameHandStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
+            GameHandStatus.RoundNotRolled => "This round has not been rolled yet. In the group chat, run: /sky roll",
+            GameHandStatus.Ok => $"{result.Seat} hand:\n{RenderHand(result.Hand!)}\n\nCurrent turn: {result.CurrentPlayer}\nPlacements remaining: {result.PlacementsRemaining}",
+            _ => "Cannot show hand."
+        };
+
+        await botClient.SendMessage(
+            chatId: message.Chat.Id,
+            text: text,
+            cancellationToken: cancellationToken);
+    }
+
+    private static async Task HandleSkyPlaceAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        string[] args,
+        CancellationToken cancellationToken)
+    {
+        if (message.From is null)
+        {
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: "Cannot identify you in this chat.",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        if (args.Length < 2)
+        {
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: "Usage: /sky place <dieIndex> <module/slot>",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        if (!int.TryParse(args[0], out var dieIndex))
+        {
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: "Invalid die index. Usage: /sky place <dieIndex> <module/slot>",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        var target = string.Join(" ", args.Skip(1));
+        var result = GameSessionStore.PlaceDie(message.From.Id, dieIndex, target);
+
+        if (result.Status != GamePlacementStatus.Placed)
+        {
+            var hand = GameSessionStore.GetHand(message.From.Id);
+            var currentTurnText = hand.Status == GameHandStatus.Ok
+                ? $" Current turn: {hand.CurrentPlayer}."
+                : string.Empty;
+
+            var errorText = result.Status switch
+            {
+                GamePlacementStatus.NoActiveSession => "No active game session found for you. Start a game in a group chat first.",
+                GamePlacementStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
+                GamePlacementStatus.RoundNotRolled => "This round has not been rolled yet. In the group chat, run: /sky roll",
+                GamePlacementStatus.RoundNotAcceptingPlacements => "This round is not accepting placements.",
+                GamePlacementStatus.NotPlayersTurn => "It is not your turn." + currentTurnText,
+                GamePlacementStatus.InvalidDieIndex => "Invalid die index (expected 0-3).",
+                GamePlacementStatus.DieAlreadyUsed => "That die has already been used.",
+                GamePlacementStatus.InvalidTarget => "A placement target is required.",
+                _ => "Cannot place die."
+            };
+
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: errorText,
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        var info = result.PublicInfo!;
+
+        var groupText = $"{info.Player.DisplayName} ({info.Seat}) placed {info.Value.Value} on {info.Target}.";
+        groupText += info.PlacementsRemaining == 0
+            ? "\n\nAll placements done. Ready to resolve the round."
+            : $"\nNext: {info.NextPlayer}. Remaining placements: {info.PlacementsRemaining}.";
+
+        await botClient.SendMessage(
+            chatId: info.GroupChatId,
+            text: groupText,
+            cancellationToken: cancellationToken);
+
+        var updatedHand = GameSessionStore.GetHand(message.From.Id);
+        var dmText = updatedHand.Status == GameHandStatus.Ok
+            ? $"Placement recorded: {info.Value.Value} → {info.Target}\n\nYour hand:\n{RenderHand(updatedHand.Hand!)}\n\nCurrent turn: {updatedHand.CurrentPlayer}"
+            : $"Placement recorded: {info.Value.Value} → {info.Target}";
+
+        await botClient.SendMessage(
+            chatId: message.Chat.Id,
+            text: dmText,
+            cancellationToken: cancellationToken);
+    }
+
+    private static string RenderHand(SecretDiceHand hand)
+        => string.Join("\n", hand.Dice.Select(die => $"{die.Index}:{die.Value.Value}{(die.IsUsed ? " (used)" : string.Empty)}"));
+
     private static async Task<bool> TrySendSecretDiceAsync(
         ITelegramBotClient botClient,
         LobbyPlayer recipient,
         string seat,
         IReadOnlyList<int> dice,
+        bool isYourTurn,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(recipient);
         ArgumentNullException.ThrowIfNull(dice);
 
-        var diceText = string.Join(", ", dice);
+        var diceText = string.Join(", ", dice.Select((value, index) => $"{index}:{value}"));
+        var turnText = isYourTurn
+            ? "It's your turn to place first."
+            : "Wait for the other player to place first.";
+
+        var messageText = $"{seat} secret dice: {diceText}\n\n{turnText}\n\nCommands:\n/sky hand\n/sky place <dieIndex> <module/slot>";
 
         try
         {
             await botClient.SendMessage(
                 chatId: recipient.UserId,
-                text: $"{seat} secret dice: {diceText}",
+                text: messageText,
                 cancellationToken: cancellationToken);
 
             return true;

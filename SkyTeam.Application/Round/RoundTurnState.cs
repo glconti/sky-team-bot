@@ -8,7 +8,7 @@ public enum RoundPhase
     ReadyToResolve
 }
 
-public sealed record RoundPlacement(int Index, PlayerSeat Player, int DieIndex, DieValue Value);
+public sealed record RoundPlacement(int Index, PlayerSeat Player, int DieIndex, DieValue Value, string Target);
 
 public sealed class RoundTurnState
 {
@@ -84,10 +84,13 @@ public sealed class RoundTurnState
             : CopilotHand.CanUse(dieIndex);
     }
 
-    public RoundTurnState RegisterPlacement(PlayerSeat player, int dieIndex)
+    public RoundTurnState RegisterPlacement(PlayerSeat player, int dieIndex, string target)
     {
         if (Phase != RoundPhase.InProgress)
             throw new InvalidOperationException("This round is not accepting placements.");
+
+        if (string.IsNullOrWhiteSpace(target))
+            throw new ArgumentException("A placement target is required.", nameof(target));
 
         if (PlacementsMade >= MaxPlacementsPerRound)
             throw new InvalidOperationException("This round has no placements remaining.");
@@ -108,7 +111,7 @@ public sealed class RoundTurnState
         else
             newCopilotHand = CopilotHand.UseDie(dieIndex, out placedValue);
 
-        placements = placements.Add(new RoundPlacement(placementIndex, player, dieIndex, placedValue));
+        placements = placements.Add(new RoundPlacement(placementIndex, player, dieIndex, placedValue, target));
 
         var newPhase = placements.Length == MaxPlacementsPerRound
             ? RoundPhase.ReadyToResolve
