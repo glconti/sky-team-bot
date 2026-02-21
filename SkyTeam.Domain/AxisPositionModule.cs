@@ -21,18 +21,31 @@ sealed class AxisPositionModule : GameModule
     public override IEnumerable<GameCommand> GetAvailableCommands(
         Player currentPlayer,
         IReadOnlyList<BlueDie> unusedBlueDice,
-        IReadOnlyList<OrangeDie> unusedOrangeDice)
+        IReadOnlyList<OrangeDie> unusedOrangeDice,
+        CoffeeTokenPool tokenPool)
     {
+        var availableTokens = tokenPool.Count;
+
         if (currentPlayer == Player.Pilot && _blueDie is null)
         {
-            foreach (var value in unusedBlueDice.Select(die => (int)die).Distinct().Order())
-                yield return CreateBlueCommand(value);
+            foreach (var rolledValue in unusedBlueDice.Select(die => (int)die).Distinct().Order())
+            {
+                yield return CreateBlueCommand(rolledValue, rolledValue, tokenCost: 0);
+
+                foreach (var effectiveValue in GetAdjustedValues(rolledValue, availableTokens))
+                    yield return CreateBlueCommand(rolledValue, effectiveValue, tokenCost: Math.Abs(effectiveValue - rolledValue));
+            }
         }
 
         if (currentPlayer == Player.Copilot && _orangeDie is null)
         {
-            foreach (var value in unusedOrangeDice.Select(die => (int)die).Distinct().Order())
-                yield return CreateOrangeCommand(value);
+            foreach (var rolledValue in unusedOrangeDice.Select(die => (int)die).Distinct().Order())
+            {
+                yield return CreateOrangeCommand(rolledValue, rolledValue, tokenCost: 0);
+
+                foreach (var effectiveValue in GetAdjustedValues(rolledValue, availableTokens))
+                    yield return CreateOrangeCommand(rolledValue, effectiveValue, tokenCost: Math.Abs(effectiveValue - rolledValue));
+            }
         }
     }
 
@@ -91,39 +104,78 @@ sealed class AxisPositionModule : GameModule
         throw new InvalidOperationException("Axis position out of bounds.");
     }
 
-    private GameCommand CreateBlueCommand(int value)
+    private static IEnumerable<int> GetAdjustedValues(int rolledValue, int availableTokens)
+    {
+        if (availableTokens <= 0) yield break;
+
+        var min = Math.Max(1, rolledValue - availableTokens);
+        var max = Math.Min(6, rolledValue + availableTokens);
+
+        for (var value = min; value <= max; value++)
+        {
+            if (value == rolledValue) continue;
+
+            yield return value;
+        }
+    }
+
+    private GameCommand CreateBlueCommand(int rolledValue, int effectiveValue, int tokenCost)
     {
         int? resulting = _orangeDie is null
             ? null
-            : CalculateAxisPositionAfterResolution(value, (int)_orangeDie);
+            : CalculateAxisPositionAfterResolution(effectiveValue, (int)_orangeDie);
 
-        return new AssignAxisBlueDieCommand(value, resulting);
+        return new AssignAxisBlueDieCommand(rolledValue, effectiveValue, tokenCost, resulting);
     }
 
-    private GameCommand CreateOrangeCommand(int value)
+    private GameCommand CreateOrangeCommand(int rolledValue, int effectiveValue, int tokenCost)
     {
         int? resulting = _blueDie is null
             ? null
-            : CalculateAxisPositionAfterResolution((int)_blueDie, value);
+            : CalculateAxisPositionAfterResolution((int)_blueDie, effectiveValue);
 
-        return new AssignAxisOrangeDieCommand(value, resulting);
+        return new AssignAxisOrangeDieCommand(rolledValue, effectiveValue, tokenCost, resulting);
     }
 
-    private sealed record AssignAxisBlueDieCommand(int Value, int? ResultingAxisPosition) : GameCommand
+    private sealed record AssignAxisBlueDieCommand(
+        int RolledValue,
+        int EffectiveValue,
+        int TokenCost,
+        int? ResultingAxisPosition) : GameCommand
     {
-        public override string CommandId => $"Axis.AssignBlue:{Value}";
+        public override string CommandId => TokenCost == 0
+            ? $"Axis.AssignBlue:{RolledValue}"
+            : $"Axis.AssignBlue:{RolledValue}>{EffectiveValue}";
 
-        public override string DisplayName => ResultingAxisPosition is null
-            ? $"Axis: place blue {Value}"
-            : $"Axis: place blue {Value} (axis -> {ResultingAxisPosition})";
+        public override string DisplayName => CreateDisplayName("blue", RolledValue, EffectiveValue, TokenCost, ResultingAxisPosition);
     }
 
-    private sealed record AssignAxisOrangeDieCommand(int Value, int? ResultingAxisPosition) : GameCommand
+    private sealed record AssignAxisOrangeDieCommand(
+        int RolledValue,
+        int EffectiveValue,
+        int TokenCost,
+        int? ResultingAxisPosition) : GameCommand
     {
-        public override string CommandId => $"Axis.AssignOrange:{Value}";
+        public override string CommandId => TokenCost == 0
+            ? $"Axis.AssignOrange:{RolledValue}"
+            : $"Axis.AssignOrange:{RolledValue}>{EffectiveValue}";
 
-        public override string DisplayName => ResultingAxisPosition is null
-            ? $"Axis: place orange {Value}"
-            : $"Axis: place orange {Value} (axis -> {ResultingAxisPosition})";
+        public override string DisplayName => CreateDisplayName("orange", RolledValue, EffectiveValue, TokenCost, ResultingAxisPosition);
+    }
+
+    private static string CreateDisplayName(
+        string color,
+        int rolledValue,
+        int effectiveValue,
+        int tokenCost,
+        int? resultingAxisPosition)
+    {
+        var label = tokenCost == 0
+            ? $"Axis: place {color} {rolledValue}"
+            : $"Axis: place {color} {rolledValue} as {effectiveValue} (cost {tokenCost})";
+
+        return resultingAxisPosition is null
+            ? label
+            : $"{label} (axis -> {resultingAxisPosition})";
     }
 }

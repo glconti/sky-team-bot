@@ -26,18 +26,25 @@ sealed class FlapsModule(Airport airport) : GameModule
     public override IEnumerable<GameCommand> GetAvailableCommands(
         Player currentPlayer,
         IReadOnlyList<BlueDie> unusedBlueDice,
-        IReadOnlyList<OrangeDie> unusedOrangeDice)
+        IReadOnlyList<OrangeDie> unusedOrangeDice,
+        CoffeeTokenPool tokenPool)
     {
         if (currentPlayer != Player.Copilot) yield break;
         if (_nextRequiredIndex >= AllowedValuesBySwitch.Length) yield break;
 
+        var availableTokens = tokenPool.Count;
         var allowedValues = AllowedValuesBySwitch[_nextRequiredIndex];
+        var switchNumber = _nextRequiredIndex + 1;
 
-        foreach (var value in unusedOrangeDice.Select(die => (int)die).Distinct().Order())
+        foreach (var rolledValue in unusedOrangeDice.Select(die => (int)die).Distinct().Order())
         {
-            if (!allowedValues.Contains(value)) continue;
+            foreach (var requiredValue in allowedValues)
+            {
+                var tokenCost = Math.Abs(requiredValue - rolledValue);
+                if (tokenCost > availableTokens) continue;
 
-            yield return new ActivateFlapsCommand(value, _nextRequiredIndex + 1);
+                yield return new ActivateFlapsCommand(rolledValue, requiredValue, tokenCost, switchNumber);
+            }
         }
     }
 
@@ -59,9 +66,18 @@ sealed class FlapsModule(Airport airport) : GameModule
         _airport.MoveOrangeAerodynamicsRight();
     }
 
-    private sealed record ActivateFlapsCommand(int Value, int SwitchNumber) : GameCommand
+    private sealed record ActivateFlapsCommand(
+        int RolledValue,
+        int EffectiveValue,
+        int TokenCost,
+        int SwitchNumber) : GameCommand
     {
-        public override string CommandId => $"Flaps.AssignOrange:{Value}";
-        public override string DisplayName => $"Flaps: activate switch {SwitchNumber} with orange {Value}";
+        public override string CommandId => TokenCost == 0
+            ? $"Flaps.AssignOrange:{RolledValue}"
+            : $"Flaps.AssignOrange:{RolledValue}>{EffectiveValue}";
+
+        public override string DisplayName => TokenCost == 0
+            ? $"Flaps: activate switch {SwitchNumber} with orange {RolledValue}"
+            : $"Flaps: activate switch {SwitchNumber} with orange {RolledValue} as {EffectiveValue} (cost {TokenCost})";
     }
 }

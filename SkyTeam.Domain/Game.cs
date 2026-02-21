@@ -91,8 +91,13 @@ class Game
             yield break;
         }
 
+        var tokenPool = _modules
+            .OfType<ConcentrationModule>()
+            .SingleOrDefault()?
+            .TokenPool ?? new CoffeeTokenPool();
+
         foreach (var gameCommand in _modules.SelectMany(module =>
-                     module.GetAvailableCommands(_state.CurrentPlayer, _state.UnusedBlueDice, _state.UnusedOrangeDice)))
+                     module.GetAvailableCommands(_state.CurrentPlayer, _state.UnusedBlueDice, _state.UnusedOrangeDice, tokenPool)))
             yield return gameCommand;
     }
 
@@ -125,8 +130,21 @@ class Game
 
         var prefix = parts[0];
 
-        if (!int.TryParse(parts[1], out var value))
+        var valuePart = parts[1];
+        var valueParts = valuePart.Split('>', 2);
+
+        if (!int.TryParse(valueParts[0], out var rolledValue))
             throw new InvalidOperationException($"Invalid command id '{commandId}'.");
+
+        var effectiveValue = rolledValue;
+
+        if (valueParts.Length == 2)
+        {
+            if (!int.TryParse(valueParts[1], out effectiveValue))
+                throw new InvalidOperationException($"Invalid command id '{commandId}'.");
+        }
+
+        var tokenCost = Math.Abs(effectiveValue - rolledValue);
 
         AxisPositionModule Axis() => GetRequiredModule<AxisPositionModule>("Axis");
         EnginesModule Engines() => GetRequiredModule<EnginesModule>("Engines");
@@ -148,85 +166,111 @@ class Game
             return die ?? throw new InvalidOperationException($"No unused orange die found with value {targetValue}.");
         }
 
+        void SpendTokensIfNeeded()
+        {
+            if (tokenCost == 0) return;
+
+            Concentration().SpendTokens(tokenCost);
+        }
+
+        BlueDie GetBlueDieForAssignment(BlueDie rolledDie) => tokenCost == 0
+            ? rolledDie
+            : BlueDie.FromValue(effectiveValue);
+
+        OrangeDie GetOrangeDieForAssignment(OrangeDie rolledDie) => tokenCost == 0
+            ? rolledDie
+            : OrangeDie.FromValue(effectiveValue);
+
         try
         {
             switch (prefix)
             {
             case "Axis.AssignBlue":
             {
-                var die = GetUnusedBlueDie(value);
-                Axis().AssignBlueDie(die);
-                _state.RemoveBlueDie(die);
+                var rolledDie = GetUnusedBlueDie(rolledValue);
+                SpendTokensIfNeeded();
+                Axis().AssignBlueDie(GetBlueDieForAssignment(rolledDie));
+                _state.RemoveBlueDie(rolledDie);
                 break;
             }
             case "Axis.AssignOrange":
             {
-                var die = GetUnusedOrangeDie(value);
-                Axis().AssignOrangeDie(die);
-                _state.RemoveOrangeDie(die);
+                var rolledDie = GetUnusedOrangeDie(rolledValue);
+                SpendTokensIfNeeded();
+                Axis().AssignOrangeDie(GetOrangeDieForAssignment(rolledDie));
+                _state.RemoveOrangeDie(rolledDie);
                 break;
             }
             case "Engines.AssignBlue":
             {
-                var die = GetUnusedBlueDie(value);
-                Engines().AssignBlueDie(die);
-                _state.RemoveBlueDie(die);
+                var rolledDie = GetUnusedBlueDie(rolledValue);
+                SpendTokensIfNeeded();
+                Engines().AssignBlueDie(GetBlueDieForAssignment(rolledDie));
+                _state.RemoveBlueDie(rolledDie);
                 break;
             }
             case "Engines.AssignOrange":
             {
-                var die = GetUnusedOrangeDie(value);
-                Engines().AssignOrangeDie(die);
-                _state.RemoveOrangeDie(die);
+                var rolledDie = GetUnusedOrangeDie(rolledValue);
+                SpendTokensIfNeeded();
+                Engines().AssignOrangeDie(GetOrangeDieForAssignment(rolledDie));
+                _state.RemoveOrangeDie(rolledDie);
                 break;
             }
             case "Brakes.AssignBlue":
             {
-                var die = GetUnusedBlueDie(value);
-                Brakes().AssignBlueDie(die);
-                _state.RemoveBlueDie(die);
+                var rolledDie = GetUnusedBlueDie(rolledValue);
+                SpendTokensIfNeeded();
+                Brakes().AssignBlueDie(GetBlueDieForAssignment(rolledDie));
+                _state.RemoveBlueDie(rolledDie);
                 break;
             }
             case "Flaps.AssignOrange":
             {
-                var die = GetUnusedOrangeDie(value);
-                Flaps().AssignOrangeDie(die);
-                _state.RemoveOrangeDie(die);
+                var rolledDie = GetUnusedOrangeDie(rolledValue);
+                SpendTokensIfNeeded();
+                Flaps().AssignOrangeDie(GetOrangeDieForAssignment(rolledDie));
+                _state.RemoveOrangeDie(rolledDie);
                 break;
             }
             case "LandingGear.AssignBlue":
             {
-                var die = GetUnusedBlueDie(value);
-                LandingGear().AssignBlueDie(die);
-                _state.RemoveBlueDie(die);
+                var rolledDie = GetUnusedBlueDie(rolledValue);
+                SpendTokensIfNeeded();
+                LandingGear().AssignBlueDie(GetBlueDieForAssignment(rolledDie));
+                _state.RemoveBlueDie(rolledDie);
                 break;
             }
             case "Radio.AssignBlue":
             {
-                var die = GetUnusedBlueDie(value);
-                Radio().AssignBlueDie(die);
-                _state.RemoveBlueDie(die);
+                var rolledDie = GetUnusedBlueDie(rolledValue);
+                SpendTokensIfNeeded();
+                Radio().AssignBlueDie(GetBlueDieForAssignment(rolledDie));
+                _state.RemoveBlueDie(rolledDie);
                 break;
             }
             case "Radio.AssignOrange":
             {
-                var die = GetUnusedOrangeDie(value);
-                Radio().AssignOrangeDie(die);
-                _state.RemoveOrangeDie(die);
+                var rolledDie = GetUnusedOrangeDie(rolledValue);
+                SpendTokensIfNeeded();
+                Radio().AssignOrangeDie(GetOrangeDieForAssignment(rolledDie));
+                _state.RemoveOrangeDie(rolledDie);
                 break;
             }
             case "Concentration.AssignBlue":
             {
-                var die = GetUnusedBlueDie(value);
-                Concentration().AssignBlueDie(die);
-                _state.RemoveBlueDie(die);
+                var rolledDie = GetUnusedBlueDie(rolledValue);
+                SpendTokensIfNeeded();
+                Concentration().AssignBlueDie(GetBlueDieForAssignment(rolledDie));
+                _state.RemoveBlueDie(rolledDie);
                 break;
             }
             case "Concentration.AssignOrange":
             {
-                var die = GetUnusedOrangeDie(value);
-                Concentration().AssignOrangeDie(die);
-                _state.RemoveOrangeDie(die);
+                var rolledDie = GetUnusedOrangeDie(rolledValue);
+                SpendTokensIfNeeded();
+                Concentration().AssignOrangeDie(GetOrangeDieForAssignment(rolledDie));
+                _state.RemoveOrangeDie(rolledDie);
                 break;
             }
             default:

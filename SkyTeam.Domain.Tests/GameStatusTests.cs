@@ -86,6 +86,265 @@ public class GameStatusTests
     }
 
     [Fact]
+    public void NextRound_ShouldSetLost_WhenApproachIsNotClearAtLanding()
+    {
+        // Arrange
+        var airport = new Airport([
+            new PathSegment(0),
+            new PathSegment(1),
+            new PathSegment(0),
+            new PathSegment(0),
+            new PathSegment(0),
+            new PathSegment(0),
+            new PathSegment(0)
+        ]);
+        airport.AdvanceApproach(6);
+
+        var altitude = CreateLandedAltitude();
+
+        var axisModule = new AxisPositionModule();
+        var enginesModule = new EnginesModule(airport);
+        var brakesModule = new BrakesModule();
+        var flapsModule = new FlapsModule(airport);
+        var landingGearModule = new LandingGearModule(airport);
+
+        var game = new Game(airport, altitude, [axisModule, enginesModule, brakesModule, flapsModule, landingGearModule]);
+
+        brakesModule.AssignBlueDie(BlueDie.FromValue(2));
+        brakesModule.AssignBlueDie(BlueDie.FromValue(4));
+        brakesModule.AssignBlueDie(BlueDie.FromValue(6));
+
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(1));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(2));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(4));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(5));
+
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(1));
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(3));
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(5));
+
+        enginesModule.AssignBlueDie(BlueDie.FromValue(6));
+        enginesModule.AssignOrangeDie(OrangeDie.FromValue(3));
+
+        ClearUnusedDice(game);
+
+        // Act
+        game.ExecuteCommand("NextRound");
+
+        // Assert
+        game.Status.Should().Be(GameStatus.Lost);
+    }
+
+    [Fact]
+    public void NextRound_ShouldSetLost_WhenEnginesThrustIsBelowNineAtLanding()
+    {
+        // Arrange
+        var airport = CreateAirportWithNoPlaneTokens(segmentCount: 7);
+        airport.AdvanceApproach(6);
+
+        var altitude = CreateLandedAltitude();
+
+        var axisModule = new AxisPositionModule();
+        var enginesModule = new EnginesModule(airport);
+        var brakesModule = new BrakesModule();
+        var flapsModule = new FlapsModule(airport);
+        var landingGearModule = new LandingGearModule(airport);
+
+        var game = new Game(airport, altitude, [axisModule, enginesModule, brakesModule, flapsModule, landingGearModule]);
+
+        brakesModule.AssignBlueDie(BlueDie.FromValue(2));
+        brakesModule.AssignBlueDie(BlueDie.FromValue(4));
+        brakesModule.AssignBlueDie(BlueDie.FromValue(6));
+
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(1));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(2));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(4));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(5));
+
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(1));
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(3));
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(5));
+
+        enginesModule.AssignBlueDie(BlueDie.FromValue(6));
+        enginesModule.AssignOrangeDie(OrangeDie.FromValue(2));
+
+        ClearUnusedDice(game);
+
+        // Act
+        game.ExecuteCommand("NextRound");
+
+        // Assert
+        game.Status.Should().Be(GameStatus.Lost);
+    }
+
+    [Fact]
+    public void NextRound_ShouldSetLost_WhenBrakesAreNotFullyDeployedAtLanding()
+    {
+        // Arrange
+        var airport = CreateAirportWithNoPlaneTokens(segmentCount: 7);
+        airport.AdvanceApproach(6);
+
+        var altitude = CreateLandedAltitude();
+
+        var axisModule = new AxisPositionModule();
+        var enginesModule = new EnginesModule(airport);
+        var brakesModule = new BrakesModule();
+        var flapsModule = new FlapsModule(airport);
+        var landingGearModule = new LandingGearModule(airport);
+
+        var game = new Game(airport, altitude, [axisModule, enginesModule, brakesModule, flapsModule, landingGearModule]);
+
+        brakesModule.AssignBlueDie(BlueDie.FromValue(2));
+        brakesModule.AssignBlueDie(BlueDie.FromValue(4));
+
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(1));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(2));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(4));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(5));
+
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(1));
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(3));
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(5));
+
+        enginesModule.AssignBlueDie(BlueDie.FromValue(6));
+        enginesModule.AssignOrangeDie(OrangeDie.FromValue(3));
+
+        ClearUnusedDice(game);
+
+        // Act
+        game.ExecuteCommand("NextRound");
+
+        // Assert
+        game.Status.Should().Be(GameStatus.Lost);
+    }
+
+    [Fact]
+    public void NextRound_ShouldSetLost_WhenFlapsAreNotFullyDeployedAtLanding()
+    {
+        // Arrange
+        var airport = CreateAirportWithNoPlaneTokens(segmentCount: 7);
+        airport.AdvanceApproach(6);
+
+        var altitude = CreateLandedAltitude();
+
+        var axisModule = new AxisPositionModule();
+        var enginesModule = new EnginesModule(airport);
+        var brakesModule = new BrakesModule();
+        var flapsModule = new FlapsModule(airport);
+        var landingGearModule = new LandingGearModule(airport);
+
+        var game = new Game(airport, altitude, [axisModule, enginesModule, brakesModule, flapsModule, landingGearModule]);
+
+        brakesModule.AssignBlueDie(BlueDie.FromValue(2));
+        brakesModule.AssignBlueDie(BlueDie.FromValue(4));
+        brakesModule.AssignBlueDie(BlueDie.FromValue(6));
+
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(1));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(2));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(4));
+
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(1));
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(3));
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(5));
+
+        enginesModule.AssignBlueDie(BlueDie.FromValue(6));
+        enginesModule.AssignOrangeDie(OrangeDie.FromValue(3));
+
+        ClearUnusedDice(game);
+
+        // Act
+        game.ExecuteCommand("NextRound");
+
+        // Assert
+        game.Status.Should().Be(GameStatus.Lost);
+    }
+
+    [Fact]
+    public void NextRound_ShouldSetLost_WhenLandingGearIsNotFullyDeployedAtLanding()
+    {
+        // Arrange
+        var airport = CreateAirportWithNoPlaneTokens(segmentCount: 7);
+        airport.AdvanceApproach(6);
+
+        var altitude = CreateLandedAltitude();
+
+        var axisModule = new AxisPositionModule();
+        var enginesModule = new EnginesModule(airport);
+        var brakesModule = new BrakesModule();
+        var flapsModule = new FlapsModule(airport);
+        var landingGearModule = new LandingGearModule(airport);
+
+        var game = new Game(airport, altitude, [axisModule, enginesModule, brakesModule, flapsModule, landingGearModule]);
+
+        brakesModule.AssignBlueDie(BlueDie.FromValue(2));
+        brakesModule.AssignBlueDie(BlueDie.FromValue(4));
+        brakesModule.AssignBlueDie(BlueDie.FromValue(6));
+
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(1));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(2));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(4));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(5));
+
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(1));
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(3));
+
+        enginesModule.AssignBlueDie(BlueDie.FromValue(6));
+        enginesModule.AssignOrangeDie(OrangeDie.FromValue(3));
+
+        ClearUnusedDice(game);
+
+        // Act
+        game.ExecuteCommand("NextRound");
+
+        // Assert
+        game.Status.Should().Be(GameStatus.Lost);
+    }
+
+    [Fact]
+    public void NextRound_ShouldSetLost_WhenAxisPositionIsOutOfBoundsAtLanding()
+    {
+        // Arrange
+        var airport = CreateAirportWithNoPlaneTokens(segmentCount: 7);
+        airport.AdvanceApproach(6);
+
+        var altitude = CreateLandedAltitude();
+
+        var axisModule = new AxisPositionModule();
+        ForceAxisPosition(axisModule, axisPosition: 3);
+
+        var enginesModule = new EnginesModule(airport);
+        var brakesModule = new BrakesModule();
+        var flapsModule = new FlapsModule(airport);
+        var landingGearModule = new LandingGearModule(airport);
+
+        var game = new Game(airport, altitude, [axisModule, enginesModule, brakesModule, flapsModule, landingGearModule]);
+
+        brakesModule.AssignBlueDie(BlueDie.FromValue(2));
+        brakesModule.AssignBlueDie(BlueDie.FromValue(4));
+        brakesModule.AssignBlueDie(BlueDie.FromValue(6));
+
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(1));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(2));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(4));
+        flapsModule.AssignOrangeDie(OrangeDie.FromValue(5));
+
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(1));
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(3));
+        landingGearModule.AssignBlueDie(BlueDie.FromValue(5));
+
+        enginesModule.AssignBlueDie(BlueDie.FromValue(6));
+        enginesModule.AssignOrangeDie(OrangeDie.FromValue(3));
+
+        ClearUnusedDice(game);
+
+        // Act
+        game.ExecuteCommand("NextRound");
+
+        // Assert
+        game.Status.Should().Be(GameStatus.Lost);
+    }
+
+    [Fact]
     public void ExecuteCommand_ShouldSetLostAndRethrow_WhenAvailableCommandFailsDuringModuleAssignment()
     {
         // Arrange
@@ -121,6 +380,24 @@ public class GameStatusTests
 
         game.Status.Should().Be(GameStatus.Lost);
         return game;
+    }
+
+    private static Altitude CreateLandedAltitude()
+    {
+        var altitude = new Altitude();
+
+        for (var i = 0; i < 6; i++)
+            altitude.Advance();
+
+        return altitude;
+    }
+
+    private static void ForceAxisPosition(AxisPositionModule module, int axisPosition)
+    {
+        var field = typeof(AxisPositionModule).GetField("_axisPosition", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Could not find '_axisPosition' field on {nameof(AxisPositionModule)}.");
+
+        field.SetValue(module, axisPosition);
     }
 
     private static Airport CreateAirportWithNoPlaneTokens(int segmentCount) =>

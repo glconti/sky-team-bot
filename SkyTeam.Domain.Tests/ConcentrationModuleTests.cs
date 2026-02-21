@@ -116,7 +116,7 @@ public class ConcentrationModuleTests
         };
 
         // Act
-        var commandIds = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, [])
+        var commandIds = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, [], new CoffeeTokenPool())
             .Select(command => command.CommandId)
             .ToArray();
 
@@ -140,7 +140,7 @@ public class ConcentrationModuleTests
         };
 
         // Act
-        var commandIds = module.GetAvailableCommands(Player.Copilot, [], unusedOrangeDice)
+        var commandIds = module.GetAvailableCommands(Player.Copilot, [], unusedOrangeDice, new CoffeeTokenPool())
             .Select(command => command.CommandId)
             .ToArray();
 
@@ -155,8 +155,8 @@ public class ConcentrationModuleTests
         var module = new ConcentrationModule();
 
         // Act
-        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)]).ToArray();
-        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], []).ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)], new CoffeeTokenPool()).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [], new CoffeeTokenPool()).ToArray();
 
         // Assert
         pilotCommands.Should().BeEmpty();
@@ -173,8 +173,8 @@ public class ConcentrationModuleTests
         module.AssignOrangeDie(OrangeDie.FromValue(1));
 
         // Act
-        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], []).ToArray();
-        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [], [OrangeDie.FromValue(1)]).ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], [], new CoffeeTokenPool()).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [], [OrangeDie.FromValue(1)], new CoffeeTokenPool()).ToArray();
 
         // Assert
         pilotCommands.Should().BeEmpty();
