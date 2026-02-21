@@ -537,3 +537,51 @@ record CoffeeTokenPool
 **Rationale:** User choice — captured for team memory.
 
 ---
+
+## 2026-02-21T13:00:05Z: Lobby slice review — MVP foundation acceptable (Sully)
+
+**By:** Sully (Architect)  
+**Decision:** Lobby slice (commit b704cbd) is acceptable MVP foundation.
+
+**Key Assessments:**
+- **Architecture:** Application-layer lobby store is clean — no Telegram SDK types leak into `SkyTeam.Application`.
+- **In-Memory Store:** Concrete `InMemoryGroupLobbyStore` in `SkyTeam.Application.Lobby` acceptable for MVP (user accepted in-memory persistence).
+- **API Hygiene:** Lobby state transport-agnostic; group chat IDs treated as primitives in application layer.
+
+**Follow-ups (non-blocking, recommended before next slices):**
+1. Introduce application port (`IGroupLobbyStore` / `IGroupLobbyRepository`) and move in-memory implementation to Host/Infrastructure for persistence swaps without application rewrites.
+2. Rename `GroupChatId` → `GroupId` (and similar) to eliminate Telegram semantics from application public API.
+3. Move `RenderLobby` / command parsing out of `Program.cs` once Presentation.Chat and Adapters.Telegram projects land (per 5-layer architecture).
+
+**Rationale:** Lobby slice unblocks team; follow-up refactors keep codebase maintainable as scope expands.
+
+---
+
+## 2026-02-21T13:00:05Z: Application test layer — InMemoryGroupLobbyStore suite (Aloha)
+
+**By:** Aloha (QA)  
+**Decision:** Created `SkyTeam.Application.Tests` xUnit project (separate from `SkyTeam.Domain.Tests`) to isolate application-layer behavior tests.
+
+**Rationale:** Lobby store is an application concern (in-memory multi-user coordination by group chat id), not domain logic. Dedicated test assembly improves signal and preserves layering.
+
+**Test Suite Coverage:**
+- **CreateNew:** Lobby created successfully; already-exists case reports current state without reset.
+- **Join:** Pilot seated, Copilot seated, full-lobby rejection, already-seated no-op, no-lobby error.
+- **GetSnapshot:** Returns null if no lobby; returns current state if lobby exists.
+
+**Implementation:** xUnit v3 with FluentAssertions; follows AAA (Arrange, Act, Assert) pattern.
+
+---
+
+## 2026-02-21T13:00:05Z: Lobby slice — /sky new is non-destructive (Skiles)
+
+**By:** Skiles (Implementation Lead)  
+**Decision:** `/sky new` command creates a lobby **only if one does not already exist**.
+
+**Behavior:**
+- If no lobby exists → Create lobby, seat caller as Pilot, report success.
+- If lobby already exists → Report current state (players seated, status) and prevent reset.
+
+**Rationale:** Avoid surprising seat resets in active groups; explicit `/sky reset` (future feature) supports advanced scenarios. Non-destructive `/sky new` is MVP-safe.
+
+---
