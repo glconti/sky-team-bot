@@ -116,3 +116,13 @@
 - Extend test coverage for reroll mechanics (blocked on implementation)
 
 ---
+
+### Session 2: Issue #31 Domain QA (2026-02-21)
+**Outcome:** Added fast, deterministic `SkyTeam.Domain.Tests` coverage for Tenerife’s locked rules spec: axis out-of-bounds immediate loss, landing win/loss criteria matrix, and coffee-token/die boundary cases.
+
+**Notes / Learnings:**
+- Axis resolution must fail fast when the resulting position is `< -2` or `> +2`.
+- Landing result is an AND of criteria (approach cleared, axis in range, engines ≥ 9, brakes/flaps/gear fully deployed); a single failure yields LOSS.
+- Brakes landing criterion appears inconsistent between spec and code; captured in `.squad/decisions/inbox/aloha-issue31-test-findings.md`.
+
+---
