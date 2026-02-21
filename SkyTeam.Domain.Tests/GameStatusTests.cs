@@ -71,8 +71,8 @@ public class GameStatusTests
         landingGearModule.AssignBlueDie(BlueDie.FromValue(3));
         landingGearModule.AssignBlueDie(BlueDie.FromValue(5));
 
-        enginesModule.AssignBlueDie(BlueDie.FromValue(1));
-        enginesModule.AssignOrangeDie(OrangeDie.FromValue(1));
+        enginesModule.AssignBlueDie(BlueDie.FromValue(6));
+        enginesModule.AssignOrangeDie(OrangeDie.FromValue(3));
 
         ClearUnusedDice(game);
 

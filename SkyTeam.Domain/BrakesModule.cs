@@ -41,7 +41,7 @@ sealed class BrakesModule : GameModule
             throw new InvalidOperationException($"Brakes requires die value {requiredValue} next.");
 
         _nextRequiredIndex++;
-        BrakesValue++;
+        BrakesValue = requiredValue;
     }
 
     private sealed record ActivateBrakesCommand(int Value, int SwitchNumber) : GameCommand

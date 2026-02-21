@@ -105,7 +105,7 @@ public class BrakesModuleTests
         module.AssignBlueDie(BlueDie.FromValue(6));
 
         // Assert
-        module.BrakesValue.Should().Be(3);
+        module.BrakesValue.Should().Be(6);
 
         var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], []).ToArray();
         commands.Should().BeEmpty();

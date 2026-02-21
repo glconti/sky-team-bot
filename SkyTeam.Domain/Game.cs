@@ -31,6 +31,14 @@ class Game
         _modules = modules.ToArray();
         _state.SetCurrentPlayer(altitude.CurrentPlayer);
         RollDice();
+
+        if (_altitude.IsLanded)
+        {
+            _airport.EnterFinalRound();
+
+            if (_airport.CurrentPositionIndex != _airport.SegmentCount - 1)
+                Status = GameStatus.Lost;
+        }
     }
 
     public void NextRound()
@@ -245,23 +253,23 @@ class Game
         var allPlaneTokensCleared = _airport.PathSegments.All(segment => segment.PlaneTokens == 0);
 
         var axisModule = _modules.OfType<AxisPositionModule>().SingleOrDefault();
-        var flapsModule = _modules.OfType<FlapsModule>().SingleOrDefault();
-        var landingGearModule = _modules.OfType<LandingGearModule>().SingleOrDefault();
         var enginesModule = _modules.OfType<EnginesModule>().SingleOrDefault();
         var brakesModule = _modules.OfType<BrakesModule>().SingleOrDefault();
+        var flapsModule = _modules.OfType<FlapsModule>().SingleOrDefault();
+        var landingGearModule = _modules.OfType<LandingGearModule>().SingleOrDefault();
 
-        var isAligned = axisModule?.AxisPosition == 0;
-        var flapsDeployed = flapsModule?.FlapsValue == 4;
-        var landingGearDeployed = landingGearModule?.LandingGearValue == 3;
-
-        var hasSafeSpeed = enginesModule?.LastSpeed is int lastSpeed
-            && brakesModule?.BrakesValue > lastSpeed;
+        var axisOk = axisModule?.AxisPosition is >= -2 and <= 2;
+        var enginesOk = enginesModule?.LastSpeed is >= 9;
+        var brakesOk = brakesModule?.BrakesValue is >= 6;
+        var flapsOk = flapsModule?.FlapsValue is >= 4;
+        var landingGearOk = landingGearModule?.LandingGearValue is >= 3;
 
         var isWin = allPlaneTokensCleared
-                    && isAligned
-                    && flapsDeployed
-                    && landingGearDeployed
-                    && hasSafeSpeed;
+                    && axisOk == true
+                    && enginesOk == true
+                    && brakesOk == true
+                    && flapsOk == true
+                    && landingGearOk == true;
 
         Status = isWin ? GameStatus.Won : GameStatus.Lost;
     }
