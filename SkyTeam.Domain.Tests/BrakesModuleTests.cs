@@ -106,6 +106,9 @@ public class BrakesModuleTests
 
         // Assert
         module.BrakesValue.Should().Be(6);
+        module.ActivatedSwitchCount.Should().Be(3);
+        module.IsFullyDeployed.Should().BeTrue();
+        module.BrakingCapability.Should().Be(12);
 
         var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], [], new CoffeeTokenPool()).ToArray();
         commands.Should().BeEmpty();

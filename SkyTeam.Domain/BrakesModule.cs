@@ -5,8 +5,12 @@ sealed class BrakesModule : GameModule
     private static readonly int[] RequiredValues = [2, 4, 6];
 
     private int _nextRequiredIndex;
+    private int _brakingCapability;
 
     internal int BrakesValue { get; private set; }
+    internal int ActivatedSwitchCount => _nextRequiredIndex;
+    internal bool IsFullyDeployed => _nextRequiredIndex >= RequiredValues.Length;
+    internal int BrakingCapability => _brakingCapability;
 
     public override bool CanAcceptBlueDie(Player player) =>
         player == Player.Pilot && _nextRequiredIndex < RequiredValues.Length;
@@ -49,6 +53,7 @@ sealed class BrakesModule : GameModule
             throw new InvalidOperationException($"Brakes requires die value {requiredValue} next.");
 
         _nextRequiredIndex++;
+        _brakingCapability += requiredValue;
         BrakesValue = requiredValue;
     }
 

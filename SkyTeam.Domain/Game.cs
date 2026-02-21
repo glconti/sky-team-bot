@@ -171,7 +171,12 @@ class Game
 
         var axisOk = axisModule?.AxisPosition is >= -2 and <= 2;
         var enginesOk = enginesModule?.LastSpeed is >= 9;
-        var brakesOk = brakesModule?.BrakesValue is >= 6;
+
+        var landingSpeed = enginesModule?.LastSpeed;
+        var brakesOk = brakesModule?.IsFullyDeployed == true
+                      && landingSpeed is not null
+                      && landingSpeed.Value <= brakesModule.BrakingCapability;
+
         var flapsOk = flapsModule?.FlapsValue is >= 4;
         var landingGearOk = landingGearModule?.LandingGearValue is >= 3;
 
