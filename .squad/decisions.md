@@ -1786,3 +1786,26 @@ Because the current application layer (`InMemoryGroupGameSessionStore` + `RoundT
 
 These will require a domain snapshot/broadcast model and/or an application service that applies placements to the domain aggregate.
 
+
+---
+
+## 2026-02-21T21:07:28Z: User directive
+
+**By:** Gianluigi Conti (via Copilot)
+**Decision:** Follow Squad (Coordinator) v0.5.2 governance: Team Mode behavior, mandatory task-based subagent spawning, ceremony triggers, reviewer lockout, directive capture, and Ralph continuous work loop.
+**Rationale:** User request — captured for team memory
+
+---
+
+## 2026-02-21T21:49:12Z: Telegram /sky undo + application replay log (Skiles)
+
+**By:** Skiles (Infrastructure)
+**Decision:** Implemented Telegram /sky undo command for private chats, wired to InMemoryGroupGameSessionStore.UndoLastPlacement(userId).
+**Implementation:** 
+- Added placement logging/replay utilities inside InMemoryGroupGameSessionStore.GameSession to rebuild DomainGame deterministically from per-round roll + placement logs.
+- On roll: store round dice values.
+- On placement: store executed commandId + display name.
+- On undo: drop last placement log, reset game (new airport/modules/game), and replay all rounds (including NextRound between completed rounds).
+
+**Rationale:** Domain has no built-in command undo; application-level undo is safest by replaying commands. Keeps domain pure and ensures cockpit state matches visible placement history after undo.
+
