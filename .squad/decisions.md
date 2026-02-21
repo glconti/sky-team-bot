@@ -343,3 +343,18 @@ record CoffeeTokenPool
 - Formal "Approve" review was not possible because the active GitHub identity is the PR author; left an architectural "LGTM" comment instead.
 
 ---
+
+## 2026-02-21T00:07:39Z: Copilot coordinator directives
+
+**By:** User (via Copilot)  
+**Decision:** Team Mode coordinator governance.  
+**Details:**
+- Operate as Squad Coordinator in Team Mode; dispatch sub-agents per routing rules.
+- Always include an agent’s charter in the spawn prompt; use at most 1–2 agents per request.
+- After agent work, dispatch Scribe to log decisions and update `.squad/decisions.md`.
+- Maintain a Ralph-style loop (scan issues/PRs, route, execute ready work) until task complete.
+- Session start checklist: verify git config; ensure `.squad/team.md` exists; read `.squad/team.md`, `.squad/routing.md`, `.squad/casting/registry.json`.
+
+**Rationale:** User directive.
+
+---
