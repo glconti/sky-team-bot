@@ -142,4 +142,75 @@ public sealed class RoundTurnStateTests
         state.IsReadyToResolve.Should().BeTrue();
         canUndo.Should().BeFalse();
     }
+
+    [Fact]
+    public void RegisterPlacement_ShouldRejectWrongPlayer_WhenItIsNotTheirTurn()
+    {
+        // Arrange
+        var pilotHand = SecretDiceHand.Create([1, 2, 3, 4]);
+        var copilotHand = SecretDiceHand.Create([5, 6, 1, 2]);
+        var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand);
+
+        // Act
+        var act = () => state.RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0);
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*not Copilot*turn*");
+    }
+
+    [Fact]
+    public void RegisterPlacement_ShouldAcceptCorrectPlayerAndUpdatePublicPlacements_WhenPlayersAlternate()
+    {
+        // Arrange
+        var pilotHand = SecretDiceHand.Create([1, 2, 3, 4]);
+        var copilotHand = SecretDiceHand.Create([5, 6, 1, 2]);
+        var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand)
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 1);
+
+        // Act
+        var act = () => state.RegisterPlacement(PlayerSeat.Pilot, dieIndex: 2);
+        var afterCopilot = state.RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0);
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*not Pilot*turn*");
+
+        afterCopilot.PlacementsMade.Should().Be(2);
+        afterCopilot.PlacementsRemaining.Should().Be(RoundTurnState.MaxPlacementsPerRound - 2);
+
+        afterCopilot.Placements.Should().Equal(
+            new RoundPlacement(0, PlayerSeat.Pilot, DieIndex: 1, Value: new DieValue(2)),
+            new RoundPlacement(1, PlayerSeat.Copilot, DieIndex: 0, Value: new DieValue(5)));
+    }
+
+    [Fact]
+    public void RegisterPlacement_ShouldTransitionToReadyToResolveAndStopAccepting_WhenEightPlacementsAreMade()
+    {
+        // Arrange
+        var pilotHand = SecretDiceHand.Create([1, 2, 3, 4]);
+        var copilotHand = SecretDiceHand.Create([5, 6, 1, 2]);
+
+        var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand)
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0)
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0)
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 1)
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 1)
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 2)
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 2)
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 3)
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 3);
+
+        // Act
+        var act = () => state.RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0);
+
+        // Assert
+        state.IsReadyToResolve.Should().BeTrue();
+        state.PlacementsRemaining.Should().Be(0);
+        state.CanPlace(PlayerSeat.Pilot).Should().BeFalse();
+        state.Placements[^1].Index.Should().Be(RoundTurnState.MaxPlacementsPerRound - 1);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*not accepting placements*");
+    }
 }
