@@ -214,4 +214,23 @@ public sealed class RoundTurnStateTests
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*not accepting placements*");
     }
+
+    [Fact]
+    public void UndoLastPlacement_ShouldThrow_WhenRequestingPlayerIsNotLastPlacer()
+    {
+        // Arrange
+        var pilotHand = SecretDiceHand.Create([1, 2, 3, 4]);
+        var copilotHand = SecretDiceHand.Create([5, 6, 1, 2]);
+
+        var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand)
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0, target: "Axis");
+
+        // Act
+        var act = () => state.UndoLastPlacement(PlayerSeat.Pilot);
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Cannot undo*");
+    }
 }

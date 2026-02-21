@@ -159,3 +159,13 @@
 - Design note: `.squad/decisions/inbox/skiles-issue28-design.md`.
 
 ---
+
+### Session 7: Telegram /sky undo (2026-02-21)
+
+**Outcome:** Implemented `/sky undo` in `SkyTeam.TelegramBot\Program.cs` (private chat only) to undo the last die placement and refresh the player's secret hand.
+
+**Key Paths & Behavior:**
+- Telegram surface: `SkyTeam.TelegramBot\Program.cs` → `HandleSkyUndoAsync()`.
+- Application use-case: `SkyTeam.Application\GameSessions\InMemoryGroupGameSessionStore.UndoLastPlacement(userId)` returning `GameUndoResult` (`NoActiveSession`, `NotSeated`, `RoundNotRolled`, `UndoNotAllowed`, `DomainError`).
+- On success: bot posts a public message to `PublicInfo.GroupChatId` and DMs the requesting user with the updated hand and available commands (same rendering style as `/sky place`).
+- Group chat guard: `/sky undo` in a group replies "Use /sky undo in a private chat with me."
