@@ -97,7 +97,8 @@ internal static class Program
                 default:
                     await botClient.SendMessage(
                         chatId: message.Chat.Id,
-                        text: "In a group chat, try: /sky new\n\nIn private chat: /sky hand | /sky place <dieIndex> <module/slot>",
+                        text: "In a group chat, try: /sky new\n\nIn private chat: /sky hand | /sky place <dieIndex> <commandId>",
+
                         cancellationToken: cancellationToken);
                     return;
             }
@@ -299,14 +300,14 @@ internal static class Program
 
         var failedRecipients = new List<string>(capacity: 2);
 
-        if (!await TrySendSecretDiceAsync(botClient, snapshot.Pilot!, "Pilot", roll.PilotDice, isYourTurn: true, cancellationToken))
+        if (!await TrySendSecretDiceAsync(botClient, snapshot.Pilot!, "Pilot", roll.PilotDice, isYourTurn: roll.StartingPlayer == PlayerSeat.Pilot, cancellationToken))
             failedRecipients.Add(snapshot.Pilot!.DisplayName);
 
-        if (!await TrySendSecretDiceAsync(botClient, snapshot.Copilot!, "Copilot", roll.CopilotDice, isYourTurn: false, cancellationToken))
+        if (!await TrySendSecretDiceAsync(botClient, snapshot.Copilot!, "Copilot", roll.CopilotDice, isYourTurn: roll.StartingPlayer == PlayerSeat.Copilot, cancellationToken))
             failedRecipients.Add(snapshot.Copilot!.DisplayName);
 
         var groupText = failedRecipients.Count == 0
-            ? "Dice rolled and sent privately to seated players. Pilot places first (use /sky place in private chat)."
+            ? $"Dice rolled and sent privately to seated players. {roll.StartingPlayer} places first (use /sky place in private chat)."
             : $"Dice rolled, but I couldn't DM: {string.Join(", ", failedRecipients)}. Each seated player must /start me in a private chat first.";
 
         await botClient.SendMessage(
@@ -333,7 +334,7 @@ internal static class Program
             GameHandStatus.NoActiveSession => "No active game session found for you. Start a game in a group chat first.",
             GameHandStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
             GameHandStatus.RoundNotRolled => "This round has not been rolled yet. In the group chat, run: /sky roll",
-            GameHandStatus.Ok => $"{result.Seat} hand:\n{RenderHand(result.Hand!)}\n\nCurrent turn: {result.CurrentPlayer}\nPlacements remaining: {result.PlacementsRemaining}",
+            GameHandStatus.Ok => $"{result.Seat} hand:\n{RenderHand(result.Hand!)}\n\nCurrent turn: {result.CurrentPlayer}\nPlacements remaining: {result.PlacementsRemaining}\n\nAvailable commands:\n{RenderCommands(result.AvailableCommands)}",
             _ => "Cannot show hand."
         };
 
@@ -362,7 +363,7 @@ internal static class Program
         {
             await botClient.SendMessage(
                 chatId: message.Chat.Id,
-                text: "Usage: /sky place <dieIndex> <module/slot>",
+                text: "Usage: /sky place <dieIndex> <commandId>",
                 cancellationToken: cancellationToken);
             return;
         }
@@ -371,13 +372,13 @@ internal static class Program
         {
             await botClient.SendMessage(
                 chatId: message.Chat.Id,
-                text: "Invalid die index. Usage: /sky place <dieIndex> <module/slot>",
+                text: "Invalid die index. Usage: /sky place <dieIndex> <commandId>",
                 cancellationToken: cancellationToken);
             return;
         }
 
-        var target = string.Join(" ", args.Skip(1));
-        var result = GameSessionStore.PlaceDie(message.From.Id, dieIndex, target);
+        var commandId = string.Join(" ", args.Skip(1));
+        var result = GameSessionStore.PlaceDie(message.From.Id, dieIndex, commandId);
 
         if (result.Status != GamePlacementStatus.Placed)
         {
@@ -395,7 +396,11 @@ internal static class Program
                 GamePlacementStatus.NotPlayersTurn => "It is not your turn." + currentTurnText,
                 GamePlacementStatus.InvalidDieIndex => "Invalid die index (expected 0-3).",
                 GamePlacementStatus.DieAlreadyUsed => "That die has already been used.",
-                GamePlacementStatus.InvalidTarget => "A placement target is required.",
+                GamePlacementStatus.InvalidTarget => "A command id is required.",
+                GamePlacementStatus.CommandDoesNotMatchDie => "That command does not match the selected die.",
+                GamePlacementStatus.CommandNotAvailable => "That command is not currently available.",
+                GamePlacementStatus.DomainError => result.ErrorMessage ?? "Cannot place die (domain error).",
+
                 _ => "Cannot place die."
             };
 
@@ -408,9 +413,9 @@ internal static class Program
 
         var info = result.PublicInfo!;
 
-        var groupText = $"{info.Player.DisplayName} ({info.Seat}) placed {info.Value.Value} on {info.Target}.";
+        var groupText = $"{info.Player.DisplayName} ({info.Seat}) placed {info.Value.Value}: {info.CommandDisplayName}.";
         groupText += info.PlacementsRemaining == 0
-            ? "\n\nAll placements done. Ready to resolve the round."
+            ? "\n\nAll placements done. Resolving the round..."
             : $"\nNext: {info.NextPlayer}. Remaining placements: {info.PlacementsRemaining}.";
 
         await botClient.SendMessage(
@@ -420,8 +425,16 @@ internal static class Program
 
         var updatedHand = GameSessionStore.GetHand(message.From.Id);
         var dmText = updatedHand.Status == GameHandStatus.Ok
-            ? $"Placement recorded: {info.Value.Value} → {info.Target}\n\nYour hand:\n{RenderHand(updatedHand.Hand!)}\n\nCurrent turn: {updatedHand.CurrentPlayer}"
-            : $"Placement recorded: {info.Value.Value} → {info.Target}";
+            ? $"Placement recorded: {info.CommandDisplayName} ({info.CommandId})\n\nYour hand:\n{RenderHand(updatedHand.Hand!)}\n\nCurrent turn: {updatedHand.CurrentPlayer}\n\nPlacements remaining: {updatedHand.PlacementsRemaining}\n\nAvailable commands:\n{RenderCommands(updatedHand.AvailableCommands)}"
+            : $"Placement recorded: {info.CommandDisplayName} ({info.CommandId})";
+
+        if (result.ResolutionInfo is not null)
+        {
+            await botClient.SendMessage(
+                chatId: info.GroupChatId,
+                text: RenderResolution(result.ResolutionInfo),
+                cancellationToken: cancellationToken);
+        }
 
         await botClient.SendMessage(
             chatId: message.Chat.Id,
@@ -431,6 +444,37 @@ internal static class Program
 
     private static string RenderHand(SecretDiceHand hand)
         => string.Join("\n", hand.Dice.Select(die => $"{die.Index}:{die.Value.Value}{(die.IsUsed ? " (used)" : string.Empty)}"));
+
+    private static string RenderCommands(IReadOnlyList<AvailableGameCommand> commands)
+    {
+        if (commands.Count == 0)
+            return "(none)";
+
+        return string.Join("\n", commands.Select(c => $"- {c.DisplayName} ({c.CommandId})"));
+    }
+
+    private static string RenderResolution(GameRoundResolutionPublicInfo info)
+    {
+        var s = info.ResolvedState;
+
+        var text = $"Round {info.ResolvedRoundNumber} resolved.\n" +
+                   $"Axis: {s.AxisPosition}\n" +
+                   $"Engines speed: {(s.EnginesSpeed is null ? "-" : s.EnginesSpeed.ToString())}\n" +
+                   $"Approach: {s.ApproachPositionIndex + 1}/{s.ApproachSegmentCount} (planes remaining: {s.TotalPlanesRemaining})\n" +
+                   $"Brakes: {s.BrakesActivatedSwitchCount}/3 (capability: {s.BrakesCapability})\n" +
+                   $"Flaps: {s.FlapsValue}/4\n" +
+                   $"Landing gear: {s.LandingGearValue}/3\n" +
+                   $"Coffee tokens: {s.CoffeeTokens}\n" +
+                   $"Aerodynamics thresholds: blue {s.BlueAerodynamicsThreshold}, orange {s.OrangeAerodynamicsThreshold}\n" +
+                   $"Game status: {info.GameStatus}";
+
+        if (info.NextRoundNumber is not null)
+        {
+            text += $"\n\nNext: round {info.NextRoundNumber} starts with {info.NextStartingPlayer}. In the group chat, run: /sky roll";
+        }
+
+        return text;
+    }
 
     private static async Task<bool> TrySendSecretDiceAsync(
         ITelegramBotClient botClient,
@@ -448,7 +492,7 @@ internal static class Program
             ? "It's your turn to place first."
             : "Wait for the other player to place first.";
 
-        var messageText = $"{seat} secret dice: {diceText}\n\n{turnText}\n\nCommands:\n/sky hand\n/sky place <dieIndex> <module/slot>";
+        var messageText = $"{seat} secret dice: {diceText}\n\n{turnText}\n\nCommands:\n/sky hand\n/sky place <dieIndex> <commandId>";
 
         try
         {

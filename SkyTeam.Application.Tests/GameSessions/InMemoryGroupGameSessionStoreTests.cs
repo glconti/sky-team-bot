@@ -111,26 +111,44 @@ public sealed class InMemoryGroupGameSessionStoreTests
         var (pilot, copilot, lobby) = CreateReadyLobby();
 
         store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
-        store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        var roll = store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        roll.Status.Should().Be(GameSessionRollStatus.Rolled);
+        roll.StartingPlayer.Should().NotBeNull();
 
-        store.PlaceDie(pilot.UserId, dieIndex: 0, target: "Axis");
-        store.PlaceDie(copilot.UserId, dieIndex: 0, target: "Axis");
-        store.PlaceDie(pilot.UserId, dieIndex: 1, target: "Axis");
-        store.PlaceDie(copilot.UserId, dieIndex: 1, target: "Axis");
-        store.PlaceDie(pilot.UserId, dieIndex: 2, target: "Axis");
-        store.PlaceDie(copilot.UserId, dieIndex: 2, target: "Axis");
-        store.PlaceDie(pilot.UserId, dieIndex: 3, target: "Axis");
+        static string GetCommandIdForDie(InMemoryGroupGameSessionStore store, long userId, int dieIndex)
+        {
+            var hand = store.GetHand(userId);
+            hand.Status.Should().Be(GameHandStatus.Ok);
+            hand.Hand.Should().NotBeNull();
+            hand.AvailableCommands.Should().NotBeNull();
+
+            var rolledValue = hand.Hand!.Dice.Single(d => d.Index == dieIndex).Value.Value;
+            var command = hand.AvailableCommands!.First(c => c.CommandId.Contains($":{rolledValue}"));
+            return command.CommandId;
+        }
+
+        var firstUser = roll.StartingPlayer == PlayerSeat.Pilot ? pilot.UserId : copilot.UserId;
+        var secondUser = roll.StartingPlayer == PlayerSeat.Pilot ? copilot.UserId : pilot.UserId;
+        var expectedNextPlayer = roll.StartingPlayer == PlayerSeat.Pilot ? PlayerSeat.Copilot : PlayerSeat.Pilot;
+
+        for (var dieIndex = 0; dieIndex < 3; dieIndex++)
+        {
+            store.PlaceDie(firstUser, dieIndex, GetCommandIdForDie(store, firstUser, dieIndex));
+            store.PlaceDie(secondUser, dieIndex, GetCommandIdForDie(store, secondUser, dieIndex));
+        }
+
+        store.PlaceDie(firstUser, dieIndex: 3, GetCommandIdForDie(store, firstUser, dieIndex: 3));
 
         // Act
         var snapshot = store.GetSnapshot(GroupChatId);
-        var hand = store.GetHand(copilot.UserId);
+        var hand = store.GetHand(secondUser);
 
         // Assert
         snapshot.Should().NotBeNull();
         snapshot!.Round.Should().Be(new GameRoundSnapshot(RoundNumber: 1, GameRoundStatus.AwaitingPlacements));
 
         hand.Status.Should().Be(GameHandStatus.Ok);
-        hand.CurrentPlayer.Should().Be(PlayerSeat.Copilot);
+        hand.CurrentPlayer.Should().Be(expectedNextPlayer);
         hand.PlacementsRemaining.Should().Be(1);
     }
 
@@ -142,18 +160,35 @@ public sealed class InMemoryGroupGameSessionStoreTests
         var (pilot, copilot, lobby) = CreateReadyLobby();
 
         store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
-        store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        var roll = store.RegisterRoll(GroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+        roll.Status.Should().Be(GameSessionRollStatus.Rolled);
+        roll.StartingPlayer.Should().NotBeNull();
+
+        static string GetCommandIdForDie(InMemoryGroupGameSessionStore store, long userId, int dieIndex)
+        {
+            var hand = store.GetHand(userId);
+            hand.Status.Should().Be(GameHandStatus.Ok);
+            hand.Hand.Should().NotBeNull();
+            hand.AvailableCommands.Should().NotBeNull();
+
+            var rolledValue = hand.Hand!.Dice.Single(d => d.Index == dieIndex).Value.Value;
+            var command = hand.AvailableCommands!.First(c => c.CommandId.Contains($":{rolledValue}"));
+            return command.CommandId;
+        }
+
+        var firstUser = roll.StartingPlayer == PlayerSeat.Pilot ? pilot.UserId : copilot.UserId;
+        var secondUser = roll.StartingPlayer == PlayerSeat.Pilot ? copilot.UserId : pilot.UserId;
 
         // Act
         for (var dieIndex = 0; dieIndex < 4; dieIndex++)
         {
-            store.PlaceDie(pilot.UserId, dieIndex, target: "Axis");
-            store.PlaceDie(copilot.UserId, dieIndex, target: "Axis");
+            store.PlaceDie(firstUser, dieIndex, GetCommandIdForDie(store, firstUser, dieIndex));
+            store.PlaceDie(secondUser, dieIndex, GetCommandIdForDie(store, secondUser, dieIndex));
         }
 
         var snapshot = store.GetSnapshot(GroupChatId);
         var pilotHand = store.GetHand(pilot.UserId);
-        var placeAfterResolve = store.PlaceDie(pilot.UserId, dieIndex: 0, target: "Axis");
+        var placeAfterResolve = store.PlaceDie(pilot.UserId, dieIndex: 0, commandId: "Axis.AssignBlue:1");
 
         // Assert
         snapshot.Should().NotBeNull();
