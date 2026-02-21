@@ -35,14 +35,6 @@
 - Skiles implements Phase 1 (test framework integration points)
 - Aloha begins E2E test harness prep (Tenerife's 7 transcripts as golden tests)
 
-### Session 2: Issue #31 Domain QA (2026-02-21)
-**Outcome:** Added fast, deterministic `SkyTeam.Domain.Tests` coverage for Tenerife's locked rules spec: axis out-of-bounds immediate loss, landing win/loss criteria matrix, and coffee-token/die boundary cases.
-
-**Notes / Learnings:**
-- Axis resolution must fail fast when the resulting position is `< -2` or `> +2`.
-- Landing result is an AND of criteria (approach cleared, axis in range, engines ≥ 9, brakes/flaps/gear fully deployed); a single failure yields LOSS.
-- Brakes landing criterion appears inconsistent between spec and code; captured in `.squad/decisions/inbox/aloha-issue31-test-findings.md`.
-
 ### Session 3: Issue #31 Completion Round (2026-02-21T10:21:03Z)
 **Outcome:** Prepared draft PR #38 (squad/31-domain-tests) with comprehensive test coverage for all 7 modules per Tenerife's final spec. Identified spec mismatches and working assumptions that require reconciliation.
 
@@ -98,5 +90,29 @@
 - **Tenerife:** Spec complete; awaiting reconciliation on Brakes landing criterion
 - **Skiles:** PR #37 implemented; code supports both Brakes interpretations (currently checks >= 6)
 - **Sully:** Awaiting code review of PR #37/38 for module design + command dispatcher + token UX surface
+
+### Session 4: PR #37 Unblock & Loss Semantics Finalization (2026-02-21T18:06:26Z)
+**Outcome:** Sully fixed token pool wiring in PR #37. Tenerife produced comprehensive loss condition checklist. Added ExecuteCommand smoke tests. Scribe logged all work and merged decisions.
+
+**ExecuteCommand Smoke Tests Added:**
+- Base-scenario coverage: valid command execution, token spend, invalid rejection
+- AAA pattern, FluentAssertions, data-driven matrix
+- Tests green; ready for broader integration suite
+- Command validation: token availability, die placement legality, module state transitions
+
+**Test Quality Improvements:**
+- Deterministic test cases with mock dependency injection
+- Isolated test per concern (token spend, command availability, die management)
+- Edge case coverage: token exhaustion, invalid die placements, state desync detection
+- Ready to merge with PR #37 once Sully validation complete
+
+**Delivered Artifacts (Session 4):**
+- `.squad/orchestration-log/2026-02-21T18-06-26Z-aloha.md` — ExecuteCommand smoke tests orchestration log
+- `.squad/decisions.md` — Merged loss condition checklist (comprehensive taxonomy + bug findings)
+
+**Pending Actions:**
+- Validate ExecuteCommand implementation against smoke test suite
+- Merge PR #37 + test PR once Sully approves
+- Extend test coverage for reroll mechanics (blocked on implementation)
 
 ---

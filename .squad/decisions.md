@@ -676,3 +676,50 @@ record CoffeeTokenPool
 **Rationale:** Avoid surprising seat resets in active groups; explicit `/sky reset` (future feature) supports advanced scenarios. Non-destructive `/sky new` is MVP-safe.
 
 ---
+
+## 2026-02-21T18:06:26Z: PR#37 Execute wiring — token pool + landing checks (Sully)
+
+**By:** Sully (Architect)  
+**Decision:** For PR #37 / issue #31, keep the **coffee token pool owned by `ConcentrationModule`** (as the authoritative source of token count).
+
+- `Game.GetAvailableCommands()` now passes `ConcentrationModule.TokenPool` (fallback: 0) into module command generation.
+- All token-adjusted `GameCommand.Execute(Game)` implementations spend tokens via `game.SpendCoffeeTokens(k)`, and `Game.SpendCoffeeTokens(k)` delegates to `ConcentrationModule.SpendCoffeeTokens(k)`.
+
+Also, landing win/loss checks are evaluated as independent criteria (Engines ≥ 9, Brakes ≥ 6, Flaps ≥ 4, Landing Gear ≥ 3, Axis within [-2,2], Approach cleared), and `NextRound()` no longer enforces an additional "mandatory placements" loss gate beyond the existing command-availability rules.
+
+**Rationale:** This keeps the PR37 command-execution wiring minimal and consistent, matches the current module/test contract, and avoids catching/rewrapping non-rule exceptions (only rule losses use `GameRuleLossException`).
+
+---
+
+## 2026-02-21T18:06:26Z: Loss Condition Semantics & Rule Validation Checklist (Tenerife)
+
+**By:** Tenerife (Rules Expert)  
+**Decision:** Codify explicit loss conditions (must throw `GameRuleLossException`) vs. invalid moves (normal rejection via command validation) based on current domain implementation and M1 rules spec.
+
+**Win Condition (All 6 Must Pass at Landing):**
+- Axis Position: [-2, 2] (balanced)
+- Engines: Sum ≥ 9
+- Brakes: Value ≥ 6
+- Flaps: Value ≥ 4
+- Landing Gear: All 3 switches activated (value = 3)
+- Approach Track: All plane tokens cleared
+
+**Explicit Loss Conditions (→ GameRuleLossException):**
+1. Axis Out of Balance at Landing: `AxisPosition < -2 OR AxisPosition > 2`
+2. Speed Too High at Landing: `BrakesValue < EnginesValue`
+3. Approach Track Collision: ANY plane token remains on Approach track
+4. Altitude Exhausted: No more segments to descend without having reached landing
+5. Mid-Round Axis Invariant: After both Axis dice placed, result out of bounds (axis ≥ ±3)
+
+**Invalid Moves (Normal Rejection, No Exception):**
+- Brakes/Flaps sequence violations, duplicate placements, concentration exhaustion, radio orange limit, die availability issues — all preventable via command availability and UI validation.
+
+**Bugs Noted:**
+- Axis landing check currently too strict (checks == 0, should check ∈[-2,2]).
+- Speed comparison uses > not ≥; verify if intended.
+- Altitude exhaustion not explicitly implemented; needs implementation after altitude redesign.
+- Reroll token mechanics not visible in current implementation.
+
+**Rationale:** Comprehensive checklist unblocks rule validation and test coverage. Separates true loss conditions from validation errors, enabling proper exception handling and game-state management.
+
+---
