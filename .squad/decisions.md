@@ -1327,3 +1327,56 @@ During each round, after both players have placed all dice, modules are resolved
 
 
 </details>
+
+
+---
+
+
+## 2026-02-21: Issue #36 tests PR base branch
+
+**Decision:** Deliver issue #36 (application turn/undo invariant tests) as a stacked PR targeting `squad/28-round-turn-state-secret-hand` (PR #39), because the tests exercise `RoundTurnState` / `SecretDiceHand` introduced by #28.
+
+**Rationale:** Keeps CI green and aligns with the declared dependency graph (#36 depends on #28). Once #39 merges to `master`, this PR can be retargeted or merged normally.
+
+---
+
+
+## 2026-02-21: PR #39 (Issue #28) — ready to undraft
+
+**By:** Skiles (Domain Dev)  
+**Decision:** PR #39 (Issue #28: application-layer round/turn state + secret dice hand) is coherent and can be moved out of Draft.
+
+**Evidence:**
+- `dotnet test -c Release` passes (145 tests, 0 failures).
+- Changes are isolated to application-layer round/turn orchestration primitives (no Telegram SDK leakage), matching prior Issue #28 design decision.
+
+**Rationale:** The PR provides the minimal state machine + invariants needed for strict alternation and private placement flows, and it is now green on the full test suite in Release configuration.
+
+---
+
+
+## 2026-02-21: PR39 resync (2)
+
+**Context:** PR #39 (`squad/28-round-turn-state-secret-hand`) was conflicting after `master` advanced.
+
+**Decision:** Re-synced by rebasing the PR branch onto latest `origin/master` using `git rebase --rebase-merges origin/master` and force-pushing with `--force-with-lease`.
+
+**Conflict resolution stance (if future conflicts recur):**
+- Keep **current `master`** domain logic for landing/brakes (Domain layer is source of truth).
+- Preserve PR branch changes for **application-layer** Round/Turn state and secret-hand workflow.
+
+**Result:** Rebase applied cleanly (no manual conflict resolution needed) and branch updated on origin.
+
+---
+
+
+## 2026-02-21T18:56:06Z: PR #39 sync with master (Skiles)
+
+**By:** Skiles (Domain Developer)
+
+**Decision:** Rebased PR #39 branch (`squad/28-round-turn-state-secret-hand`) onto `origin/master` to unblock merge conflicts; resolved Brakes-related conflicts by keeping the current master landing/braking-capability logic, and skipped the older coffee-token adjustment commit that was already upstream.
+
+**Rationale:** Minimizes divergence from master, avoids re-introducing stale token-adjustment implementations, and keeps PR focused on Issue #28 changes.
+
+---
+
