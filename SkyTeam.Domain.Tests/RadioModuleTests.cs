@@ -204,4 +204,53 @@ public class RadioModuleTests
         // Assert
         commandIds.Should().Equal(["Radio.AssignOrange:1", "Radio.AssignOrange:3", "Radio.AssignOrange:6"]);
     }
+
+    [Fact]
+    public void GetAvailableCommands_ShouldBeEmpty_WhenNoUnusedDiceOfCurrentPlayersColor()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new RadioModule(airport);
+
+        // Act
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)]).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], []).ToArray();
+
+        // Assert
+        pilotCommands.Should().BeEmpty();
+        copilotCommands.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetAvailableCommands_ShouldBeEmpty_WhenBlueSlotIsAlreadyFilled()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new RadioModule(airport);
+
+        module.AssignBlueDie(BlueDie.FromValue(1));
+
+        // Act
+        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], []).ToArray();
+
+        // Assert
+        commands.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetAvailableCommands_ShouldBeEmpty_WhenOrangeCapacityIsExhausted()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new RadioModule(airport);
+
+        module.AssignOrangeDie(OrangeDie.FromValue(1));
+        module.AssignOrangeDie(OrangeDie.FromValue(2));
+
+        // Act
+        var commands = module.GetAvailableCommands(Player.Copilot, [], [OrangeDie.FromValue(3)]).ToArray();
+
+        // Assert
+        commands.Should().BeEmpty();
+    }
 }
