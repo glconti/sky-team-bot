@@ -169,3 +169,63 @@
 - Application use-case: `SkyTeam.Application\GameSessions\InMemoryGroupGameSessionStore.UndoLastPlacement(userId)` returning `GameUndoResult` (`NoActiveSession`, `NotSeated`, `RoundNotRolled`, `UndoNotAllowed`, `DomainError`).
 - On success: bot posts a public message to `PublicInfo.GroupChatId` and DMs the requesting user with the updated hand and available commands (same rendering style as `/sky place`).
 - Group chat guard: `/sky undo` in a group replies "Use /sky undo in a private chat with me."
+
+### Session 8: Telegram Button-First UX — Callback Architecture Breakdown (2026-02-21T23:05:13Z)
+
+**Outcome:** Produced comprehensive technical breakdown of callback_query handling, single edited cockpit message pattern, DM menu design, 64-byte callback_data mitigation strategy, menu state store architecture, deep-link onboarding flow, and constraint-handling strategies.
+
+**Key Decisions:**
+
+**1. Callback Query Handler Pattern**
+- Validate payload: `(userId, groupChatId, menuVersion, actionId)`
+- Server-side lookup: `MenuState[(userId, groupChatId, menuVersion)][actionId]` → command/target
+- Execute corresponding domain command
+- `AnswerCallbackQuery` response (spinner stop, error toast)
+- Idempotency: track `(userId, groupChatId, menuVersion, actionId)` to dedupe retries
+
+**2. Single Edited Cockpit Message Lifecycle**
+- On first interaction (`/sky new`): send cockpit, persist `message_id`
+- On state change (after round resolution): `EditMessageText` only (no new messages)
+- Cockpit deleted on game end or session timeout
+
+**3. Menu State Store (In-Memory, Per-Group)**
+- Storage: `Dictionary<(userId, groupChatId, menuVersion), MenuState>`
+- MenuState: `{ actionId → commandId, targetId → moduleSlot, timestamp }`
+- Thread-safe with `ReaderWriterLockSlim` per group
+- GC: expire after 1 hour or session end
+- Supports versioning (`v1:`, `v2:` for schema evolution)
+
+**4. callback_data 64-Byte Constraint Solution**
+- Problem: full command IDs + dynamic options exceed 64 bytes
+- Solution: short versioned action tokens (`v1:place:d2`) + server-side state
+- No long IDs in callback; all mapping is server-side
+- Format: `v1:action:index`
+
+**5. DM Menu Design**
+- Display secret hand + available placements
+- Persist DM `message_id` per user; edit on state change
+- Button layout: die-selector (0–3) + target buttons (module slots) + undo/cancel
+
+**6. Deep-Link Onboarding (/start?game=<groupId>)**
+- Entry: group "Join Game" button or manual `/start?game=123`
+- Handler: register user, join session, show DM hand menu
+- Fallback: plain `/start` lists active games
+
+**Constraints & Mitigations:**
+- **Retry dedup:** idempotency key prevents duplicate actions
+- **Restart recovery:** stale buttons → "menu expired" toast; retry from `/sky hand`
+- **Concurrency:** per-group serialization + async/await on all Telegram API calls
+
+**GitHub Artifacts Created:**
+- Epic #49: https://github.com/glconti/sky-team-bot/issues/49 (Telegram button-first UX)
+- Child issues #50–#57: callback handler, cockpit renderer, DM menu, callback_data design, state store, onboarding, button lifecycle, E2E tests
+
+**Implementation Sequencing:**
+- Issue #54 (menu state store) unblocks #50–#52 (callbacks, renderer, menu)
+- Phases: #50–#52 (Phase 1), #53–#55 (Phase 2), #56–#57 (Phase 3 polish/tests)
+
+**Cross-Team:**
+- Sully created Epic #49 + child issues, routed to Skiles
+- Tenerife validates button rendering against UX spec
+- Aloha designs E2E callback test harness (mock Telegram SDK)
+- Scribe logs all work + merges decision inbox (3 files)

@@ -1824,3 +1824,124 @@ These will require a domain snapshot/broadcast model and/or an application servi
 - Consider removing or using the `startingPlayer` input in `RegisterRoll(...)` to keep a single source of truth.
 - Keep the “one active group session per user” invariant explicit until persistence/multi-session support exists.
 
+
+---
+
+## 2026-02-21T23:05:13Z: Telegram button-first cockpit UX epic (Sully)
+
+**By:** Sully (Architect)  
+**Date:** 2026-02-21  
+**Status:** Epic #49 + child issues #50–#57 created
+
+**Decision:** Drive the Telegram group UX through a *single* edited "Cockpit" message (EditMessageText + inline keyboard) to avoid chat spam, while keeping /sky ...` commands as a fully supported fallback.
+
+**Scope / Rollout:**
+- **Phase 1 (MVP):** Inline keyboards + callback queries for the primary flows (group lobby/game actions + DM placement/undo). Keep current text command handlers unchanged.
+- **Cockpit message:** On first interaction per group (e.g., /sky new` or "Open cockpit" button), send a cockpit message and persist its `message_id` in the group session store; all subsequent state changes edit this message.
+- **Reliability:** Always `AnswerCallbackQuery` (stop spinner) and validate callback payloads; treat unknown/expired callbacks as no-ops with a short toast.
+
+**Constraints:**
+- **callback_data:** 1–64 bytes; use short, versioned tokens (e.g., `v1:...`) and avoid long IDs / verbose strings.
+- **Idempotency:** Callback handlers should be safe to retry (Telegram may deliver updates out of order / duplicated).
+
+**Non-goals:**
+- Persistence across process restarts (in-memory stores are acceptable for now).
+- Telegram Menu Button / WebApp cockpit (tracked as an explicit stretch issue).
+
+**GitHub Artifacts:**
+- Epic #49: https://github.com/glconti/sky-team-bot/issues/49
+- Child issues: #50 (callback handler), #51 (cockpit renderer), #52 (DM menu), #53 (callback_data design), #54 (state store), #55 (deep-link onboarding), #56 (button lifecycle), #57 (E2E tests)
+
+---
+
+## 2026-02-21T23:05:13Z: Telegram button-first UX — callback data + UI state (Skiles)
+
+**By:** Skiles (Domain Dev)  
+**Date:** 2026-02-21  
+**Status:** Technical breakdown ready for implementation
+
+**Decision:** Implement button-first UX by keeping **Telegram UI state** (message ids, menu versions, option mappings) inside the Telegram adapter/host layer (e.g., `SkyTeam.TelegramBot`), and keep `SkyTeam.Application` transport-agnostic.
+
+**Technical Architecture:**
+
+**1. Callback Query Handler Pattern**
+- Validate callback payload: `(userId, groupChatId, menuVersion, actionId)`
+- Look up action in menu state store: `MenuState[(userId, groupChatId, menuVersion)][actionId]`
+- Execute corresponding domain command
+- Send `AnswerCallbackQuery` response (stop spinner, toast on error)
+
+**2. Single Edited Cockpit Message Lifecycle**
+- On first interaction (`/sky new`): send cockpit message, store `message_id`
+- On state change (after round resolution): `EditMessageText` with updated keyboard + content
+- No new messages posted; all updates are edits
+- Cockpit deleted on game end or session timeout
+
+**3. Menu State Store (In-Memory)**
+- Storage: `Dictionary<(userId, groupChatId, menuVersion), MenuState>`
+- MenuState: `{ actionId → commandId, targetId → moduleSlot, timestamp }`
+- Per-group serialization (thread-safe with `ReaderWriterLockSlim`)
+- GC: expire entries after 1 hour or on session end
+- Supports versioning (e.g., `v1:`, `v2:` for schema evolution)
+
+**4. callback_data 64-Byte Mitigation**
+- Problem: full command IDs + options exceed 64 bytes
+- Solution: short versioned action tokens (`v1:place:d2`) reference server state
+- No long IDs in callback payloads; all mapping is server-side
+
+**5. DM Menu (Hand + Commands)**
+- Display secret dice hand + available placements
+- Store DM `message_id` per user; edit on state change
+- Button layout: die-selector (0–3) + target buttons (module slots) + undo/cancel
+
+**6. Deep-Link Onboarding (/start?game=<groupId>)**
+- Entry from group "Join Game" button or manual `/start?game=123`
+- Handler registers user, joins group session, shows DM hand menu
+- Fallback: plain `/start` lists active games or "no active games"
+
+**Constraints & Mitigations:**
+- **Retry dedup:** track `(userId, groupChatId, menuVersion, actionId)` to avoid duplicate actions
+- **Restart recovery:** stale buttons → toast "menu expired, refresh"; user retries from `/sky hand`
+- **Concurrency:** per-group serialization + async/await on all Telegram API calls
+
+**Non-goals (deferred to implementation):**
+- Persistence across bot restart
+- WebApp cockpit (tracked as stretch issue)
+
+---
+
+## 2026-02-21: Epic #26 Triage: Telegram MVP Playable in Group Chat (Sully)
+
+**By:** Sully (Architect)  
+**Date:** 2026-02-21  
+**Status:** Epic #26 CLOSED — all child issues (#27–#36) completed
+
+**Decision:** Close Epic #26 as COMPLETED. All 10 child issues are closed and merged.
+
+**MVP Goal Satisfied:**
+✅ Playable in group chat (2 seated players + spectators)  
+✅ Secret dice rolls per player (DM'd privately)  
+✅ Public placements with strict alternation  
+✅ Undo support (current player, before opponent plays)  
+✅ Round resolution + win/loss broadcast  
+✅ Complete domain modules (all 7)  
+✅ In-memory persistence (OK for MVP)  
+✅ Hardening: per-chat serialization, idempotency, dedup  
+
+**Merged Work:**
+- PR #47: Undo (#33) + cockpit renderer (#34) + app tests (#36)
+- PR #48: Per-chat serialization + idempotency (#35)
+
+**P0 Path (Core MVP) — All Closed:**
+- #27 (start command), #28 (app state), #29 (secret DM roll), #30 (public placements), #31 (domain modules), #32 (round resolution)
+
+**P1 Polish — All Closed:**
+- #33 (undo support), #34 (cockpit renderer), #35 (per-chat dedup), #36 (app tests)
+
+**Next Steps (Epic Post-MVP):**
+1. Persistence (DB, Redis)
+2. Spectator visibility (cards dealt, token spends)
+3. UX polish (better messages, inline keyboards)
+4. Stats/leaderboard
+5. Reroll/mulligan mechanics
+
+---

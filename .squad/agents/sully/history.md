@@ -173,4 +173,35 @@
 - ✅ ExecuteCommand baseline established; smoke tests passing
 - ✅ Next phase unblocked: Skiles integration testing + altitude/reroll redesign
 
+### Session 8: Telegram UX Epic #49 Spawn + Triage (2026-02-21T23:05:13Z)
+**Outcome:** Sully created GitHub Epic #49 (Telegram button-first UX) + 8 child issues (#50–#57); Epic #26 (MVP playable group chat) marked CLOSED with all 10 child issues resolved (PRs #47–#48 merged).
+
+**Sully's UX Epic #49 Creation:**
+- **Epic Scope:** Button-first Telegram UI via single edited "Cockpit" message (group) + DM hand menus (private)
+- **Pattern:** Inline keyboards + callback queries for primary flows; `/sky ...` command handlers as fallback
+- **Lifecycle:** Send cockpit on first interaction, edit on all state changes (no new message spam)
+- **Implementation Phases:** Issue #54 (menu state store) unblocks #50–#52 (callbacks, cockpit renderer, DM menu)
+
+**Child Issues Breakdown:**
+- #50: Callback query handler + validation + retry logic
+- #51: Single edited cockpit message + state persistence  
+- #52: DM menu with hand display + inline keyboard
+- #53: callback_data 64-byte constraint + token design (short versioned action tokens)
+- #54: Menu state store (in-memory, per-group, thread-safe, 1-hour GC)
+- #55: Deep-link onboarding (`/start?game=<groupId>`)
+- #56: Button lifecycle + dedup/expiry ("menu expired" toast)
+- #57: E2E integration tests (callback→action mapping, message edits, DM sends)
+
+**Epic #26 Closure:**
+- All 10 child issues closed (#27–#36 across P0 + P1 paths)
+- PRs #47 (undo + cockpit renderer + app tests) and #48 (per-chat dedup) merged to master
+- **MVP Deliverable:** Fully playable group chat (2 seated players + spectators), secret DM dice, public placements with strict alternation, undo support, round resolution + broadcast, all 7 domain modules, in-memory persistence with hardening
+- **Post-MVP Roadmap:** Persistence, spectator visibility, UX polish, stats/leaderboard, reroll mechanics
+
+**Team Coordination:**
+- Skiles receives Epic #49 child issues with implementation sequencing (Issue #54 first)
+- Tenerife validates button text + rendering against existing UX spec
+- Aloha prepares E2E callback test harness (Telegram SDK mock)
+- Scribe logs all work + merges decision inbox (3 files) + updates agent histories
+
 ---
