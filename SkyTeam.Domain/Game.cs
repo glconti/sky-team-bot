@@ -67,8 +67,142 @@ class Game
     /// <summary>
     ///     Executes a command by placing a die on the specified module.
     /// </summary>
-    public void ExecuteCommand(string command)
+    public void ExecuteCommand(string commandId)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(commandId);
+
+        var availableCommandIds = GetAvailableCommands()
+            .Select(command => command.CommandId)
+            .ToHashSet(StringComparer.Ordinal);
+
+        if (!availableCommandIds.Contains(commandId))
+            throw new InvalidOperationException($"Command '{commandId}' is not currently available.");
+
+        if (commandId == NextRoundCommand.Instance.CommandId)
+        {
+            NextRound();
+            return;
+        }
+
+        var parts = commandId.Split(':', 2);
+        if (parts.Length != 2)
+            throw new InvalidOperationException($"Invalid command id '{commandId}'.");
+
+        var prefix = parts[0];
+
+        if (!int.TryParse(parts[1], out var value))
+            throw new InvalidOperationException($"Invalid command id '{commandId}'.");
+
+        AxisPositionModule Axis() => GetRequiredModule<AxisPositionModule>("Axis");
+        EnginesModule Engines() => GetRequiredModule<EnginesModule>("Engines");
+        BrakesModule Brakes() => GetRequiredModule<BrakesModule>("Brakes");
+        FlapsModule Flaps() => GetRequiredModule<FlapsModule>("Flaps");
+        LandingGearModule LandingGear() => GetRequiredModule<LandingGearModule>("LandingGear");
+        RadioModule Radio() => GetRequiredModule<RadioModule>("Radio");
+        ConcentrationModule Concentration() => GetRequiredModule<ConcentrationModule>("Concentration");
+
+        BlueDie GetUnusedBlueDie(int targetValue)
+        {
+            var die = _state.UnusedBlueDice.FirstOrDefault(d => (int)d == targetValue);
+            return die ?? throw new InvalidOperationException($"No unused blue die found with value {targetValue}.");
+        }
+
+        OrangeDie GetUnusedOrangeDie(int targetValue)
+        {
+            var die = _state.UnusedOrangeDice.FirstOrDefault(d => (int)d == targetValue);
+            return die ?? throw new InvalidOperationException($"No unused orange die found with value {targetValue}.");
+        }
+
+        switch (prefix)
+        {
+            case "Axis.AssignBlue":
+            {
+                var die = GetUnusedBlueDie(value);
+                Axis().AssignBlueDie(die);
+                _state.RemoveBlueDie(die);
+                break;
+            }
+            case "Axis.AssignOrange":
+            {
+                var die = GetUnusedOrangeDie(value);
+                Axis().AssignOrangeDie(die);
+                _state.RemoveOrangeDie(die);
+                break;
+            }
+            case "Engines.AssignBlue":
+            {
+                var die = GetUnusedBlueDie(value);
+                Engines().AssignBlueDie(die);
+                _state.RemoveBlueDie(die);
+                break;
+            }
+            case "Engines.AssignOrange":
+            {
+                var die = GetUnusedOrangeDie(value);
+                Engines().AssignOrangeDie(die);
+                _state.RemoveOrangeDie(die);
+                break;
+            }
+            case "Brakes.AssignBlue":
+            {
+                var die = GetUnusedBlueDie(value);
+                Brakes().AssignBlueDie(die);
+                _state.RemoveBlueDie(die);
+                break;
+            }
+            case "Flaps.AssignOrange":
+            {
+                var die = GetUnusedOrangeDie(value);
+                Flaps().AssignOrangeDie(die);
+                _state.RemoveOrangeDie(die);
+                break;
+            }
+            case "LandingGear.AssignBlue":
+            {
+                var die = GetUnusedBlueDie(value);
+                LandingGear().AssignBlueDie(die);
+                _state.RemoveBlueDie(die);
+                break;
+            }
+            case "Radio.AssignBlue":
+            {
+                var die = GetUnusedBlueDie(value);
+                Radio().AssignBlueDie(die);
+                _state.RemoveBlueDie(die);
+                break;
+            }
+            case "Radio.AssignOrange":
+            {
+                var die = GetUnusedOrangeDie(value);
+                Radio().AssignOrangeDie(die);
+                _state.RemoveOrangeDie(die);
+                break;
+            }
+            case "Concentration.AssignBlue":
+            {
+                var die = GetUnusedBlueDie(value);
+                Concentration().AssignBlueDie(die);
+                _state.RemoveBlueDie(die);
+                break;
+            }
+            case "Concentration.AssignOrange":
+            {
+                var die = GetUnusedOrangeDie(value);
+                Concentration().AssignOrangeDie(die);
+                _state.RemoveOrangeDie(die);
+                break;
+            }
+            default:
+                throw new InvalidOperationException($"Invalid command id '{commandId}'.");
+        }
+
+        _state.SwitchPlayer();
+
+        TModule GetRequiredModule<TModule>(string name) where TModule : GameModule
+        {
+            var module = _modules.OfType<TModule>().SingleOrDefault();
+            return module ?? throw new InvalidOperationException($"{name} module is not present.");
+        }
     }
 
     /// <summary>
