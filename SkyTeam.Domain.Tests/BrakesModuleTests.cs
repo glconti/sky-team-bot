@@ -1,0 +1,80 @@
+namespace SkyTeam.Domain.Tests;
+
+using System.Linq;
+using FluentAssertions;
+
+public class BrakesModuleTests
+{
+    [Fact]
+    public void CanAcceptBlueDie_ShouldBeTrueForPilot_WhenNotAllSwitchesAreActivated()
+    {
+        // Arrange
+        var module = new BrakesModule();
+
+        // Act
+        var canAccept = module.CanAcceptBlueDie(Player.Pilot);
+
+        // Assert
+        canAccept.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanAcceptOrangeDie_ShouldAlwaysBeFalse()
+    {
+        // Arrange
+        var module = new BrakesModule();
+
+        // Act
+        var canAccept = module.CanAcceptOrangeDie(Player.Copilot);
+
+        // Assert
+        canAccept.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AssignBlueDie_ShouldAdvanceInOrder_AndIncreaseBrakesValue_WhenCorrectValuesArePlaced()
+    {
+        // Arrange
+        var module = new BrakesModule();
+
+        // Act
+        module.AssignBlueDie(BlueDie.FromValue(2));
+        module.AssignBlueDie(BlueDie.FromValue(4));
+        module.AssignBlueDie(BlueDie.FromValue(6));
+
+        // Assert
+        module.BrakesValue.Should().Be(3);
+
+        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], []).ToArray();
+        commands.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AssignBlueDie_ShouldThrow_WhenDieValueDoesNotMatchNextRequiredValue()
+    {
+        // Arrange
+        var module = new BrakesModule();
+
+        // Act
+        var assigning = () => module.AssignBlueDie(BlueDie.FromValue(4));
+
+        // Assert
+        assigning.Should().Throw<InvalidOperationException>()
+            .WithMessage("Brakes requires die value 2 next.");
+    }
+
+    [Fact]
+    public void GetAvailableCommands_ShouldReturnNextRequiredValue_WhenPlayerHasMatchingDie()
+    {
+        // Arrange
+        var module = new BrakesModule();
+        var unusedBlueDice = new[] { BlueDie.FromValue(1), BlueDie.FromValue(2) };
+
+        // Act
+        var commands = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, []).ToArray();
+
+        // Assert
+        commands.Should().ContainSingle();
+        commands[0].CommandId.Should().Be("Brakes.AssignBlue:2");
+    }
+}
