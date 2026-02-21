@@ -254,7 +254,7 @@ public sealed class InMemoryGroupGameSessionStore
             {
                 session.DomainGame.ExecuteCommand(commandId);
             }
-            catch (InvalidOperationException exception) when (session.DomainGame.Status == GameStatus.Lost)
+            catch (InvalidOperationException) when (session.DomainGame.Status == GameStatus.Lost)
             {
                 // Placement was valid but caused a loss.
             }
