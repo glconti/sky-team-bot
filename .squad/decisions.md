@@ -723,3 +723,46 @@ Also, landing win/loss checks are evaluated as independent criteria (Engines ≥
 **Rationale:** Comprehensive checklist unblocks rule validation and test coverage. Separates true loss conditions from validation errors, enabling proper exception handling and game-state management.
 
 ---
+---
+
+## 2026-02-21T18:14:17Z: Epic #26 triage — P0 path to playable Telegram MVP (Sully)
+
+**Decision:** The smallest P0 sequence to reach a *playable* Sky Team MVP in a Telegram group chat is:
+
+1. **Start game from ready lobby** (Issue #27)
+2. **Authoritative application round/turn state + per-player secret dice hand** (Issue #28)
+3. **DM secret dice roll/hand to each seated player** (Issue #29)
+4. **Public placements in group + strict alternation enforcement** (Issue #30)
+5. **Resolve round after 8 placements + broadcast updated cockpit/state** (Issue #32)
+6. **Domain completion to base game + landing win/loss criteria** (Issue #31) — can progress in parallel, but required before calling the MVP "playable".
+
+**Dependency note:** #27/#29/#30/#32 depend on #28 for a single source of truth for turn order and secret hands; #31 is the rule-completeness gate.
+
+**Rationale:** This keeps Telegram wiring incremental while preserving DDD boundaries (Domain pure; Application owns multi-user orchestration; Telegram only adapts transport/UI).
+
+---
+
+## 2026-02-21T18:14:17Z: Issue #28 — Application round/turn state + secret hands (Skiles)
+
+**Context:** We need application-layer orchestration state for Telegram UX where each player sees only their rolled dice hand, while the group chat enforces strict alternation and resolves after 8 placements. Domain types (`Player`, `BlueDie`, `OrangeDie`, `GameState`) are internal and must remain UI-agnostic; therefore Telegram and application orchestration cannot depend on them.
+
+**Decision:** Implement a small, pure application state model in `SkyTeam.Application.Round`:
+
+- `PlayerSeat` (`Pilot` / `Copilot`) + `Other()` helper for strict alternation.
+- `DieValue` value object (1–6).
+- `SecretDiceHand` (exactly 4 dice, per-player, tracks used/unused dice by index).
+- `RoundTurnState`:
+  - Holds `RoundNumber`, `StartingPlayer`, `CurrentPlayer`, hands, `Placements` list, and a `RoundPhase`.
+  - Enforces strict alternation in `RegisterPlacement()`.
+  - Transitions to `ReadyToResolve` automatically after 8 total placements.
+  - Provides `UndoLastPlacement()` guard-railed by the existing UX policy: only the player who placed last can undo, and only before the other player plays.
+
+**Rationale:**
+- Keeps Telegram SDK types out of application and domain.
+- Deterministic, immutable-ish state makes downstream testing trivial (Aloha can assert state transitions without any randomness).
+- Provides explicit guardrails for upcoming issues: DM roll (#29) uses the hands; public placement (#30) uses the placement log; resolve-after-8 (#32) uses the phase transition.
+
+**Follow-ups:**
+- Wire this state into the session repository/use-cases once the application service layer is introduced.
+- Aloha: add deterministic tests for placement alternation, max 8 placements, and undo gating.
+
