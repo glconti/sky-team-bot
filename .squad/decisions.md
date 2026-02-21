@@ -1809,3 +1809,18 @@ These will require a domain snapshot/broadcast model and/or an application servi
 
 **Rationale:** Domain has no built-in command undo; application-level undo is safest by replaying commands. Keeps domain pure and ensures cockpit state matches visible placement history after undo.
 
+---
+
+## 2026-02-21T21:46:44Z: PR #47–48 architecture review (Sully)
+
+**By:** Sully (Architect)
+
+**Decision:**
+- Undo stays out of the Domain; implement application-level undo via deterministic replay (roll values + executed command IDs).
+- Transport-agnostic cockpit rendering lives in `SkyTeam.Application.Presentation` for adapter reuse.
+- Telegram adapter must be concurrency-safe: serialize per group chat and dedupe `update_id`.
+
+**Notes (non-blocking):**
+- Consider removing or using the `startingPlayer` input in `RegisterRoll(...)` to keep a single source of truth.
+- Keep the “one active group session per user” invariant explicit until persistence/multi-session support exists.
+
