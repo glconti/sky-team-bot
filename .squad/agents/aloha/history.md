@@ -126,3 +126,30 @@
 - Brakes landing criterion appears inconsistent between spec and code; captured in `.squad/decisions/inbox/aloha-issue31-test-findings.md`.
 
 ---
+
+### Session 5: Issue #36 — application turn/undo invariants (2026-02-21)
+**Outcome:** Mapped application orchestration to `RoundTurnState` + `InMemoryGroupGameSessionStore` and added tests for turn alternation, secret-hand mutation isolation, and command gating.
+
+**Where orchestration is exercised (today):**
+- `SkyTeam.Application\\Round\\RoundTurnState.cs` — strict alternation, placement tracking, undo gating, ready-to-resolve transition.
+- `SkyTeam.Application\\GameSessions\\InMemoryGroupGameSessionStore.cs` — per-group session wiring: hand exposure + placement orchestration + resolve/advance.
+- Tests live in `SkyTeam.Application.Tests`:
+  - `SkyTeam.Application.Tests\\Round\\RoundTurnStateTests.cs`
+  - `SkyTeam.Application.Tests\\GameSessions\\InMemoryGroupGameSessionStoreTests.cs`
+
+**Concrete test plan (Issue #36):**
+- Turn alternation:
+  - `GetHand_ShouldReturnNoCommands_WhenRequestingPlayerIsNotCurrentPlayer` (implemented)
+  - `PlaceDie_ShouldReturnNotPlayersTurn_WhenRequestingPlayerIsNotCurrentPlayer` (implemented)
+- Secret hand mutation:
+  - `PlaceDie_ShouldMarkOnlyRequestingPlayersDieUsed_WhenPlacementIsAccepted` (implemented)
+- Undo gate rules:
+  - `UndoLastPlacement_ShouldThrow_WhenRequestingPlayerIsNotLastPlacer` (implemented)
+  - (pending #33) store-level undo orchestration tests once an undo API exists on `InMemoryGroupGameSessionStore`.
+
+**Checklist once #33 lands (undo orchestration):**
+- Add tests for store-level undo API (name TBD by implementation):
+  - Should restore requesting player’s die to unused and rewind `CurrentPlayer`.
+  - Should reject undo after opponent has played.
+  - Should reject undo when round is `ReadyToResolve`.
+- Ensure `GetHand`/available command exposure stays consistent after undo.
