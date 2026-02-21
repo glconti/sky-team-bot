@@ -72,11 +72,14 @@ sealed class EnginesModule(Airport airport) : GameModule
         LastSpeed = speed;
 
         var advanceBy = CalculateApproachAdvance(speed);
-        _airport.AdvanceApproach(advanceBy);
+
+        if (!_airport.IsFinalRound)
+            _airport.AdvanceApproach(advanceBy);
     }
 
     private int CalculateApproachAdvance(int speed)
     {
+        if (_airport.IsFinalRound) return 0;
         if (speed < _airport.BlueAerodynamicsThreshold) return 0;
         if (speed <= _airport.OrangeAerodynamicsThreshold) return 1;
 

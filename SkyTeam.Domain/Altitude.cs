@@ -15,10 +15,15 @@ class Altitude
 
     public AltitudeSegment CurrentAltitude => _altitudeSegments.Peek();
 
+    internal bool IsLanded => _altitudeSegments.Count == 1;
+
     public Player CurrentPlayer { get; private set; } = Player.Pilot;
 
     public void Advance()
     {
+        if (IsLanded)
+            throw new InvalidOperationException("Cannot advance altitude after landing.");
+
         _altitudeSegments.Dequeue();
 
         CurrentPlayer = CurrentPlayer == Player.Pilot ? Player.Copilot : Player.Pilot;
