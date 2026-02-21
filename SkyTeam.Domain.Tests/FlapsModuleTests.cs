@@ -6,6 +6,23 @@ using FluentAssertions;
 
 public class FlapsModuleTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void CanAcceptBlueDie_ShouldAlwaysBeFalse(int playerValue)
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new FlapsModule(airport);
+        var player = (Player)playerValue;
+
+        // Act
+        var canAccept = module.CanAcceptBlueDie(player);
+
+        // Assert
+        canAccept.Should().BeFalse();
+    }
+
     [Fact]
     public void CanAcceptOrangeDie_ShouldBeTrue_ForCopilot_WhenSwitchesRemain()
     {
@@ -98,6 +115,58 @@ public class FlapsModuleTests
 
         // Act
         var commands = module.GetAvailableCommands(Player.Pilot, [], unusedOrangeDice).ToArray();
+
+        // Assert
+        commands.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CanAcceptOrangeDie_ShouldBeFalse_WhenAllSwitchesAreActivated()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new FlapsModule(airport);
+
+        module.AssignOrangeDie(OrangeDie.FromValue(1));
+        module.AssignOrangeDie(OrangeDie.FromValue(2));
+        module.AssignOrangeDie(OrangeDie.FromValue(4));
+        module.AssignOrangeDie(OrangeDie.FromValue(5));
+
+        // Act
+        var canAccept = module.CanAcceptOrangeDie(Player.Copilot);
+
+        // Assert
+        canAccept.Should().BeFalse();
+    }
+
+    [Fact]
+    public void GetAvailableCommands_ShouldBeEmpty_WhenNoUnusedOrangeDice()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new FlapsModule(airport);
+
+        // Act
+        var commands = module.GetAvailableCommands(Player.Copilot, [], []).ToArray();
+
+        // Assert
+        commands.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetAvailableCommands_ShouldBeEmpty_WhenAllSwitchesActivated()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new FlapsModule(airport);
+
+        module.AssignOrangeDie(OrangeDie.FromValue(1));
+        module.AssignOrangeDie(OrangeDie.FromValue(2));
+        module.AssignOrangeDie(OrangeDie.FromValue(4));
+        module.AssignOrangeDie(OrangeDie.FromValue(5));
+
+        // Act
+        var commands = module.GetAvailableCommands(Player.Copilot, [], [OrangeDie.FromValue(6)]).ToArray();
 
         // Assert
         commands.Should().BeEmpty();

@@ -98,6 +98,56 @@ public class LandingGearModuleTests
     }
 
     [Fact]
+    public void CanAcceptBlueDie_ShouldBeFalse_WhenAllSwitchesAreActivated()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new LandingGearModule(airport);
+
+        module.AssignBlueDie(BlueDie.FromValue(1));
+        module.AssignBlueDie(BlueDie.FromValue(4));
+        module.AssignBlueDie(BlueDie.FromValue(6));
+
+        // Act
+        var canAccept = module.CanAcceptBlueDie(Player.Pilot);
+
+        // Assert
+        canAccept.Should().BeFalse();
+    }
+
+    [Fact]
+    public void GetAvailableCommands_ShouldBeEmpty_WhenNoUnusedBlueDice()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new LandingGearModule(airport);
+
+        // Act
+        var commands = module.GetAvailableCommands(Player.Pilot, [], []).ToArray();
+
+        // Assert
+        commands.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetAvailableCommands_ShouldBeEmpty_WhenAllSwitchesActivated()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new LandingGearModule(airport);
+
+        module.AssignBlueDie(BlueDie.FromValue(1));
+        module.AssignBlueDie(BlueDie.FromValue(4));
+        module.AssignBlueDie(BlueDie.FromValue(6));
+
+        // Act
+        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], []).ToArray();
+
+        // Assert
+        commands.Should().BeEmpty();
+    }
+
+    [Fact]
     public void GetAvailableCommands_ShouldYieldOnlyPilotCommands_ForDistinctValuesThatActivateRedSwitches()
     {
         // Arrange

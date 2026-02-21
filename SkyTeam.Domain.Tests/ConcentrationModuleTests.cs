@@ -6,7 +6,32 @@ namespace SkyTeam.Domain.Tests;
 public class ConcentrationModuleTests
 {
     [Fact]
-    public void CanAcceptDie_ShouldBeFalseForPilotAndCopilot_WhenTwoPlacementsDoneInRound()
+    public void CanAcceptDice_ShouldAllowPilotBlueAndCopilotOrangeOnly_WhenSlotsRemain()
+    {
+        // Arrange
+        var module = new ConcentrationModule();
+
+        // Act
+        var canAccept = new
+        {
+            PilotBlue = module.CanAcceptBlueDie(Player.Pilot),
+            CopilotBlue = module.CanAcceptBlueDie(Player.Copilot),
+            PilotOrange = module.CanAcceptOrangeDie(Player.Pilot),
+            CopilotOrange = module.CanAcceptOrangeDie(Player.Copilot)
+        };
+
+        // Assert
+        canAccept.Should().BeEquivalentTo(new
+        {
+            PilotBlue = true,
+            CopilotBlue = false,
+            PilotOrange = false,
+            CopilotOrange = true
+        });
+    }
+
+    [Fact]
+    public void CanAcceptDice_ShouldBeFalseForBothPlayers_WhenTwoPlacementsDoneInRound()
     {
         // Arrange
         var module = new ConcentrationModule();
@@ -17,12 +42,20 @@ public class ConcentrationModuleTests
 
         var canAccept = new
         {
-            Blue = module.CanAcceptBlueDie(Player.Pilot),
-            Orange = module.CanAcceptOrangeDie(Player.Copilot)
+            PilotBlue = module.CanAcceptBlueDie(Player.Pilot),
+            CopilotBlue = module.CanAcceptBlueDie(Player.Copilot),
+            PilotOrange = module.CanAcceptOrangeDie(Player.Pilot),
+            CopilotOrange = module.CanAcceptOrangeDie(Player.Copilot)
         };
 
         // Assert
-        canAccept.Should().BeEquivalentTo(new { Blue = false, Orange = false });
+        canAccept.Should().BeEquivalentTo(new
+        {
+            PilotBlue = false,
+            CopilotBlue = false,
+            PilotOrange = false,
+            CopilotOrange = false
+        });
     }
 
     [Fact]
@@ -116,6 +149,21 @@ public class ConcentrationModuleTests
     }
 
     [Fact]
+    public void GetAvailableCommands_ShouldBeEmpty_WhenNoUnusedDiceOfCurrentPlayersColor()
+    {
+        // Arrange
+        var module = new ConcentrationModule();
+
+        // Act
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)]).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], []).ToArray();
+
+        // Assert
+        pilotCommands.Should().BeEmpty();
+        copilotCommands.Should().BeEmpty();
+    }
+
+    [Fact]
     public void GetAvailableCommands_ShouldYieldNone_WhenSlotsAreFull()
     {
         // Arrange
@@ -125,10 +173,11 @@ public class ConcentrationModuleTests
         module.AssignOrangeDie(OrangeDie.FromValue(1));
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], [])
-            .ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], []).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [], [OrangeDie.FromValue(1)]).ToArray();
 
         // Assert
-        commands.Should().BeEmpty();
+        pilotCommands.Should().BeEmpty();
+        copilotCommands.Should().BeEmpty();
     }
 }

@@ -6,6 +6,32 @@ using FluentAssertions;
 public class EnginesModuleTests
 {
     [Fact]
+    public void CanAcceptDice_ShouldAllowPilotBlueAndCopilotOrangeOnly_WhenSlotsAreEmpty()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new EnginesModule(airport);
+
+        // Act
+        var canAccept = new
+        {
+            PilotBlue = module.CanAcceptBlueDie(Player.Pilot),
+            CopilotBlue = module.CanAcceptBlueDie(Player.Copilot),
+            PilotOrange = module.CanAcceptOrangeDie(Player.Pilot),
+            CopilotOrange = module.CanAcceptOrangeDie(Player.Copilot)
+        };
+
+        // Assert
+        canAccept.Should().BeEquivalentTo(new
+        {
+            PilotBlue = true,
+            CopilotBlue = false,
+            PilotOrange = false,
+            CopilotOrange = true
+        });
+    }
+
+    [Fact]
     public void AssignDice_ShouldNotAdvanceApproach_WhenSpeedIsBelowBlueThreshold()
     {
         // Arrange
@@ -100,20 +126,78 @@ public class EnginesModuleTests
     }
 
     [Fact]
-    public void GetAvailableCommands_ShouldReturnCommandsForUnusedDiceValues_WhenSlotIsEmpty()
+    public void ResetRound_ShouldClearDiceAssignmentsAndLastSpeed_WhenCalled()
     {
         // Arrange
         var airport = (Airport)new MontrealAirport();
         var module = new EnginesModule(airport);
-        var unusedBlueDice = new[] { BlueDie.FromValue(2), BlueDie.FromValue(5) };
-        var unusedOrangeDice = new[] { OrangeDie.FromValue(1), OrangeDie.FromValue(6) };
+
+        module.AssignBlueDie(BlueDie.FromValue(4));
+        module.AssignOrangeDie(OrangeDie.FromValue(3));
+
+        // Act
+        module.ResetRound();
+
+        // Assert
+        new
+        {
+            CanAcceptBlue = module.CanAcceptBlueDie(Player.Pilot),
+            CanAcceptOrange = module.CanAcceptOrangeDie(Player.Copilot),
+            module.LastSpeed
+        }
+        .Should().BeEquivalentTo(new { CanAcceptBlue = true, CanAcceptOrange = true, LastSpeed = (int?)null });
+    }
+
+    [Fact]
+    public void GetAvailableCommands_ShouldBeEmpty_WhenNoUnusedDiceOfCurrentPlayersColor()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new EnginesModule(airport);
+
+        // Act
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)]).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], []).ToArray();
+
+        // Assert
+        pilotCommands.Should().BeEmpty();
+        copilotCommands.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetAvailableCommands_ShouldBeEmpty_WhenSlotIsAlreadyFilledForThatPlayer()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new EnginesModule(airport);
+
+        module.AssignBlueDie(BlueDie.FromValue(2));
+        module.AssignOrangeDie(OrangeDie.FromValue(3));
+
+        // Act
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)]).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)]).ToArray();
+
+        // Assert
+        pilotCommands.Should().BeEmpty();
+        copilotCommands.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetAvailableCommands_ShouldReturnDistinctSortedCommandsForUnusedDiceValues_WhenSlotIsEmpty()
+    {
+        // Arrange
+        var airport = (Airport)new MontrealAirport();
+        var module = new EnginesModule(airport);
+        var unusedBlueDice = new[] { BlueDie.FromValue(5), BlueDie.FromValue(2), BlueDie.FromValue(5) };
+        var unusedOrangeDice = new[] { OrangeDie.FromValue(6), OrangeDie.FromValue(1), OrangeDie.FromValue(6) };
 
         // Act
         var pilotCommands = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, unusedOrangeDice).ToArray();
         var copilotCommands = module.GetAvailableCommands(Player.Copilot, unusedBlueDice, unusedOrangeDice).ToArray();
 
         // Assert
-        pilotCommands.Select(c => c.CommandId).Should().BeEquivalentTo(["Engines.AssignBlue:2", "Engines.AssignBlue:5"]);
-        copilotCommands.Select(c => c.CommandId).Should().BeEquivalentTo(["Engines.AssignOrange:1", "Engines.AssignOrange:6"]);
+        pilotCommands.Select(c => c.CommandId).Should().Equal(["Engines.AssignBlue:2", "Engines.AssignBlue:5"]);
+        copilotCommands.Select(c => c.CommandId).Should().Equal(["Engines.AssignOrange:1", "Engines.AssignOrange:6"]);
     }
 }
