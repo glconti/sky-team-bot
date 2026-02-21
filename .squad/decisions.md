@@ -2214,3 +2214,24 @@ When callback plumbing is implemented, unskip these tests and wire them to the c
 - Makes expected lifecycle behavior explicit: single per-group cockpit message id persistence, edit-in-place updates, recreate-on-missing/uneditable fallback, best-effort auto-pin non-blocking behavior, and \/sky state\ fallback refresh.
 
 **Follow-up:** When issue #51 implementation is merged, unskip these tests and wire them to the concrete cockpit lifecycle and Telegram client abstraction.
+
+---
+
+## Skiles — PR Publish Decision for Issues #50 and #51
+
+**Context:**
+Both callback plumbing (#50) and cockpit lifecycle (#51) are complete. Ready for publication.
+
+**Decision:**
+Publish both issues together in one draft PR because they converge in SkyTeam.TelegramBot\Program.cs through the shared group cockpit refresh flow.
+
+**Why:**
+- Callback 1:grp:refresh behavior depends on the same edit/recreate cockpit lifecycle introduced for #51.
+- A single PR gives reviewers one coherent end-to-end path for group state rendering, callback answering, and cockpit message persistence.
+
+**Test Evidence:**
+- \dotnet test SkyTeam.Application.Tests\SkyTeam.Application.Tests.csproj\ — passing
+
+**Follow-up:**
+- Replace skipped Telegram contract tests in SkyTeam.Application.Tests\Telegram\Issue50CallbackQueryFlowTests.cs and SkyTeam.Application.Tests\Telegram\Issue51CockpitLifecycleTests.cs with executable integration tests after introducing Telegram client seams.
+
