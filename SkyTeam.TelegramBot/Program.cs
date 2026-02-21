@@ -1,5 +1,7 @@
 namespace SkyTeam.TelegramBot;
 
+using System.Collections.Concurrent;
+
 using SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
 using SkyTeam.Application.Presentation;
@@ -11,8 +13,16 @@ using Telegram.Bot.Types.Enums;
 
 internal static class Program
 {
+    private const int MaxRecentUpdateIds = 1_000;
+
     private static readonly InMemoryGroupLobbyStore LobbyStore = new();
     private static readonly InMemoryGroupGameSessionStore GameSessionStore = new();
+
+    private static readonly ConcurrentDictionary<long, SemaphoreSlim> ChatLocks = new();
+
+    private static readonly object UpdateDedupSync = new();
+    private static readonly Queue<int> RecentUpdateIds = new();
+    private static readonly HashSet<int> RecentUpdateIdSet = new();
 
     public static async Task Main()
     {
@@ -53,30 +63,42 @@ internal static class Program
 
     private static async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
+        if (IsDuplicateUpdate(update.Id)) return;
         if (update.Message is not { Text: { } text } message) return;
 
-        var parts = text.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0) return;
+        var lockKey = GetLockKey(message);
+        var gate = ChatLocks.GetOrAdd(lockKey, _ => new SemaphoreSlim(1, 1));
 
-        if (IsCommand(parts[0], "/start"))
+        await gate.WaitAsync(cancellationToken);
+        try
         {
+            var parts = text.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return;
+
+            if (IsCommand(parts[0], "/start"))
+            {
+                await botClient.SendMessage(
+                    chatId: message.Chat.Id,
+                    text: "Sky Team bot is online. In a group chat, try: /sky new",
+                    cancellationToken: cancellationToken);
+                return;
+            }
+
+            if (IsCommand(parts[0], "/sky"))
+            {
+                await HandleSkyAsync(botClient, message, parts.Skip(1).ToArray(), cancellationToken);
+                return;
+            }
+
             await botClient.SendMessage(
                 chatId: message.Chat.Id,
-                text: "Sky Team bot is online. In a group chat, try: /sky new",
+                text: "Unknown command. Try /sky new",
                 cancellationToken: cancellationToken);
-            return;
         }
-
-        if (IsCommand(parts[0], "/sky"))
+        finally
         {
-            await HandleSkyAsync(botClient, message, parts.Skip(1).ToArray(), cancellationToken);
-            return;
+            gate.Release();
         }
-
-        await botClient.SendMessage(
-            chatId: message.Chat.Id,
-            text: "Unknown command. Try /sky new",
-            cancellationToken: cancellationToken);
     }
 
     private static async Task HandleSkyAsync(ITelegramBotClient botClient, Message message, string[] args, CancellationToken cancellationToken)
@@ -572,6 +594,34 @@ internal static class Program
 
     private static string RenderLobby(LobbySnapshot snapshot)
         => GroupChatCockpitRenderer.RenderLobby(snapshot);
+
+    private static long GetLockKey(Message message)
+    {
+        if (message.Chat.Type != ChatType.Private) return message.Chat.Id;
+        if (message.From is null) return message.Chat.Id;
+
+        return GameSessionStore.TryGetGroupChatIdForUserId(message.From.Id, out var groupChatId)
+            ? groupChatId
+            : message.Chat.Id;
+    }
+
+    private static bool IsDuplicateUpdate(int updateId)
+    {
+        lock (UpdateDedupSync)
+        {
+            if (!RecentUpdateIdSet.Add(updateId)) return true;
+
+            RecentUpdateIds.Enqueue(updateId);
+
+            while (RecentUpdateIds.Count > MaxRecentUpdateIds)
+            {
+                var oldest = RecentUpdateIds.Dequeue();
+                RecentUpdateIdSet.Remove(oldest);
+            }
+
+            return false;
+        }
+    }
 
     private static string GetDisplayName(User user)
     {

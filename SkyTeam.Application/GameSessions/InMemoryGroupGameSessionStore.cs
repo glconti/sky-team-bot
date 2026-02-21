@@ -188,6 +188,12 @@ public sealed class InMemoryGroupGameSessionStore
         }
     }
 
+    public bool TryGetGroupChatIdForUserId(long userId, out long groupChatId)
+    {
+        lock (_sync)
+            return _groupChatIdByUserId.TryGetValue(userId, out groupChatId);
+    }
+
     public GameSessionPublicState? GetPublicState(long groupChatId)
     {
         lock (_sync)
