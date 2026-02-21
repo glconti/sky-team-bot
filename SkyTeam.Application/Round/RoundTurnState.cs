@@ -50,6 +50,8 @@ public sealed class RoundTurnState
     public SecretDiceHand CopilotHand { get; }
     public RoundPhase Phase { get; }
 
+    public bool IsReadyToResolve => Phase == RoundPhase.ReadyToResolve;
+
     public IReadOnlyList<RoundPlacement> Placements => _placements;
 
     public int PlacementsMade => _placements.Length;
@@ -72,6 +74,15 @@ public sealed class RoundTurnState
     public bool CanPlace(PlayerSeat player) => Phase == RoundPhase.InProgress
                                               && player == CurrentPlayer
                                               && PlacementsMade < MaxPlacementsPerRound;
+
+    public bool CanPlace(PlayerSeat player, int dieIndex)
+    {
+        if (!CanPlace(player)) return false;
+
+        return player == PlayerSeat.Pilot
+            ? PilotHand.CanUse(dieIndex)
+            : CopilotHand.CanUse(dieIndex);
+    }
 
     public RoundTurnState RegisterPlacement(PlayerSeat player, int dieIndex)
     {
