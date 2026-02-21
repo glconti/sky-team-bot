@@ -31,7 +31,7 @@ public sealed class RoundTurnStateTests
         var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand);
 
         // Act
-        var newState = state.RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0);
+        var newState = state.RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0, target: "Axis");
 
         // Assert
         state.PilotHand.Dice[0].IsUsed.Should().BeFalse();
@@ -44,7 +44,8 @@ public sealed class RoundTurnStateTests
             Index: 0,
             Player: PlayerSeat.Pilot,
             DieIndex: 0,
-            Value: new DieValue(1)));
+            Value: new DieValue(1),
+            Target: "Axis"));
     }
 
     [Fact]
@@ -54,7 +55,7 @@ public sealed class RoundTurnStateTests
         var pilotHand = SecretDiceHand.Create([1, 2, 3, 4]);
         var copilotHand = SecretDiceHand.Create([5, 6, 1, 2]);
         var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0);
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0, target: "Axis");
 
         // Act
         var pilotCanPlace = state.CanPlace(PlayerSeat.Pilot);
@@ -72,7 +73,7 @@ public sealed class RoundTurnStateTests
         var pilotHand = SecretDiceHand.Create([1, 2, 3, 4]);
         var copilotHand = SecretDiceHand.Create([5, 6, 1, 2]);
         var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0);
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0, target: "Axis");
 
         // Act
         var pilotCanUndo = state.CanUndoLastPlacement(PlayerSeat.Pilot);
@@ -90,7 +91,7 @@ public sealed class RoundTurnStateTests
         var pilotHand = SecretDiceHand.Create([1, 2, 3, 4]);
         var copilotHand = SecretDiceHand.Create([5, 6, 1, 2]);
         var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0);
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0, target: "Axis");
 
         // Act
         var undone = state.UndoLastPlacement(PlayerSeat.Pilot);
@@ -108,8 +109,8 @@ public sealed class RoundTurnStateTests
         var pilotHand = SecretDiceHand.Create([1, 2, 3, 4]);
         var copilotHand = SecretDiceHand.Create([5, 6, 1, 2]);
         var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0)
-            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0);
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0, target: "Axis");
 
         // Act
         var pilotCanUndo = state.CanUndoLastPlacement(PlayerSeat.Pilot);
@@ -126,14 +127,14 @@ public sealed class RoundTurnStateTests
         var copilotHand = SecretDiceHand.Create([5, 6, 1, 2]);
 
         var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0)
-            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 1)
-            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 1)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 2)
-            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 2)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 3)
-            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 3);
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 1, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 1, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 2, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 2, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 3, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 3, target: "Axis");
 
         // Act
         var canUndo = state.CanUndoLastPlacement(PlayerSeat.Copilot);
@@ -152,7 +153,7 @@ public sealed class RoundTurnStateTests
         var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand);
 
         // Act
-        var act = () => state.RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0);
+        var act = () => state.RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0, target: "Axis");
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
@@ -166,11 +167,11 @@ public sealed class RoundTurnStateTests
         var pilotHand = SecretDiceHand.Create([1, 2, 3, 4]);
         var copilotHand = SecretDiceHand.Create([5, 6, 1, 2]);
         var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 1);
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 1, target: "Axis");
 
         // Act
-        var act = () => state.RegisterPlacement(PlayerSeat.Pilot, dieIndex: 2);
-        var afterCopilot = state.RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0);
+        var act = () => state.RegisterPlacement(PlayerSeat.Pilot, dieIndex: 2, target: "Axis");
+        var afterCopilot = state.RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0, target: "Axis");
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
@@ -180,8 +181,8 @@ public sealed class RoundTurnStateTests
         afterCopilot.PlacementsRemaining.Should().Be(RoundTurnState.MaxPlacementsPerRound - 2);
 
         afterCopilot.Placements.Should().Equal(
-            new RoundPlacement(0, PlayerSeat.Pilot, DieIndex: 1, Value: new DieValue(2)),
-            new RoundPlacement(1, PlayerSeat.Copilot, DieIndex: 0, Value: new DieValue(5)));
+            new RoundPlacement(0, PlayerSeat.Pilot, DieIndex: 1, Value: new DieValue(2), Target: "Axis"),
+            new RoundPlacement(1, PlayerSeat.Copilot, DieIndex: 0, Value: new DieValue(5), Target: "Axis"));
     }
 
     [Fact]
@@ -192,17 +193,17 @@ public sealed class RoundTurnStateTests
         var copilotHand = SecretDiceHand.Create([5, 6, 1, 2]);
 
         var state = RoundTurnState.StartNew(roundNumber: 1, PlayerSeat.Pilot, pilotHand, copilotHand)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0)
-            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 1)
-            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 1)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 2)
-            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 2)
-            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 3)
-            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 3);
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 0, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 1, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 1, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 2, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 2, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Pilot, dieIndex: 3, target: "Axis")
+            .RegisterPlacement(PlayerSeat.Copilot, dieIndex: 3, target: "Axis");
 
         // Act
-        var act = () => state.RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0);
+        var act = () => state.RegisterPlacement(PlayerSeat.Pilot, dieIndex: 0, target: "Axis");
 
         // Assert
         state.IsReadyToResolve.Should().BeTrue();
