@@ -120,3 +120,18 @@
 - Centralizing the token budget at `Game.GetAvailableCommands()` (via `ConcentrationModule.TokenPool`) keeps modules token-aware without introducing infrastructure concerns.
 
 ---
+
+### Session 6: Issue #28 Application round/turn state + secret hand (2026-02-21)
+
+**Outcome:** Implemented application-layer round/turn state primitives to support strict alternation and secret dice hands (no Telegram SDK types).
+
+**Key Learnings:**
+- Keeping round/turn orchestration in application avoids leaking domain-internal dice/player types into Telegram UX.
+- Modeling the round as a small state machine (`InProgress` → `ReadyToResolve` after 8 placements) keeps downstream use-cases simple.
+- Undo gating is easiest to express as: "only the player who placed last can undo, and only before the other player plays".
+
+**Delivered Artifacts:**
+- `SkyTeam.Application.Round`: `PlayerSeat`, `DieValue`, `SecretDiceHand`, `RoundTurnState`.
+- Design note: `.squad/decisions/inbox/skiles-issue28-design.md`.
+
+---
