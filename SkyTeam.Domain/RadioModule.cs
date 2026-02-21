@@ -31,10 +31,10 @@ sealed class RadioModule(Airport airport) : GameModule
 
             foreach (var rolledValue in unusedBlueDice.Select(die => (int)die).Distinct().Order())
             {
-                yield return new AssignRadioBlueDieCommand(rolledValue, rolledValue, TokenCost: 0);
+                yield return new AssignRadioBlueDieCommand(this, rolledValue, rolledValue, TokenCost: 0);
 
                 foreach (var effectiveValue in GetAdjustedValues(rolledValue, availableTokens))
-                    yield return new AssignRadioBlueDieCommand(rolledValue, effectiveValue, TokenCost: Math.Abs(effectiveValue - rolledValue));
+                    yield return new AssignRadioBlueDieCommand(this, rolledValue, effectiveValue, TokenCost: Math.Abs(effectiveValue - rolledValue));
             }
 
             yield break;
@@ -45,10 +45,10 @@ sealed class RadioModule(Airport airport) : GameModule
 
         foreach (var rolledValue in unusedOrangeDice.Select(die => (int)die).Distinct().Order())
         {
-            yield return new AssignRadioOrangeDieCommand(rolledValue, rolledValue, TokenCost: 0);
+            yield return new AssignRadioOrangeDieCommand(this, rolledValue, rolledValue, TokenCost: 0);
 
             foreach (var effectiveValue in GetAdjustedValues(rolledValue, availableTokens))
-                yield return new AssignRadioOrangeDieCommand(rolledValue, effectiveValue, TokenCost: Math.Abs(effectiveValue - rolledValue));
+                yield return new AssignRadioOrangeDieCommand(this, rolledValue, effectiveValue, TokenCost: Math.Abs(effectiveValue - rolledValue));
         }
     }
 
@@ -95,7 +95,11 @@ sealed class RadioModule(Airport airport) : GameModule
         }
     }
 
-    private sealed record AssignRadioBlueDieCommand(int RolledValue, int EffectiveValue, int TokenCost) : GameCommand
+    private sealed record AssignRadioBlueDieCommand(
+        RadioModule Module,
+        int RolledValue,
+        int EffectiveValue,
+        int TokenCost) : GameCommand
     {
         public override string CommandId => TokenCost == 0
             ? $"Radio.AssignBlue:{RolledValue}"
@@ -104,9 +108,27 @@ sealed class RadioModule(Airport airport) : GameModule
         public override string DisplayName => TokenCost == 0
             ? $"Radio: place blue {RolledValue}"
             : $"Radio: place blue {RolledValue} as {EffectiveValue} (cost {TokenCost})";
+
+        internal override void Execute(Game game)
+        {
+            var rolledDie = game.GetUnusedBlueDie(RolledValue);
+
+            if (TokenCost > 0)
+                game.SpendCoffeeTokens(TokenCost);
+
+            var dieForAssignment = TokenCost == 0 ? rolledDie : BlueDie.FromValue(EffectiveValue);
+            Module.AssignBlueDie(dieForAssignment);
+
+            game.RemoveUnusedDie(rolledDie);
+            game.SwitchPlayer();
+        }
     }
 
-    private sealed record AssignRadioOrangeDieCommand(int RolledValue, int EffectiveValue, int TokenCost) : GameCommand
+    private sealed record AssignRadioOrangeDieCommand(
+        RadioModule Module,
+        int RolledValue,
+        int EffectiveValue,
+        int TokenCost) : GameCommand
     {
         public override string CommandId => TokenCost == 0
             ? $"Radio.AssignOrange:{RolledValue}"
@@ -115,5 +137,19 @@ sealed class RadioModule(Airport airport) : GameModule
         public override string DisplayName => TokenCost == 0
             ? $"Radio: place orange {RolledValue}"
             : $"Radio: place orange {RolledValue} as {EffectiveValue} (cost {TokenCost})";
+
+        internal override void Execute(Game game)
+        {
+            var rolledDie = game.GetUnusedOrangeDie(RolledValue);
+
+            if (TokenCost > 0)
+                game.SpendCoffeeTokens(TokenCost);
+
+            var dieForAssignment = TokenCost == 0 ? rolledDie : OrangeDie.FromValue(EffectiveValue);
+            Module.AssignOrangeDie(dieForAssignment);
+
+            game.RemoveUnusedDie(rolledDie);
+            game.SwitchPlayer();
+        }
     }
 }

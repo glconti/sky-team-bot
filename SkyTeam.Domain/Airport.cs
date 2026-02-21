@@ -37,10 +37,10 @@ sealed class Airport
             throw new InvalidOperationException("Cannot advance approach when no path segments exist.");
 
         if (CurrentSegment.PlaneTokens > 0)
-            throw new InvalidOperationException("Cannot advance approach with airplanes at current position.");
+            throw new GameRuleLossException("Cannot advance approach with airplanes at current position.");
 
         if (_currentPositionIndex + steps >= _segments.Length)
-            throw new InvalidOperationException("Approach overshoot.");
+            throw new GameRuleLossException("Approach overshoot.");
 
         _currentPositionIndex += steps;
     }

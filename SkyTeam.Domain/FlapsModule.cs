@@ -43,7 +43,7 @@ sealed class FlapsModule(Airport airport) : GameModule
                 var tokenCost = Math.Abs(requiredValue - rolledValue);
                 if (tokenCost > availableTokens) continue;
 
-                yield return new ActivateFlapsCommand(rolledValue, requiredValue, tokenCost, switchNumber);
+                yield return new ActivateFlapsCommand(this, rolledValue, requiredValue, tokenCost, switchNumber);
             }
         }
     }
@@ -67,6 +67,7 @@ sealed class FlapsModule(Airport airport) : GameModule
     }
 
     private sealed record ActivateFlapsCommand(
+        FlapsModule Module,
         int RolledValue,
         int EffectiveValue,
         int TokenCost,
@@ -79,5 +80,19 @@ sealed class FlapsModule(Airport airport) : GameModule
         public override string DisplayName => TokenCost == 0
             ? $"Flaps: activate switch {SwitchNumber} with orange {RolledValue}"
             : $"Flaps: activate switch {SwitchNumber} with orange {RolledValue} as {EffectiveValue} (cost {TokenCost})";
+
+        internal override void Execute(Game game)
+        {
+            var rolledDie = game.GetUnusedOrangeDie(RolledValue);
+
+            if (TokenCost > 0)
+                game.SpendCoffeeTokens(TokenCost);
+
+            var dieForAssignment = TokenCost == 0 ? rolledDie : OrangeDie.FromValue(EffectiveValue);
+            Module.AssignOrangeDie(dieForAssignment);
+
+            game.RemoveUnusedDie(rolledDie);
+            game.SwitchPlayer();
+        }
     }
 }

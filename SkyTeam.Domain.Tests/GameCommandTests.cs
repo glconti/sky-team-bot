@@ -158,5 +158,10 @@ public class GameCommandTests
     {
         public override string CommandId => Id;
         public override string DisplayName => Id;
+
+        internal override void Execute(Game game)
+        {
+            // No-op for testing
+        }
     }
 }

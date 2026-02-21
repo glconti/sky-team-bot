@@ -119,4 +119,28 @@
 - Coffee token adjustment is simplest when encoded in command ids as `Rolled>Effective`, consuming the rolled die but assigning an effective-value die to modules.
 - Centralizing the token budget at `Game.GetAvailableCommands()` (via `ConcentrationModule.TokenPool`) keeps modules token-aware without introducing infrastructure concerns.
 
+### Session 5: Issue #31 Completion Round (2026-02-21T10:21:03Z)
+**Outcome:** Skiles delivered draft PR #37 (squad/31-domain-base-modules-landing) with all 7 module implementations, landing win/loss validation, and coffee-token multi-spend. Tenerife finalized comprehensive 500+ line spec with all 7 modules, invariants, edge cases, and verification checklist. Aloha created draft PR #38 (squad/31-domain-tests) with boundary conditions, landing outcome matrix, and token mechanics tests.
+
+**Team Coordination:**
+- **Tenerife's Spec Lock:** Module resolution order (Axis → Engines → Brakes → Flaps → Gear → Radio → Concentration), 6 landing criteria (all must pass for win), 3 immediate loss conditions, multi-token spend cost formula
+- **Aloha's Test Findings:** Identified Brakes landing criterion inconsistency (BrakesValue switch count 0–3 vs. speed comparison >= 9 impossible); token-adjusted command IDs validated with cost `k = |effective - rolled|`; awaiting clarification on Brakes semantics
+
+**Cross-Agent Dependencies:**
+- Awaiting Sully code review (PR #37, #38) for module design + command dispatcher + aggregate cohesion
+- Awaiting user clarification on Brakes landing criterion (Tenerife spec vs. Aloha findings)
+- Concentration token design complete; ready for Telegram adapter integration once Epic B (transport) baseline established
+
+**Delivered Artifacts:**
+- Draft PR #37 (Skiles): GameState refactor, 7 modules, landing validation, coffee-token multi-spend, command ID surface
+- Tenerife spec (500+ lines): All modules, invariants, edge cases, verification checklist, clarifications
+- Draft PR #38 (Aloha): Boundary tests, landing outcome matrix (1 win + 6 loss scenarios), token pool/die value boundaries
+- Orchestration logs (3 agents): Skiles, Tenerife, Aloha
+- Session log: Ralph round summary
+- Decision inbox merged: Tenerife spec + Aloha findings + Copilot directive (placement undo rules)
+
+**Pending Escalations:**
+1. **Brakes Landing Criterion:** Spec states `BrakesValue == 3 AND BrakesValue > LastSpeed` but BrakesValue max is 3; if LastSpeed ≥ 9, condition is unsatisfiable. Current code checks `BrakesValue >= 6`. Recommend reconciliation before test finalization.
+2. **Token-Adjusted Command IDs:** Design surface (e.g., `Axis.AssignBlue:1>3` for "place rolled 1 as 3 for 2 tokens") validated in tests. Awaiting Telegram button rendering spec (Sully + Tenerife).
+
 ---

@@ -7,6 +7,8 @@ sealed class GameState
 
     internal Player CurrentPlayer { get; private set; } = Player.Pilot;
 
+    internal CoffeeTokenPool TokenPool { get; private set; } = new();
+
     internal IReadOnlyList<BlueDie> UnusedBlueDice => _unusedBlueDice.AsReadOnly();
     internal IReadOnlyList<OrangeDie> UnusedOrangeDice => _unusedOrangeDice.AsReadOnly();
 
@@ -51,9 +53,13 @@ sealed class GameState
     internal void SwitchPlayer() =>
         CurrentPlayer = CurrentPlayer == Player.Pilot ? Player.Copilot : Player.Pilot;
 
+    internal void EarnCoffeeTokens(int amount = 1) => TokenPool = TokenPool.Earn(amount);
+    internal void SpendCoffeeTokens(int amount) => TokenPool = TokenPool.Spend(amount);
+
     internal void Reset()
     {
         ClearUnusedDice();
         CurrentPlayer = Player.Pilot;
+        TokenPool = new CoffeeTokenPool();
     }
 }

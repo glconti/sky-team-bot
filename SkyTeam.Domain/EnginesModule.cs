@@ -9,6 +9,8 @@ sealed class EnginesModule(Airport airport) : GameModule
 
     internal int? LastSpeed { get; private set; }
 
+    internal bool IsRoundComplete => _blueDie is not null && _orangeDie is not null;
+
     public override bool CanAcceptBlueDie(Player player) =>
         player == Player.Pilot && _blueDie is null;
 
@@ -121,7 +123,7 @@ sealed class EnginesModule(Airport airport) : GameModule
         if (_orangeDie is not null)
             preview = GetPreview(effectiveValue + (int)_orangeDie);
 
-        return new AssignEnginesBlueDieCommand(rolledValue, effectiveValue, tokenCost, preview);
+        return new AssignEnginesBlueDieCommand(this, rolledValue, effectiveValue, tokenCost, preview);
     }
 
     private GameCommand CreateOrangeCommand(int rolledValue, int effectiveValue, int tokenCost)
@@ -131,7 +133,7 @@ sealed class EnginesModule(Airport airport) : GameModule
         if (_blueDie is not null)
             preview = GetPreview((int)_blueDie + effectiveValue);
 
-        return new AssignEnginesOrangeDieCommand(rolledValue, effectiveValue, tokenCost, preview);
+        return new AssignEnginesOrangeDieCommand(this, rolledValue, effectiveValue, tokenCost, preview);
     }
 
     private EnginesPlacementPreview GetPreview(int speed)
@@ -145,6 +147,7 @@ sealed class EnginesModule(Airport airport) : GameModule
     private sealed record EnginesPlacementPreview(int Speed, int AdvanceBy, int ResultingPosition);
 
     private sealed record AssignEnginesBlueDieCommand(
+        EnginesModule Module,
         int RolledValue,
         int EffectiveValue,
         int TokenCost,
@@ -155,9 +158,24 @@ sealed class EnginesModule(Airport airport) : GameModule
             : $"Engines.AssignBlue:{RolledValue}>{EffectiveValue}";
 
         public override string DisplayName => CreateDisplayName("blue", RolledValue, EffectiveValue, TokenCost, Preview);
+
+        internal override void Execute(Game game)
+        {
+            var rolledDie = game.GetUnusedBlueDie(RolledValue);
+
+            if (TokenCost > 0)
+                game.SpendCoffeeTokens(TokenCost);
+
+            var dieForAssignment = TokenCost == 0 ? rolledDie : BlueDie.FromValue(EffectiveValue);
+            Module.AssignBlueDie(dieForAssignment);
+
+            game.RemoveUnusedDie(rolledDie);
+            game.SwitchPlayer();
+        }
     }
 
     private sealed record AssignEnginesOrangeDieCommand(
+        EnginesModule Module,
         int RolledValue,
         int EffectiveValue,
         int TokenCost,
@@ -168,6 +186,20 @@ sealed class EnginesModule(Airport airport) : GameModule
             : $"Engines.AssignOrange:{RolledValue}>{EffectiveValue}";
 
         public override string DisplayName => CreateDisplayName("orange", RolledValue, EffectiveValue, TokenCost, Preview);
+
+        internal override void Execute(Game game)
+        {
+            var rolledDie = game.GetUnusedOrangeDie(RolledValue);
+
+            if (TokenCost > 0)
+                game.SpendCoffeeTokens(TokenCost);
+
+            var dieForAssignment = TokenCost == 0 ? rolledDie : OrangeDie.FromValue(EffectiveValue);
+            Module.AssignOrangeDie(dieForAssignment);
+
+            game.RemoveUnusedDie(rolledDie);
+            game.SwitchPlayer();
+        }
     }
 
     private static string CreateDisplayName(

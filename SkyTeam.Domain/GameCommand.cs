@@ -7,6 +7,8 @@ abstract record GameCommand
 {
     public abstract string CommandId { get; }
     public abstract string DisplayName { get; }
+
+    internal abstract void Execute(Game game);
 }
 
 enum DieType

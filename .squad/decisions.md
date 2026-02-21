@@ -344,6 +344,97 @@ record CoffeeTokenPool
 
 ---
 
+## 2026-02-21T10:21:03Z: Issue #31 specification — base game modules and landing criteria (Tenerife)
+
+**Decision:** Comprehensive specification finalized for all 7 mandatory base-game modules and landing win/loss criteria.
+
+**Specification:** `.squad/decisions/inbox/tenerife-issue31-spec.md` (500+ lines with detailed module specs, invariants, edge cases, verification checklist).
+
+**Modules Specified:**
+1. Axis Position — Balance check ([-2, +2]), immediate loss if out-of-bounds
+2. Engines — Thrust accumulation (≥9 at landing), Approach advance
+3. Brakes — Sequential switches (2 → 4 → 6), landing check requires all 3 activated AND > LastSpeed
+4. Flaps — 4 switches with flexible die ranges, cumulative threshold shifts
+5. Landing Gear — 3 switches with die-range mapping, idempotent re-activation
+6. Radio — Clear planes from Approach track (up to 2 orange, 1 blue per round)
+7. Concentration — Coffee token pool (0–3, shared, persistent), multi-token spend (cost = |adjusted - rolled|)
+
+**Landing Criteria (all 6 must pass for WIN):**
+1. Axis balanced: AxisPosition ∈ [-2, +2]
+2. Engines thrust: LastSpeed ≥ 9
+3. Brakes descent: BrakesValue == 3 AND BrakesValue > LastSpeed
+4. Flaps deployed: FlapsValue == 4
+5. Landing Gear deployed: LandingGearValue == 3
+6. Approach clear: All planes cleared from track
+
+**Loss Conditions (pre-landing, immediate):**
+1. Axis imbalance: AxisPosition < -2 OR > +2 (checked during resolution, not at landing)
+2. Altitude exhausted: Altitude reaches 0 with planes still on Approach (checked on final round entry)
+3. Landing failure: Any criterion fails at landing check
+
+**Module Resolution Order:** Axis → Engines → Brakes → Flaps → Gear → Radio → Concentration (fixed sequence).
+
+**Key Clarifications & Decisions:**
+- Brakes landing criterion reconciliation: BrakesValue == 3 (all switches) AND BrakesValue > LastSpeed
+- Engines final round: No Approach advance during final round (altitude 0)
+- Landing Gear idempotence: Duplicate switch placement silently ignored (graceful no-op)
+- Concentration token spend: Multi-token spend locked (cost = |adjusted - rolled|, bounded to [1, 6], no wraparound)
+- Token pool scoping: Shared across both players, capacity 3, persistent across rounds
+- Token earn: +1 per Concentration die placement (capped at 3)
+- Token spend + Concentration placement: Net change = 1 - k (spend cost k, earn +1)
+
+**Verification Checklist:** All 7 modules verified against implementation; ~85% alignment. Minor clarifications captured in spec.
+
+**Rationale:** Comprehensive rules documentation unblocks implementation work and validates existing code against official Sky Team rules.
+
+---
+
+## 2026-02-21T10:21:03Z: Issue #31 test findings and spec mismatches (Aloha)
+
+**By:** Aloha (QA)  
+**Decision:** Identified test coverage for Issue #31 modules and flagged spec mismatches requiring reconciliation.
+
+**Test Coverage Added:**
+- **Axis:** Out-of-bounds resolution throws immediately when < -2 or > +2; explicit boundary tests for positions -2 and +2
+- **Landing:** 1 passing WIN scenario + 1 focused LOSS scenario per landing criterion (6 loss scenarios total)
+  - Axis out-of-bounds at landing
+  - Engines thrust below 9
+  - Brakes not fully deployed
+  - Flaps not fully deployed
+  - Landing Gear not fully deployed
+  - Approach not fully cleared
+- **Concentration / Coffee tokens:** Token pool bounds (0–3), Earn/Spend transitions (including k=1, k=2), die value bounds (1–6)
+
+**Spec Mismatches Identified:**
+
+1. **Brakes Landing Criterion Inconsistency:**
+   - Spec states: `BrakesValue == 3` AND `BrakesValue > LastSpeed`
+   - Problem: BrakesValue is switch count (0–3); if LastSpeed ≥ 9, condition `BrakesValue > LastSpeed` is impossible (3 ≯ 9)
+   - Current code: Treats BrakesValue as last activated required value (2/4/6) and checks `BrakesValue ≥ 6` without speed comparison
+   - **Recommendation:** Clarify whether intended landing check is "all switches deployed" only, or a different brakes magnitude meant to be compared to speed
+
+2. **Coffee-Token Die Adjustment Implementation:**
+   - `Game.GetAvailableCommands()` surfaces token-adjusted command IDs like `Axis.AssignBlue:1>3` when tokens available
+   - Cost: `k = |effective - rolled|` tokens
+   - `Game.ExecuteCommand()` spends required tokens, consumes die, assigns effective value (bounded to 1–6)
+   - Tests cover command surfacing, spend behavior, pool bounds, die-value bounds
+   - Design validated; awaiting UX surface confirmation (Telegram button rendering)
+
+**Test Framework:** xUnit + FluentAssertions, AAA pattern.
+
+**Rationale:** Test harness validates spec compliance and uncovers implementation gaps. Brakes criterion requires reconciliation before finalizing tests.
+
+---
+
+## 2026-02-21T09:36:58Z: User directive — placement undo policy (Gianluigi Conti)
+
+**By:** Gianluigi Conti (via Copilot)  
+**Decision:** Dice placements are secret (private submissions), but ALL placements are public in group chat. Allow undo/cancel of last placement only if the other player has not played yet this round.
+
+**Rationale:** UX clarification — captured for team memory. Enables secret play while preserving transparency on outcomes.
+
+---
+
 ## 2026-02-21T00:07:39Z: Copilot coordinator directives
 
 **By:** User (via Copilot)  
@@ -583,5 +674,52 @@ record CoffeeTokenPool
 - If lobby already exists → Report current state (players seated, status) and prevent reset.
 
 **Rationale:** Avoid surprising seat resets in active groups; explicit `/sky reset` (future feature) supports advanced scenarios. Non-destructive `/sky new` is MVP-safe.
+
+---
+
+## 2026-02-21T18:06:26Z: PR#37 Execute wiring — token pool + landing checks (Sully)
+
+**By:** Sully (Architect)  
+**Decision:** For PR #37 / issue #31, keep the **coffee token pool owned by `ConcentrationModule`** (as the authoritative source of token count).
+
+- `Game.GetAvailableCommands()` now passes `ConcentrationModule.TokenPool` (fallback: 0) into module command generation.
+- All token-adjusted `GameCommand.Execute(Game)` implementations spend tokens via `game.SpendCoffeeTokens(k)`, and `Game.SpendCoffeeTokens(k)` delegates to `ConcentrationModule.SpendCoffeeTokens(k)`.
+
+Also, landing win/loss checks are evaluated as independent criteria (Engines ≥ 9, Brakes ≥ 6, Flaps ≥ 4, Landing Gear ≥ 3, Axis within [-2,2], Approach cleared), and `NextRound()` no longer enforces an additional "mandatory placements" loss gate beyond the existing command-availability rules.
+
+**Rationale:** This keeps the PR37 command-execution wiring minimal and consistent, matches the current module/test contract, and avoids catching/rewrapping non-rule exceptions (only rule losses use `GameRuleLossException`).
+
+---
+
+## 2026-02-21T18:06:26Z: Loss Condition Semantics & Rule Validation Checklist (Tenerife)
+
+**By:** Tenerife (Rules Expert)  
+**Decision:** Codify explicit loss conditions (must throw `GameRuleLossException`) vs. invalid moves (normal rejection via command validation) based on current domain implementation and M1 rules spec.
+
+**Win Condition (All 6 Must Pass at Landing):**
+- Axis Position: [-2, 2] (balanced)
+- Engines: Sum ≥ 9
+- Brakes: Value ≥ 6
+- Flaps: Value ≥ 4
+- Landing Gear: All 3 switches activated (value = 3)
+- Approach Track: All plane tokens cleared
+
+**Explicit Loss Conditions (→ GameRuleLossException):**
+1. Axis Out of Balance at Landing: `AxisPosition < -2 OR AxisPosition > 2`
+2. Speed Too High at Landing: `BrakesValue < EnginesValue`
+3. Approach Track Collision: ANY plane token remains on Approach track
+4. Altitude Exhausted: No more segments to descend without having reached landing
+5. Mid-Round Axis Invariant: After both Axis dice placed, result out of bounds (axis ≥ ±3)
+
+**Invalid Moves (Normal Rejection, No Exception):**
+- Brakes/Flaps sequence violations, duplicate placements, concentration exhaustion, radio orange limit, die availability issues — all preventable via command availability and UI validation.
+
+**Bugs Noted:**
+- Axis landing check currently too strict (checks == 0, should check ∈[-2,2]).
+- Speed comparison uses > not ≥; verify if intended.
+- Altitude exhaustion not explicitly implemented; needs implementation after altitude redesign.
+- Reroll token mechanics not visible in current implementation.
+
+**Rationale:** Comprehensive checklist unblocks rule validation and test coverage. Separates true loss conditions from validation errors, enabling proper exception handling and game-state management.
 
 ---
