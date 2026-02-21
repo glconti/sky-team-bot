@@ -1,6 +1,7 @@
 namespace SkyTeam.TelegramBot;
 
 using SkyTeam.Application.Lobby;
+using SkyTeam.Application.Round;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
@@ -101,10 +102,14 @@ internal static class Program
                 await HandleSkyStateAsync(botClient, message, cancellationToken);
                 return;
 
+            case "roll":
+                await HandleSkyRollAsync(botClient, message, cancellationToken);
+                return;
+
             default:
                 await botClient.SendMessage(
                     chatId: message.Chat.Id,
-                    text: "Usage: /sky new | /sky join | /sky state",
+                    text: "Usage: /sky new | /sky join | /sky state | /sky roll",
                     cancellationToken: cancellationToken);
                 return;
         }
@@ -182,6 +187,75 @@ internal static class Program
             chatId: message.Chat.Id,
             text: RenderLobby(snapshot),
             cancellationToken: cancellationToken);
+    }
+
+    private static async Task HandleSkyRollAsync(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+    {
+        var snapshot = LobbyStore.GetSnapshot(message.Chat.Id);
+        if (snapshot is null)
+        {
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: "No lobby yet. Create one with /sky new",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        if (!snapshot.IsReady)
+        {
+            await botClient.SendMessage(
+                chatId: message.Chat.Id,
+                text: "Lobby is not ready yet. Two players must /sky join before rolling dice.",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        var roll = SecretDiceRoller.Roll(() => Random.Shared.Next(1, 7));
+
+        var failedRecipients = new List<string>(capacity: 2);
+
+        if (!await TrySendSecretDiceAsync(botClient, snapshot.Pilot!, "Pilot", roll.PilotDice, cancellationToken))
+            failedRecipients.Add(snapshot.Pilot!.DisplayName);
+
+        if (!await TrySendSecretDiceAsync(botClient, snapshot.Copilot!, "Copilot", roll.CopilotDice, cancellationToken))
+            failedRecipients.Add(snapshot.Copilot!.DisplayName);
+
+        var groupText = failedRecipients.Count == 0
+            ? "Dice rolled and sent privately to seated players."
+            : $"Dice rolled, but I couldn't DM: {string.Join(", ", failedRecipients)}. Each seated player must /start me in a private chat first.";
+
+        await botClient.SendMessage(
+            chatId: message.Chat.Id,
+            text: groupText,
+            cancellationToken: cancellationToken);
+    }
+
+    private static async Task<bool> TrySendSecretDiceAsync(
+        ITelegramBotClient botClient,
+        LobbyPlayer recipient,
+        string seat,
+        IReadOnlyList<int> dice,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipient);
+        ArgumentNullException.ThrowIfNull(dice);
+
+        var diceText = string.Join(", ", dice);
+
+        try
+        {
+            await botClient.SendMessage(
+                chatId: recipient.UserId,
+                text: $"{seat} secret dice: {diceText}",
+                cancellationToken: cancellationToken);
+
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine(exception);
+            return false;
+        }
     }
 
     private static string RenderLobby(LobbySnapshot snapshot)
