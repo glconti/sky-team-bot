@@ -18,15 +18,23 @@ sealed class BrakesModule : GameModule
     public override IEnumerable<GameCommand> GetAvailableCommands(
         Player currentPlayer,
         IReadOnlyList<BlueDie> unusedBlueDice,
-        IReadOnlyList<OrangeDie> unusedOrangeDice)
+        IReadOnlyList<OrangeDie> unusedOrangeDice,
+        CoffeeTokenPool tokenPool)
     {
         if (currentPlayer != Player.Pilot) yield break;
         if (_nextRequiredIndex >= RequiredValues.Length) yield break;
 
+        var availableTokens = tokenPool.Count;
         var requiredValue = RequiredValues[_nextRequiredIndex];
-        if (!unusedBlueDice.Any(die => (int)die == requiredValue)) yield break;
+        var switchNumber = _nextRequiredIndex + 1;
 
-        yield return new ActivateBrakesCommand(requiredValue, _nextRequiredIndex + 1);
+        foreach (var rolledValue in unusedBlueDice.Select(die => (int)die).Distinct().Order())
+        {
+            var tokenCost = Math.Abs(requiredValue - rolledValue);
+            if (tokenCost > availableTokens) continue;
+
+            yield return new ActivateBrakesCommand(rolledValue, requiredValue, tokenCost, switchNumber);
+        }
     }
 
     public void AssignBlueDie(BlueDie die)
@@ -41,12 +49,21 @@ sealed class BrakesModule : GameModule
             throw new InvalidOperationException($"Brakes requires die value {requiredValue} next.");
 
         _nextRequiredIndex++;
-        BrakesValue++;
+        BrakesValue = requiredValue;
     }
 
-    private sealed record ActivateBrakesCommand(int Value, int SwitchNumber) : GameCommand
+    private sealed record ActivateBrakesCommand(
+        int RolledValue,
+        int RequiredValue,
+        int TokenCost,
+        int SwitchNumber) : GameCommand
     {
-        public override string CommandId => $"Brakes.AssignBlue:{Value}";
-        public override string DisplayName => $"Brakes: activate switch {SwitchNumber} with {Value}";
+        public override string CommandId => TokenCost == 0
+            ? $"Brakes.AssignBlue:{RolledValue}"
+            : $"Brakes.AssignBlue:{RolledValue}>{RequiredValue}";
+
+        public override string DisplayName => TokenCost == 0
+            ? $"Brakes: activate switch {SwitchNumber} with {RolledValue}"
+            : $"Brakes: activate switch {SwitchNumber} with {RolledValue} as {RequiredValue} (cost {TokenCost})";
     }
 }

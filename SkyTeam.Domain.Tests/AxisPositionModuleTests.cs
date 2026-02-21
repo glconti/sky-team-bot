@@ -98,8 +98,8 @@ public class AxisPositionModuleTests
         var module = new AxisPositionModule();
 
         // Act
-        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)]).ToArray();
-        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], []).ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)], new CoffeeTokenPool()).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [], new CoffeeTokenPool()).ToArray();
 
         // Assert
         pilotCommands.Should().BeEmpty();
@@ -115,8 +115,8 @@ public class AxisPositionModuleTests
         module.AssignOrangeDie(OrangeDie.FromValue(3));
 
         // Act
-        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)]).ToArray();
-        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)]).ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)], new CoffeeTokenPool()).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)], new CoffeeTokenPool()).ToArray();
 
         // Assert
         pilotCommands.Should().BeEmpty();
@@ -132,11 +132,57 @@ public class AxisPositionModuleTests
         var unusedOrangeDice = new[] { OrangeDie.FromValue(6), OrangeDie.FromValue(1), OrangeDie.FromValue(6) };
 
         // Act
-        var pilotCommands = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, unusedOrangeDice).ToArray();
-        var copilotCommands = module.GetAvailableCommands(Player.Copilot, unusedBlueDice, unusedOrangeDice).ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, unusedOrangeDice, new CoffeeTokenPool()).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, unusedBlueDice, unusedOrangeDice, new CoffeeTokenPool()).ToArray();
 
         // Assert
         pilotCommands.Select(c => c.CommandId).Should().Equal(["Axis.AssignBlue:2", "Axis.AssignBlue:5"]);
         copilotCommands.Select(c => c.CommandId).Should().Equal(["Axis.AssignOrange:1", "Axis.AssignOrange:6"]);
+    }
+
+    [Fact]
+    public void AssignDice_ShouldThrow_WhenAxisWouldGoOutOfBoundsAboveTwo()
+    {
+        // Arrange
+        var module = new AxisPositionModule();
+        module.AssignBlueDie(BlueDie.FromValue(6));
+
+        // Act
+        var assigning = () => module.AssignOrangeDie(OrangeDie.FromValue(3));
+
+        // Assert
+        assigning.Should().Throw<InvalidOperationException>()
+            .WithMessage("Axis position out of bounds.");
+    }
+
+    [Fact]
+    public void AssignDice_ShouldThrow_WhenAxisWouldGoOutOfBoundsBelowMinusTwo()
+    {
+        // Arrange
+        var module = new AxisPositionModule();
+        module.AssignOrangeDie(OrangeDie.FromValue(6));
+
+        // Act
+        var assigning = () => module.AssignBlueDie(BlueDie.FromValue(3));
+
+        // Assert
+        assigning.Should().Throw<InvalidOperationException>()
+            .WithMessage("Axis position out of bounds.");
+    }
+
+    [Theory]
+    [InlineData(6, 4, 2)]
+    [InlineData(4, 6, -2)]
+    public void AssignDice_ShouldAllowAxisAtBounds_WhenResultIsMinusTwoOrPlusTwo(int blueValue, int orangeValue, int expectedAxisPosition)
+    {
+        // Arrange
+        var module = new AxisPositionModule();
+
+        // Act
+        module.AssignBlueDie(BlueDie.FromValue(blueValue));
+        module.AssignOrangeDie(OrangeDie.FromValue(orangeValue));
+
+        // Assert
+        module.AxisPosition.Should().Be(expectedAxisPosition);
     }
 }

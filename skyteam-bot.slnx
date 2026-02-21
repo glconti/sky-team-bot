@@ -1,4 +1,7 @@
 <Solution>
   <Project Path="SkyTeam.Domain.Tests\SkyTeam.Domain.Tests.csproj" Type="C#"/>
   <Project Path="SkyTeam.Domain/SkyTeam.Domain.csproj"/>
+  <Project Path="SkyTeam.Application\SkyTeam.Application.csproj"/>
+  <Project Path="SkyTeam.Application.Tests\SkyTeam.Application.Tests.csproj" Type="C#"/>
+  <Project Path="SkyTeam.TelegramBot\SkyTeam.TelegramBot.csproj"/>
 </Solution>

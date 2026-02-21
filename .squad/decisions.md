@@ -358,3 +358,230 @@ record CoffeeTokenPool
 **Rationale:** User directive.
 
 ---
+
+## 2026-02-21T08:17:30Z: User directive — keep Telegram communication logic separated
+
+**By:** Gianluigi Conti (via Copilot)  
+**Decision:** Keep Telegram communication logic separated from the game application logic and presentation; UX must work in a 2-people Telegram group chat.  
+**Rationale:** User request — captured for team memory.
+
+---
+
+## 2026-02-21T08:20:00Z: Telegram bot layered architecture + MVP backlog (Sully)
+
+**By:** Sully (Architect)  
+**Decision:** Proposed 5-layer architecture for clean separation of concerns:
+
+**Layers (dependency direction: top → down):**
+1. **Domain (`SkyTeam.Domain`)** — Pure DDD: Game aggregate, GameState, modules, commands, invariants. No Telegram types, no I/O, no formatting.
+2. **Application (`SkyTeam.Application`)** — Orchestrates use-cases and multi-user workflows. Exposes ports: `IGameSessionRepository`, `IClock`, `IDiceRoller`, `IChatGateway`.
+3. **Presentation (`SkyTeam.Presentation.Chat`)** — Converts app/domain state into transport-agnostic chat UI models: `ChatMessage`, `ChatKeyboard`, `ChatUiEvent`. No Telegram SDK references.
+4. **Telegram Adapter (`SkyTeam.Adapters.Telegram`)** — Translates Telegram Updates → application commands; `ChatMessage/ChatKeyboard` → Telegram `SendMessage/EditMessageText/InlineKeyboardMarkup`.
+5. **Host (`SkyTeam.Bot.Telegram` executable)** — Wiring only: DI, config, logging, token, polling/webhook.
+
+**Recommended Project Layout:**
+- `SkyTeam.Domain` (exists)
+- `SkyTeam.Application` (new class library)
+- `SkyTeam.Presentation.Chat` (new class library)
+- `SkyTeam.Adapters.Telegram` (new class library)
+- `SkyTeam.Bot.Telegram` (new console app)
+
+**Core Application Contract (Ports):**
+- `IChatGateway`: SendToGroup, SendToUser, EditGroupMessage
+- `IGameSessionRepository`: GetByGroup, Upsert
+- `IDiceRoller`: RollDie, RollHand
+
+**MVP Backlog (Epics A–G):**
+- **Epic A:** Solution & layering foundation (Slices A1–A3)
+- **Epic B:** Telegram transport baseline (Slices B1–B3)
+- **Epic C:** Group session lifecycle (Slices C1–C3)
+- **Epic D:** Turn/round interaction loop (Slices D1–D3)
+- **Epic E:** Domain completion to Base Game (Slices E1–E3)
+- **Epic F:** Presentation: "Cockpit" + reveal output (Slices F1–F3)
+- **Epic G:** MVP hardening (Slices G1–G3)
+
+**Interview Questions for User (8 total):**
+1. DM onboarding required (each player must `/start` the bot privately)?
+2. Strict alternation (one placement at a time) vs. submit-all-then-resolve?
+3. Preferred UX: buttons/inline keyboards, or typed commands, or both?
+4. Token spends/adjustments announced immediately (transparent) or only at round end?
+5. Persistence across bot restarts required for MVP?
+6. Undo/cancel policy: "undo last placement" vs. "only cancel round"?
+7. With 2+ humans in group, enforce exactly 2 seated players + spectators?
+8. Must-have non-base-game UX: pin cockpit, auto-advance, reminders/timeouts?
+
+**Rationale:** Layered architecture enforces compile-time separation. Epic structure enables parallel team work. Interview questions clarify UX tradeoffs before locking implementation.
+
+---
+
+## 2026-02-21T08:20:15Z: Telegram bot project isolation + solution wiring (Skiles)
+
+**By:** Skiles (Implementation Lead)  
+**Decision:** Created `SkyTeam.TelegramBot` console project and integrated into solution (`.slnx`).
+
+**Operational Details:**
+- Uses `Telegram.Bot` NuGet package (version managed via `Directory.Packages.props`).
+- Bot token sourced from `TELEGRAM_BOT_TOKEN` environment variable.
+- Implements long-polling via `StartReceiving` with minimal `/start` handler.
+- Project references `SkyTeam.Domain` directly; future adapter/application/presentation layers will be added per Sully's architecture.
+
+**Architecture Alignment:**
+- Maintains clean separation: bot project does not leak Telegram SDK into domain.
+- Ready for Sully's 5-layer model once foundation epics (A1–A3) are complete.
+
+**Rationale:** Isolates Telegram concerns from domain; foundation for layered architecture. Minimal bootstrap code supports immediate testing.
+
+---
+
+## 2026-02-21T08:20:30Z: Telegram UX specification for Sky Team (Tenerife)
+
+**By:** Tenerife (Rules Expert)  
+**Decision:** Comprehensive UX specification for 2-player cooperative Sky Team gameplay in Telegram group chat.
+
+**Core Principles:**
+1. **Secret Assignments:** Dice placements private (via inline keyboards); bot reveals outcomes at resolution.
+2. **Transparency on Non-Secrets:** Token counts, altitude, module values, turn status broadcast publicly.
+3. **Visual Clarity:** Emoji, prefixes, ASCII tables for easy state scanning.
+4. **Minimal Commands:** Most interactions via buttons; `/` commands only for setup/queries.
+5. **Turn Discipline:** Alternating player turns; 60-second timeout (configurable); bot enforces ordering.
+
+**Main Commands:**
+- Setup: `/start_game`, `/join`, `/rules`, `/state`
+- In-Game: `/undo_placement`, `/surrender`
+
+**Game Flow (Round-by-Round):**
+- Phase 1: Roll Dice (bot action)
+- Phase 2: Assign Dice (player action — secret)
+- Phase 3: Reveal & Resolve (bot action)
+- Phase 4: Altitude Descent & Board Update (bot action)
+- Phase 5: Win/Loss Check (bot action)
+
+**Token Mechanics (Button-Based):**
+- Display token-cost options: `[Axis]`, `[Axis] 💰2` (if pool > 0 and affordable)
+- Spend declaration announced publicly (not secret)
+- Gain: +1 token per Concentration placement (capped at 3)
+
+**Board State Display:**
+- Full `/state` output: altitude bar, modules, tokens, turn status, next action
+- Inline round summary: round number, assignment status, resolution status
+
+**7 Concrete Example Transcripts:**
+1. Simple round, no tokens, both cooperate
+2. Token spend (multi-token adjustment)
+3. Reroll declaration
+4. Landing & victory
+5. Collision loss
+6. Axis imbalance loss at landing
+7. Concentration token spend + earn (net zero)
+
+**Edge Cases & Timing:**
+- Token pool 0 & spend attempt → buttons disable options
+- No reroll available → prevent button click
+- Concentration placed + die pre-adjusted → token spent → token earned → net 0
+- Pilot bad roll (all 1s) → Copilot sees "Pilot thinking…" up to 120 sec
+- Radio clears all planes → "Approach track cleared! ✅"
+- Altitude at 6000 ft round 7 → no landing (only at 0)
+
+**Implementation Hooks:**
+- Bot: Ephemeral keyboard rendering, session state management, broadcast & reveal
+- Domain: Accept `PlaceDieCommand`, module resolution order, landing check logic
+
+**Rationale:** Comprehensive spec ensures clarity + secrecy. Concrete examples enable deterministic testing. Token UX is button-driven, not command-based (minimum friction). Rule compliance is validated in every decision branch.
+
+---
+
+## 2026-02-21T09:08:13Z: Group-chat-first UX for Telegram (Gianluigi Conti)
+
+**By:** Gianluigi Conti  
+**Decision:** Keep UX group-chat-first; start the game in the group chat, and use private messages only when needed for secret dice/placements (after onboarding).  
+**Rationale:** User clarification — captured for team memory.
+
+---
+
+## 2026-02-21T09:09:14Z: Round interaction model — strict alternation (Gianluigi Conti)
+
+**By:** Gianluigi Conti  
+**Decision:** Strict alternation one die placement at a time (Pilot places 1 die, then Copilot, repeat).  
+**Rationale:** User choice — captured for team memory.
+
+---
+
+## 2026-02-21T09:10:08Z: UX interaction preference — inline buttons primary (Gianluigi Conti)
+
+**By:** Gianluigi Conti  
+**Decision:** Primarily inline buttons/menus (typed commands optional, not required for parity).  
+**Rationale:** User choice — captured for team memory.
+
+---
+
+## 2026-02-21T09:10:26Z: MVP persistence — in-memory session store (Gianluigi Conti)
+
+**By:** Gianluigi Conti  
+**Decision:** In-memory session store is acceptable for MVP (sessions reset on bot restart).  
+**Rationale:** User choice — captured for team memory.
+
+---
+
+## 2026-02-21T09:11:20Z: Group spectators and 2-player enforcement (Gianluigi Conti)
+
+**By:** Gianluigi Conti  
+**Decision:** Group chats may have spectators, but the game enforces exactly 2 seated players (Pilot + Copilot).  
+**Rationale:** User choice — captured for team memory.
+
+---
+
+## 2026-02-21T09:12:32Z: Undo placement — pre-other-player-action (Gianluigi Conti)
+
+**By:** Gianluigi Conti  
+**Decision:** Allow undo last placement, but only before the other player takes an action.  
+**Rationale:** User choice — captured for team memory.
+
+---
+
+## 2026-02-21T13:00:05Z: Lobby slice review — MVP foundation acceptable (Sully)
+
+**By:** Sully (Architect)  
+**Decision:** Lobby slice (commit b704cbd) is acceptable MVP foundation.
+
+**Key Assessments:**
+- **Architecture:** Application-layer lobby store is clean — no Telegram SDK types leak into `SkyTeam.Application`.
+- **In-Memory Store:** Concrete `InMemoryGroupLobbyStore` in `SkyTeam.Application.Lobby` acceptable for MVP (user accepted in-memory persistence).
+- **API Hygiene:** Lobby state transport-agnostic; group chat IDs treated as primitives in application layer.
+
+**Follow-ups (non-blocking, recommended before next slices):**
+1. Introduce application port (`IGroupLobbyStore` / `IGroupLobbyRepository`) and move in-memory implementation to Host/Infrastructure for persistence swaps without application rewrites.
+2. Rename `GroupChatId` → `GroupId` (and similar) to eliminate Telegram semantics from application public API.
+3. Move `RenderLobby` / command parsing out of `Program.cs` once Presentation.Chat and Adapters.Telegram projects land (per 5-layer architecture).
+
+**Rationale:** Lobby slice unblocks team; follow-up refactors keep codebase maintainable as scope expands.
+
+---
+
+## 2026-02-21T13:00:05Z: Application test layer — InMemoryGroupLobbyStore suite (Aloha)
+
+**By:** Aloha (QA)  
+**Decision:** Created `SkyTeam.Application.Tests` xUnit project (separate from `SkyTeam.Domain.Tests`) to isolate application-layer behavior tests.
+
+**Rationale:** Lobby store is an application concern (in-memory multi-user coordination by group chat id), not domain logic. Dedicated test assembly improves signal and preserves layering.
+
+**Test Suite Coverage:**
+- **CreateNew:** Lobby created successfully; already-exists case reports current state without reset.
+- **Join:** Pilot seated, Copilot seated, full-lobby rejection, already-seated no-op, no-lobby error.
+- **GetSnapshot:** Returns null if no lobby; returns current state if lobby exists.
+
+**Implementation:** xUnit v3 with FluentAssertions; follows AAA (Arrange, Act, Assert) pattern.
+
+---
+
+## 2026-02-21T13:00:05Z: Lobby slice — /sky new is non-destructive (Skiles)
+
+**By:** Skiles (Implementation Lead)  
+**Decision:** `/sky new` command creates a lobby **only if one does not already exist**.
+
+**Behavior:**
+- If no lobby exists → Create lobby, seat caller as Pilot, report success.
+- If lobby already exists → Report current state (players seated, status) and prevent reset.
+
+**Rationale:** Avoid surprising seat resets in active groups; explicit `/sky reset` (future feature) supports advanced scenarios. Non-destructive `/sky new` is MVP-safe.
+
+---
