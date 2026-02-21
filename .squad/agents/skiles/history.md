@@ -229,3 +229,29 @@
 - Tenerife validates button rendering against UX spec
 - Aloha designs E2E callback test harness (mock Telegram SDK)
 - Scribe logs all work + merges decision inbox (3 files)
+
+### Session 9: Issue #50 CallbackQuery plumbing + safe Refresh (2026-02-22)
+
+**Outcome:** Implemented end-to-end callback plumbing in `SkyTeam.TelegramBot\Program.cs` for both `Message` and `CallbackQuery` updates, added a minimal callback router with `v1:grp:refresh`, and wired Refresh to edit the originating group state message.
+
+**Key Learnings:**
+- Reusing the existing per-group lock model for callback queries is straightforward by deriving lock keys from callback message chat (or mapped user→group fallback), preserving message/callback serialization consistency.
+- A shared `RenderGroupState(groupChatId)` path keeps `/sky state` fallback and callback refresh behavior aligned, avoiding duplicate state rendering logic.
+- Always answering callback queries (success and error/expired) is easiest when callback handlers are treated as no-throw UX operations with a clear recovery toast: `Menu expired — press /sky state`.
+
+### Session 10: Issue #51 Cockpit lifecycle + auto-pin (2026-02-22)
+
+**Outcome:** Added cockpit lifecycle management in `SkyTeam.TelegramBot\Program.cs` with edit-first refresh, recreate-on-edit-failure fallback, and best-effort pinning; persisted one cockpit message id per group in `InMemoryGroupGameSessionStore`.
+
+**Key Learnings:**
+- A single `RefreshGroupCockpitAsync()` entry point keeps `/sky` command flows and callback refresh behavior consistent and reduces drift in lifecycle handling.
+- Treating `EditMessageText` failures as non-fatal and recreating cockpit immediately is a robust strategy for deleted/uneditable message recovery.
+- Pinning should remain side-effect-only (`try/catch` ignore), so state refresh is never blocked by missing Telegram pin permissions.
+
+### Session 11: Publish prep for issues #50 and #51 (2026-02-22)
+
+**Outcome:** Prepared draft PR publication flow by consolidating #50 callback plumbing and #51 cockpit lifecycle changes on a dedicated branch, with focused test execution evidence.
+
+**Key Learnings:**
+- Keeping callback refresh and `/sky state` on the same cockpit refresh pipeline reduces divergence during publish/review.
+- Persisting cockpit message id in application state is sufficient to support edit-first lifecycle without introducing infrastructure coupling.

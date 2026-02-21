@@ -2185,3 +2185,32 @@ When callback plumbing is implemented, unskip these tests and wire them to the c
 
 ---
 
+
+---
+
+## 2026-02-22T02:00:00Z: Issue #51 — cockpit lifecycle implementation decision (Skiles)
+
+**By:** Skiles (Implementer)
+
+**Decision:** Adopt a single cockpit lifecycle handler in SkyTeam.TelegramBot\Program.cs (\RefreshGroupCockpitAsync\) that always attempts edit-first against the stored cockpit message id, recreates and re-persists the message id when edit fails, and performs best-effort pin on create/recreate.
+
+**Why:**
+- Enforces one edited cockpit message per group flow instead of emitting new state messages.
+- Keeps \/sky\ command fallback and callback refresh paths aligned by sharing the same lifecycle operation.
+- Prevents permission-related pin failures from breaking gameplay state updates.
+
+**Follow-up:** Unskip and implement end-to-end Telegram lifecycle tests in \SkyTeam.Application.Tests\Telegram\Issue51CockpitLifecycleTests.cs\ once Telegram client seams are introduced for deterministic message/pin failure simulation.
+
+---
+
+## 2026-02-22T02:00:05Z: Issue #51 — test contract scaffolding decision (Aloha)
+
+**By:** Aloha (Tester)
+
+**Decision:** Scaffold issue #51 cockpit lifecycle behaviors as skipped contract tests in \SkyTeam.Application.Tests\Telegram\Issue51CockpitLifecycleTests.cs\, because the cockpit \message_id\ lifecycle and best-effort auto-pin flows are not yet implemented in \SkyTeam.TelegramBot\Program.cs\.
+
+**Why:**
+- Preserves issue #51 acceptance criteria as executable contracts before implementation lands.
+- Makes expected lifecycle behavior explicit: single per-group cockpit message id persistence, edit-in-place updates, recreate-on-missing/uneditable fallback, best-effort auto-pin non-blocking behavior, and \/sky state\ fallback refresh.
+
+**Follow-up:** When issue #51 implementation is merged, unskip these tests and wire them to the concrete cockpit lifecycle and Telegram client abstraction.
