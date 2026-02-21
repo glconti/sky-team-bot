@@ -255,3 +255,19 @@
 **Key Learnings:**
 - Keeping callback refresh and `/sky state` on the same cockpit refresh pipeline reduces divergence during publish/review.
 - Persisting cockpit message id in application state is sufficient to support edit-first lifecycle without introducing infrastructure coupling.
+
+### Session 12: Issue #52 Slice 3/7 — Lobby cockpit buttons (2026-02-22)
+
+**Outcome:** Implemented group cockpit lobby buttons end-to-end in `SkyTeam.TelegramBot\Program.cs`: `New`, `Join`, `Start`, `Refresh` callbacks now route through server-side validation, invalid presses no-op with callback toast, and successful presses refresh by editing the cockpit.
+
+**Key Learnings:**
+- Keeping lobby buttons always visible is compatible with role/seat safety as long as callback handlers enforce legality via existing lobby/session stores.
+- Callback UX should fail softly (`AnswerCallbackQuery` toast) while text command fallbacks (`/sky new|join|start`) remain unchanged and cockpit-refreshing.
+
+### Session 13: PR #58 publish for issue #52 (2026-02-22)
+
+**Outcome:** Published issue #52 implementation on draft PR #58 by committing/pushing lobby callback + tests changes, updating PR scope/checklist with test evidence, and posting issue status with PR linkage.
+
+**Key Learnings:**
+- Publishing in-place on the existing draft branch keeps review continuity for #50/#51/#52 cockpit work.
+- Test evidence is strongest when combining executable checks and explicit skipped-contract rationale for remaining callback test seams.

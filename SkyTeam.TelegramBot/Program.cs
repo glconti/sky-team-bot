@@ -13,6 +13,9 @@ namespace SkyTeam.TelegramBot;
 static class Program
 {
     private const int MaxRecentUpdateIds = 1_000;
+    private const string NewCallbackData = "v1:grp:new";
+    private const string JoinCallbackData = "v1:grp:join";
+    private const string StartCallbackData = "v1:grp:start";
     private const string RefreshCallbackData = "v1:grp:refresh";
     private const string ExpiredMenuToast = "Menu expired — press /sky state";
 
@@ -125,7 +128,7 @@ static class Program
         CallbackQuery callbackQuery,
         CancellationToken cancellationToken)
     {
-        if (callbackQuery.Message is null || callbackQuery.Data != RefreshCallbackData)
+        if (callbackQuery.Message is null || callbackQuery.Data is null)
         {
             await botClient.AnswerCallbackQuery(
                 callbackQuery.Id,
@@ -136,10 +139,14 @@ static class Program
 
         try
         {
-            await RefreshGroupCockpitAsync(botClient, callbackQuery.Message.Chat.Id, cancellationToken);
+            var toast = await HandleGroupCockpitCallbackAsync(
+                botClient,
+                callbackQuery,
+                cancellationToken);
 
             await botClient.AnswerCallbackQuery(
                 callbackQuery.Id,
+                toast,
                 cancellationToken: cancellationToken);
         }
         catch
@@ -149,6 +156,106 @@ static class Program
                 ExpiredMenuToast,
                 cancellationToken: cancellationToken);
         }
+    }
+
+    private static async Task<string?> HandleGroupCockpitCallbackAsync(
+        ITelegramBotClient botClient,
+        CallbackQuery callbackQuery,
+        CancellationToken cancellationToken)
+    {
+        var groupChatId = callbackQuery.Message!.Chat.Id;
+        return callbackQuery.Data switch
+        {
+            NewCallbackData => await HandleLobbyNewFromCallbackAsync(
+                botClient,
+                groupChatId,
+                cancellationToken),
+            JoinCallbackData => await HandleLobbyJoinFromCallbackAsync(
+                botClient,
+                callbackQuery.From,
+                groupChatId,
+                cancellationToken),
+            StartCallbackData => await HandleLobbyStartFromCallbackAsync(
+                botClient,
+                callbackQuery.From,
+                groupChatId,
+                cancellationToken),
+            RefreshCallbackData => await HandleLobbyRefreshFromCallbackAsync(
+                botClient,
+                groupChatId,
+                cancellationToken),
+            _ => ExpiredMenuToast
+        };
+    }
+
+    private static async Task<string?> HandleLobbyNewFromCallbackAsync(
+        ITelegramBotClient botClient,
+        long groupChatId,
+        CancellationToken cancellationToken)
+    {
+        var result = LobbyStore.CreateNew(groupChatId);
+        if (result.Status != LobbyCreateStatus.Created)
+            return "Lobby already exists.";
+
+        await RefreshGroupCockpitAsync(botClient, groupChatId, cancellationToken);
+        return null;
+    }
+
+    private static async Task<string?> HandleLobbyJoinFromCallbackAsync(
+        ITelegramBotClient botClient,
+        User user,
+        long groupChatId,
+        CancellationToken cancellationToken)
+    {
+        var player = new LobbyPlayer(user.Id, GetDisplayName(user));
+        var result = LobbyStore.Join(groupChatId, player);
+
+        if (result.Status is LobbyJoinStatus.JoinedAsPilot or LobbyJoinStatus.JoinedAsCopilot)
+        {
+            await RefreshGroupCockpitAsync(botClient, groupChatId, cancellationToken);
+            return null;
+        }
+
+        return result.Status switch
+        {
+            LobbyJoinStatus.NoLobby => "No lobby yet. Press New first.",
+            LobbyJoinStatus.AlreadySeated => "You are already seated.",
+            LobbyJoinStatus.Full => "Lobby is full.",
+            _ => "Cannot join lobby."
+        };
+    }
+
+    private static async Task<string?> HandleLobbyStartFromCallbackAsync(
+        ITelegramBotClient botClient,
+        User user,
+        long groupChatId,
+        CancellationToken cancellationToken)
+    {
+        var lobbySnapshot = LobbyStore.GetSnapshot(groupChatId);
+        var result = GameSessionStore.Start(groupChatId, lobbySnapshot, user.Id);
+
+        if (result.Status is GameSessionStartStatus.Started or GameSessionStartStatus.AlreadyStarted)
+        {
+            await RefreshGroupCockpitAsync(botClient, groupChatId, cancellationToken);
+            return null;
+        }
+
+        return result.Status switch
+        {
+            GameSessionStartStatus.NoLobby => "No lobby yet. Press New first.",
+            GameSessionStartStatus.LobbyNotReady => "Lobby needs two players before start.",
+            GameSessionStartStatus.NotSeated => "Only seated players can start.",
+            _ => "Cannot start game."
+        };
+    }
+
+    private static async Task<string?> HandleLobbyRefreshFromCallbackAsync(
+        ITelegramBotClient botClient,
+        long groupChatId,
+        CancellationToken cancellationToken)
+    {
+        await RefreshGroupCockpitAsync(botClient, groupChatId, cancellationToken);
+        return null;
     }
 
     private static async Task HandleSkyAsync(ITelegramBotClient botClient, Message message,
@@ -683,7 +790,14 @@ static class Program
     }
 
     private static InlineKeyboardMarkup BuildGroupStateKeyboard()
-        => new([[InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)]]);
+        => new([
+            [
+                InlineKeyboardButton.WithCallbackData("New", NewCallbackData),
+                InlineKeyboardButton.WithCallbackData("Join", JoinCallbackData),
+                InlineKeyboardButton.WithCallbackData("Start", StartCallbackData)
+            ],
+            [InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)]
+        ]);
 
     private static long? GetLockKey(Update update)
     {
