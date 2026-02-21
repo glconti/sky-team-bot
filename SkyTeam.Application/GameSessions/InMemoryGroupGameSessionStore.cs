@@ -154,6 +154,12 @@ public sealed class InMemoryGroupGameSessionStore
         }
     }
 
+    public bool TryGetGroupChatIdForUserId(long userId, out long groupChatId)
+    {
+        lock (_sync)
+            return _groupChatIdByUserId.TryGetValue(userId, out groupChatId);
+    }
+
     public GameSessionRollResult RegisterRoll(long groupChatId, SecretDiceRoll roll, PlayerSeat startingPlayer = PlayerSeat.Pilot)
     {
         ArgumentNullException.ThrowIfNull(roll);

@@ -1,5 +1,7 @@
 namespace SkyTeam.TelegramBot;
 
+using System.Collections.Concurrent;
+
 using SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
 using SkyTeam.Application.Round;
@@ -10,8 +12,16 @@ using Telegram.Bot.Types.Enums;
 
 internal static class Program
 {
+    private const int MaxRecentUpdateIds = 1_000;
+
     private static readonly InMemoryGroupLobbyStore LobbyStore = new();
     private static readonly InMemoryGroupGameSessionStore GameSessionStore = new();
+
+    private static readonly ConcurrentDictionary<long, SemaphoreSlim> ChatLocks = new();
+
+    private static readonly object UpdateDedupSync = new();
+    private static readonly Queue<int> RecentUpdateIds = new();
+    private static readonly HashSet<int> RecentUpdateIdSet = new();
 
     public static async Task Main()
     {
@@ -52,30 +62,42 @@ internal static class Program
 
     private static async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
+        if (IsDuplicateUpdate(update.Id)) return;
         if (update.Message is not { Text: { } text } message) return;
 
-        var parts = text.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0) return;
+        var lockKey = GetLockKey(message);
+        var gate = ChatLocks.GetOrAdd(lockKey, _ => new SemaphoreSlim(1, 1));
 
-        if (IsCommand(parts[0], "/start"))
+        await gate.WaitAsync(cancellationToken);
+        try
         {
+            var parts = text.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return;
+
+            if (IsCommand(parts[0], "/start"))
+            {
+                await botClient.SendMessage(
+                    chatId: message.Chat.Id,
+                    text: "Sky Team bot is online. In a group chat, try: /sky new",
+                    cancellationToken: cancellationToken);
+                return;
+            }
+
+            if (IsCommand(parts[0], "/sky"))
+            {
+                await HandleSkyAsync(botClient, message, parts.Skip(1).ToArray(), cancellationToken);
+                return;
+            }
+
             await botClient.SendMessage(
                 chatId: message.Chat.Id,
-                text: "Sky Team bot is online. In a group chat, try: /sky new",
+                text: "Unknown command. Try /sky new",
                 cancellationToken: cancellationToken);
-            return;
         }
-
-        if (IsCommand(parts[0], "/sky"))
+        finally
         {
-            await HandleSkyAsync(botClient, message, parts.Skip(1).ToArray(), cancellationToken);
-            return;
+            gate.Release();
         }
-
-        await botClient.SendMessage(
-            chatId: message.Chat.Id,
-            text: "Unknown command. Try /sky new",
-            cancellationToken: cancellationToken);
     }
 
     private static async Task HandleSkyAsync(ITelegramBotClient botClient, Message message, string[] args, CancellationToken cancellationToken)
@@ -298,16 +320,18 @@ internal static class Program
             return;
         }
 
+        var startingPlayer = rollResult.StartingPlayer ?? PlayerSeat.Pilot;
+
         var failedRecipients = new List<string>(capacity: 2);
 
-        if (!await TrySendSecretDiceAsync(botClient, snapshot.Pilot!, "Pilot", roll.PilotDice, isYourTurn: roll.StartingPlayer == PlayerSeat.Pilot, cancellationToken))
+        if (!await TrySendSecretDiceAsync(botClient, snapshot.Pilot!, "Pilot", roll.PilotDice, isYourTurn: startingPlayer == PlayerSeat.Pilot, cancellationToken))
             failedRecipients.Add(snapshot.Pilot!.DisplayName);
 
-        if (!await TrySendSecretDiceAsync(botClient, snapshot.Copilot!, "Copilot", roll.CopilotDice, isYourTurn: roll.StartingPlayer == PlayerSeat.Copilot, cancellationToken))
+        if (!await TrySendSecretDiceAsync(botClient, snapshot.Copilot!, "Copilot", roll.CopilotDice, isYourTurn: startingPlayer == PlayerSeat.Copilot, cancellationToken))
             failedRecipients.Add(snapshot.Copilot!.DisplayName);
 
         var groupText = failedRecipients.Count == 0
-            ? $"Dice rolled and sent privately to seated players. {roll.StartingPlayer} places first (use /sky place in private chat)."
+            ? $"Dice rolled and sent privately to seated players. {startingPlayer} places first (use /sky place in private chat)."
             : $"Dice rolled, but I couldn't DM: {string.Join(", ", failedRecipients)}. Each seated player must /start me in a private chat first.";
 
         await botClient.SendMessage(
@@ -334,7 +358,7 @@ internal static class Program
             GameHandStatus.NoActiveSession => "No active game session found for you. Start a game in a group chat first.",
             GameHandStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
             GameHandStatus.RoundNotRolled => "This round has not been rolled yet. In the group chat, run: /sky roll",
-            GameHandStatus.Ok => $"{result.Seat} hand:\n{RenderHand(result.Hand!)}\n\nCurrent turn: {result.CurrentPlayer}\nPlacements remaining: {result.PlacementsRemaining}\n\nAvailable commands:\n{RenderCommands(result.AvailableCommands)}",
+            GameHandStatus.Ok => $"{result.Seat} hand:\n{RenderHand(result.Hand!)}\n\nCurrent turn: {result.CurrentPlayer}\nPlacements remaining: {result.PlacementsRemaining}\n\nAvailable commands:\n{RenderCommands(result.AvailableCommands!)}",
             _ => "Cannot show hand."
         };
 
@@ -425,7 +449,7 @@ internal static class Program
 
         var updatedHand = GameSessionStore.GetHand(message.From.Id);
         var dmText = updatedHand.Status == GameHandStatus.Ok
-            ? $"Placement recorded: {info.CommandDisplayName} ({info.CommandId})\n\nYour hand:\n{RenderHand(updatedHand.Hand!)}\n\nCurrent turn: {updatedHand.CurrentPlayer}\n\nPlacements remaining: {updatedHand.PlacementsRemaining}\n\nAvailable commands:\n{RenderCommands(updatedHand.AvailableCommands)}"
+            ? $"Placement recorded: {info.CommandDisplayName} ({info.CommandId})\n\nYour hand:\n{RenderHand(updatedHand.Hand!)}\n\nCurrent turn: {updatedHand.CurrentPlayer}\n\nPlacements remaining: {updatedHand.PlacementsRemaining}\n\nAvailable commands:\n{RenderCommands(updatedHand.AvailableCommands!)}"
             : $"Placement recorded: {info.CommandDisplayName} ({info.CommandId})";
 
         if (result.ResolutionInfo is not null)
@@ -517,6 +541,34 @@ internal static class Program
         var ready = snapshot.IsReady ? "Yes" : "No";
 
         return $"Lobby state:\nPilot: {pilot}\nCopilot: {copilot}\nReady: {ready}";
+    }
+
+    private static long GetLockKey(Message message)
+    {
+        if (message.Chat.Type != ChatType.Private) return message.Chat.Id;
+        if (message.From is null) return message.Chat.Id;
+
+        return GameSessionStore.TryGetGroupChatIdForUserId(message.From.Id, out var groupChatId)
+            ? groupChatId
+            : message.Chat.Id;
+    }
+
+    private static bool IsDuplicateUpdate(int updateId)
+    {
+        lock (UpdateDedupSync)
+        {
+            if (!RecentUpdateIdSet.Add(updateId)) return true;
+
+            RecentUpdateIds.Enqueue(updateId);
+
+            while (RecentUpdateIds.Count > MaxRecentUpdateIds)
+            {
+                var oldest = RecentUpdateIds.Dequeue();
+                RecentUpdateIdSet.Remove(oldest);
+            }
+
+            return false;
+        }
     }
 
     private static string GetDisplayName(User user)
