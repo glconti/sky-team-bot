@@ -2235,3 +2235,63 @@ Publish both issues together in one draft PR because they converge in SkyTeam.Te
 **Follow-up:**
 - Replace skipped Telegram contract tests in SkyTeam.Application.Tests\Telegram\Issue50CallbackQueryFlowTests.cs and SkyTeam.Application.Tests\Telegram\Issue51CockpitLifecycleTests.cs with executable integration tests after introducing Telegram client seams.
 
+---
+## 2026-02-22: PR #58 publication update for issue #52
+
+**By:** Skiles (Domain Dev)  
+**Context:** Publish completed issue #52 lobby cockpit button slice on existing draft PR #58.
+
+### Decision
+- Keep PR #58 as the single draft vehicle for issues #50, #51, and #52.
+- Extend PR title/body/checklist to explicitly include issue #52 scope:
+  - Group cockpit buttons: New, Join, Start, Refresh
+  - Callback routing + legality toasts + no-op on invalid callbacks
+  - Cockpit refresh via existing edit-first lifecycle
+  - /sky new|join|start fallback parity
+- Include current test evidence from SkyTeam.Application.Tests and note skipped-contract tests for remaining callback seam coverage.
+- Add Closes #52 in PR body because #52 implementation scope shipped in this branch.
+
+### Rationale
+- Preserves reviewer context on one branch and avoids splitting tightly coupled cockpit/callback work.
+- Makes completion status explicit for issue tracking and release notes.
+
+---
+## 2026-02-22: Issue #52 Slice 3 — Lobby cockpit button semantics
+
+**By:** Skiles (Domain Dev)  
+**Context:** Implementing lobby cockpit buttons (New, Join, Start, Refresh) in group chat while preserving /sky command fallback behavior.
+
+### Decision
+- Group cockpit always renders all four lobby controls: New, Join, Start, Refresh.
+- Buttons are pressable by any group member; legality is enforced server-side in callback handlers via existing InMemoryGroupLobbyStore and InMemoryGroupGameSessionStore operations.
+- Invalid callback actions are handled as no-op + toast via AnswerCallbackQuery text (no group message spam, no cockpit mutation).
+- Successful callback actions refresh cockpit through the existing edit-first lifecycle (RefreshGroupCockpitAsync), preserving single-cockpit-message behavior.
+- /sky new|join|start fallback commands remain supported and continue to refresh cockpit state.
+
+### Rationale
+- Aligns with Epic #49 constraints: visible/pressable group controls, server-side authorization, graceful callback failure, and text-command regression safety.
+- Keeps implementation minimal by reusing current lobby/session command paths and cockpit refresh pipeline.
+
+### Implications
+- Callback toasts now carry user-facing legality feedback for lobby actions.
+- Cockpit button surface is stable while future slices can add in-game controls without changing this contract.
+
+---
+## 2026-02-22: Issue #52 test contract status
+
+**By:** Aloha (Tester)  
+**Context:** Implementing tests for lobby button callback flow (New, Join, Start, Refresh) and fallback behavior.
+
+### Decision
+- Add issue-52 test coverage as mixed verification + contract scaffold:
+  - Active checks for currently verifiable behavior (Refresh callback button presence and /sky state fallback contract).
+  - Skipped contract tests (with explicit rationale) for callback paths not yet fully testable/implemented (New/Join/Start callbacks, invalid press no-op side effects, successful callback integration with existing handlers and cockpit edit lifecycle).
+
+### Rationale
+- Keeps CI green while making the missing behavior explicit and traceable.
+- Allows fast unskip once callback handlers and injectable seams for side-effect assertions are available.
+
+### Implications
+- Issue #52 has concrete executable acceptance placeholders in Issue52LobbyButtonFlowTests.
+- Team can treat skip reasons as implementation checklist for callback completion.
+

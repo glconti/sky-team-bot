@@ -169,3 +169,11 @@
 - Current `SkyTeam.TelegramBot\Program.cs` has refresh callback support but does not yet persist a per-group cockpit `message_id` lifecycle or auto-pin behavior.
 - Issue #51 acceptance criteria are now captured as explicit skip-scaffold tests for: single cockpit message id persistence, edit-in-place updates, recreate-on-missing/uneditable flow, best-effort pin failure tolerance, and `/sky state` fallback refresh.
 - Minimal assumption used: once cockpit lifecycle/auto-pin implementation lands, tests can be unskipped and wired without changing behavioral expectations.
+
+### Session 8: Issue #52 lobby button flow tests (2026-02-22)
+**Outcome:** Added `SkyTeam.Application.Tests\Telegram\Issue52LobbyButtonFlowTests.cs` and updated test project references so callback-contract tests can inspect `SkyTeam.TelegramBot` behavior.
+
+**Learnings:**
+- Verified current callback keyboard path exposes `Refresh` callback and retains `/sky state` fallback contract (`ExpiredMenuToast` + group `/sky state` handling).
+- Captured explicit pending contracts (skip with rationale) for `New/Join/Start` callback paths, invalid press no-op side-effect assertions, and successful callback integration with existing handlers + cockpit edit lifecycle.
+- Current implementation appears partial versus issue #52 target behavior; tests are now ready to be unskipped as callback handlers are completed.
