@@ -191,10 +191,12 @@ public sealed class InMemoryGroupGameSessionStore
 
             session.TurnState = session.TurnState.RegisterPlacement(seat, dieIndex, target);
 
-            if (session.TurnState.IsReadyToResolve)
-                session.Round = session.Round with { Status = GameRoundStatus.ReadyToResolve };
-
             var placed = session.TurnState.Placements[^1];
+            var nextPlayer = session.TurnState.CurrentPlayer;
+            var placementsRemaining = session.TurnState.PlacementsRemaining;
+
+            if (session.TurnState.IsReadyToResolve)
+                session.ResolveRoundAndAdvance();
 
             var publicInfo = new GamePlacementPublicInfo(
                 GroupChatId: session.GroupChatId,
@@ -203,8 +205,8 @@ public sealed class InMemoryGroupGameSessionStore
                 PlacementIndex: placed.Index,
                 Value: placed.Value,
                 Target: placed.Target,
-                NextPlayer: session.TurnState.CurrentPlayer,
-                PlacementsRemaining: session.TurnState.PlacementsRemaining);
+                NextPlayer: nextPlayer,
+                PlacementsRemaining: placementsRemaining);
 
             return new GamePlacementResult(GamePlacementStatus.Placed, publicInfo);
         }
@@ -262,6 +264,13 @@ public sealed class InMemoryGroupGameSessionStore
                 SecretDiceHand.Create(roll.CopilotDice));
 
             Round = Round with { Status = GameRoundStatus.AwaitingPlacements };
+        }
+
+        public void ResolveRoundAndAdvance()
+        {
+            // Issue #32: domain resolution + broadcast will live above this store.
+            TurnState = null;
+            Round = GameRoundSnapshot.StartNew(roundNumber: Round.RoundNumber + 1);
         }
     }
 }
