@@ -18,6 +18,8 @@ class Game
     internal IReadOnlyList<BlueDie> UnusedBlueDice => _state.UnusedBlueDice;
     internal IReadOnlyList<OrangeDie> UnusedOrangeDice => _state.UnusedOrangeDice;
 
+    internal GameStatus Status { get; private set; } = GameStatus.InProgress;
+
     public Game(Airport airport, Altitude altitude, GameModule[] modules)
     {
         ArgumentNullException.ThrowIfNull(airport);
@@ -33,11 +35,31 @@ class Game
 
     public void NextRound()
     {
+        if (Status != GameStatus.InProgress)
+            throw new InvalidOperationException("Cannot proceed to next round after the game has ended.");
+
         if (_state.UnusedBlueDice.Count > 0 || _state.UnusedOrangeDice.Count > 0)
             throw new InvalidOperationException("Cannot proceed to next round with unused dice.");
 
+        if (_altitude.IsLanded)
+        {
+            EvaluateLandingOutcome();
+            return;
+        }
+
         _altitude.Advance();
         _state.SetCurrentPlayer(_altitude.CurrentPlayer);
+
+        if (_altitude.IsLanded)
+        {
+            _airport.EnterFinalRound();
+
+            if (_airport.CurrentPositionIndex != _airport.SegmentCount - 1)
+            {
+                Status = GameStatus.Lost;
+                return;
+            }
+        }
 
         foreach (var module in _modules)
             module.ResetRound();
@@ -53,6 +75,8 @@ class Game
     /// </summary>
     public IEnumerable<GameCommand> GetAvailableCommands()
     {
+        if (Status != GameStatus.InProgress) yield break;
+
         if (_state.UnusedBlueDice.Count == 0 && _state.UnusedOrangeDice.Count == 0)
         {
             yield return _allCommands[NextRoundCommand.Instance.CommandId];
@@ -70,6 +94,9 @@ class Game
     public void ExecuteCommand(string commandId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(commandId);
+
+        if (Status != GameStatus.InProgress)
+            throw new InvalidOperationException("Cannot execute commands after the game has ended.");
 
         var availableCommandIds = GetAvailableCommands()
             .Select(command => command.CommandId)
@@ -113,8 +140,10 @@ class Game
             return die ?? throw new InvalidOperationException($"No unused orange die found with value {targetValue}.");
         }
 
-        switch (prefix)
+        try
         {
+            switch (prefix)
+            {
             case "Axis.AssignBlue":
             {
                 var die = GetUnusedBlueDie(value);
@@ -194,15 +223,47 @@ class Game
             }
             default:
                 throw new InvalidOperationException($"Invalid command id '{commandId}'.");
-        }
+            }
 
-        _state.SwitchPlayer();
+            _state.SwitchPlayer();
+        }
+        catch
+        {
+            Status = GameStatus.Lost;
+            throw;
+        }
 
         TModule GetRequiredModule<TModule>(string name) where TModule : GameModule
         {
             var module = _modules.OfType<TModule>().SingleOrDefault();
             return module ?? throw new InvalidOperationException($"{name} module is not present.");
         }
+    }
+
+    private void EvaluateLandingOutcome()
+    {
+        var allPlaneTokensCleared = _airport.PathSegments.All(segment => segment.PlaneTokens == 0);
+
+        var axisModule = _modules.OfType<AxisPositionModule>().SingleOrDefault();
+        var flapsModule = _modules.OfType<FlapsModule>().SingleOrDefault();
+        var landingGearModule = _modules.OfType<LandingGearModule>().SingleOrDefault();
+        var enginesModule = _modules.OfType<EnginesModule>().SingleOrDefault();
+        var brakesModule = _modules.OfType<BrakesModule>().SingleOrDefault();
+
+        var isAligned = axisModule?.AxisPosition == 0;
+        var flapsDeployed = flapsModule?.FlapsValue == 4;
+        var landingGearDeployed = landingGearModule?.LandingGearValue == 3;
+
+        var hasSafeSpeed = enginesModule?.LastSpeed is int lastSpeed
+            && brakesModule?.BrakesValue > lastSpeed;
+
+        var isWin = allPlaneTokensCleared
+                    && isAligned
+                    && flapsDeployed
+                    && landingGearDeployed
+                    && hasSafeSpeed;
+
+        Status = isWin ? GameStatus.Won : GameStatus.Lost;
     }
 
     /// <summary>

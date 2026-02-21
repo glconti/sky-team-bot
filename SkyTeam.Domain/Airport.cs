@@ -8,6 +8,10 @@ sealed class Airport
     internal double BlueAerodynamicsThreshold { get; private set; } = 4.5;
     internal double OrangeAerodynamicsThreshold { get; private set; } = 8.5;
 
+    internal bool IsFinalRound { get; private set; }
+
+    internal void EnterFinalRound() => IsFinalRound = true;
+
     public Airport(IEnumerable<PathSegment> pathSegments)
     {
         ArgumentNullException.ThrowIfNull(pathSegments);
