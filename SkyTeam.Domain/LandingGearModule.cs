@@ -24,17 +24,24 @@ sealed class LandingGearModule(Airport airport) : GameModule
     public override IEnumerable<GameCommand> GetAvailableCommands(
         Player currentPlayer,
         IReadOnlyList<BlueDie> unusedBlueDice,
-        IReadOnlyList<OrangeDie> unusedOrangeDice)
+        IReadOnlyList<OrangeDie> unusedOrangeDice,
+        CoffeeTokenPool tokenPool)
     {
         if (currentPlayer != Player.Pilot) yield break;
         if (_isSwitchActivated.All(activated => activated)) yield break;
 
-        foreach (var value in unusedBlueDice.Select(die => (int)die).Distinct().Order())
-        {
-            var switchIndex = GetSwitchIndexForValue(value);
-            if (_isSwitchActivated[switchIndex]) continue;
+        var availableTokens = tokenPool.Count;
 
-            yield return new ActivateLandingGearCommand(value, switchIndex + 1);
+        foreach (var rolledValue in unusedBlueDice.Select(die => (int)die).Distinct().Order())
+        {
+            var unadjusted = CreateCommandIfPossible(rolledValue, rolledValue, tokenCost: 0);
+            if (unadjusted is not null) yield return unadjusted;
+
+            foreach (var effectiveValue in GetAdjustedValues(rolledValue, availableTokens))
+            {
+                var adjusted = CreateCommandIfPossible(rolledValue, effectiveValue, tokenCost: Math.Abs(effectiveValue - rolledValue));
+                if (adjusted is not null) yield return adjusted;
+            }
         }
     }
 
@@ -55,6 +62,29 @@ sealed class LandingGearModule(Airport airport) : GameModule
         _airport.MoveBlueAerodynamicsRight();
     }
 
+    private static IEnumerable<int> GetAdjustedValues(int rolledValue, int availableTokens)
+    {
+        if (availableTokens <= 0) yield break;
+
+        var min = Math.Max(1, rolledValue - availableTokens);
+        var max = Math.Min(6, rolledValue + availableTokens);
+
+        for (var value = min; value <= max; value++)
+        {
+            if (value == rolledValue) continue;
+
+            yield return value;
+        }
+    }
+
+    private GameCommand? CreateCommandIfPossible(int rolledValue, int effectiveValue, int tokenCost)
+    {
+        var switchIndex = GetSwitchIndexForValue(effectiveValue);
+        if (_isSwitchActivated[switchIndex]) return null;
+
+        return new ActivateLandingGearCommand(rolledValue, effectiveValue, tokenCost, switchIndex + 1);
+    }
+
     private static int GetSwitchIndexForValue(int value) => value switch
     {
         1 or 2 => 0,
@@ -63,9 +93,18 @@ sealed class LandingGearModule(Airport airport) : GameModule
         _ => throw new ArgumentOutOfRangeException(nameof(value), "Die values must be between 1 and 6.")
     };
 
-    private sealed record ActivateLandingGearCommand(int Value, int SwitchNumber) : GameCommand
+    private sealed record ActivateLandingGearCommand(
+        int RolledValue,
+        int EffectiveValue,
+        int TokenCost,
+        int SwitchNumber) : GameCommand
     {
-        public override string CommandId => $"LandingGear.AssignBlue:{Value}";
-        public override string DisplayName => $"Landing gear: deploy switch {SwitchNumber} with {Value}";
+        public override string CommandId => TokenCost == 0
+            ? $"LandingGear.AssignBlue:{RolledValue}"
+            : $"LandingGear.AssignBlue:{RolledValue}>{EffectiveValue}";
+
+        public override string DisplayName => TokenCost == 0
+            ? $"Landing gear: deploy switch {SwitchNumber} with {RolledValue}"
+            : $"Landing gear: deploy switch {SwitchNumber} with {RolledValue} as {EffectiveValue} (cost {TokenCost})";
     }
 }

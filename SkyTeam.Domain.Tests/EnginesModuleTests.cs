@@ -156,8 +156,8 @@ public class EnginesModuleTests
         var module = new EnginesModule(airport);
 
         // Act
-        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)]).ToArray();
-        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], []).ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [], [OrangeDie.FromValue(1)], new CoffeeTokenPool()).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [], new CoffeeTokenPool()).ToArray();
 
         // Assert
         pilotCommands.Should().BeEmpty();
@@ -175,8 +175,8 @@ public class EnginesModuleTests
         module.AssignOrangeDie(OrangeDie.FromValue(3));
 
         // Act
-        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)]).ToArray();
-        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)]).ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)], new CoffeeTokenPool()).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(1)], [OrangeDie.FromValue(1)], new CoffeeTokenPool()).ToArray();
 
         // Assert
         pilotCommands.Should().BeEmpty();
@@ -193,8 +193,8 @@ public class EnginesModuleTests
         var unusedOrangeDice = new[] { OrangeDie.FromValue(6), OrangeDie.FromValue(1), OrangeDie.FromValue(6) };
 
         // Act
-        var pilotCommands = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, unusedOrangeDice).ToArray();
-        var copilotCommands = module.GetAvailableCommands(Player.Copilot, unusedBlueDice, unusedOrangeDice).ToArray();
+        var pilotCommands = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, unusedOrangeDice, new CoffeeTokenPool()).ToArray();
+        var copilotCommands = module.GetAvailableCommands(Player.Copilot, unusedBlueDice, unusedOrangeDice, new CoffeeTokenPool()).ToArray();
 
         // Assert
         pilotCommands.Select(c => c.CommandId).Should().Equal(["Engines.AssignBlue:2", "Engines.AssignBlue:5"]);

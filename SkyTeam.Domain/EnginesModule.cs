@@ -20,18 +20,31 @@ sealed class EnginesModule(Airport airport) : GameModule
     public override IEnumerable<GameCommand> GetAvailableCommands(
         Player currentPlayer,
         IReadOnlyList<BlueDie> unusedBlueDice,
-        IReadOnlyList<OrangeDie> unusedOrangeDice)
+        IReadOnlyList<OrangeDie> unusedOrangeDice,
+        CoffeeTokenPool tokenPool)
     {
+        var availableTokens = tokenPool.Count;
+
         if (currentPlayer == Player.Pilot && _blueDie is null)
         {
-            foreach (var value in unusedBlueDice.Select(die => (int)die).Distinct().Order())
-                yield return CreateBlueCommand(value);
+            foreach (var rolledValue in unusedBlueDice.Select(die => (int)die).Distinct().Order())
+            {
+                yield return CreateBlueCommand(rolledValue, rolledValue, tokenCost: 0);
+
+                foreach (var effectiveValue in GetAdjustedValues(rolledValue, availableTokens))
+                    yield return CreateBlueCommand(rolledValue, effectiveValue, tokenCost: Math.Abs(effectiveValue - rolledValue));
+            }
         }
 
         if (currentPlayer == Player.Copilot && _orangeDie is null)
         {
-            foreach (var value in unusedOrangeDice.Select(die => (int)die).Distinct().Order())
-                yield return CreateOrangeCommand(value);
+            foreach (var rolledValue in unusedOrangeDice.Select(die => (int)die).Distinct().Order())
+            {
+                yield return CreateOrangeCommand(rolledValue, rolledValue, tokenCost: 0);
+
+                foreach (var effectiveValue in GetAdjustedValues(rolledValue, availableTokens))
+                    yield return CreateOrangeCommand(rolledValue, effectiveValue, tokenCost: Math.Abs(effectiveValue - rolledValue));
+            }
         }
     }
 
@@ -86,24 +99,39 @@ sealed class EnginesModule(Airport airport) : GameModule
         return 2;
     }
 
-    private GameCommand CreateBlueCommand(int value)
+    private static IEnumerable<int> GetAdjustedValues(int rolledValue, int availableTokens)
+    {
+        if (availableTokens <= 0) yield break;
+
+        var min = Math.Max(1, rolledValue - availableTokens);
+        var max = Math.Min(6, rolledValue + availableTokens);
+
+        for (var value = min; value <= max; value++)
+        {
+            if (value == rolledValue) continue;
+
+            yield return value;
+        }
+    }
+
+    private GameCommand CreateBlueCommand(int rolledValue, int effectiveValue, int tokenCost)
     {
         EnginesPlacementPreview? preview = null;
 
         if (_orangeDie is not null)
-            preview = GetPreview(value + (int)_orangeDie);
+            preview = GetPreview(effectiveValue + (int)_orangeDie);
 
-        return new AssignEnginesBlueDieCommand(value, preview);
+        return new AssignEnginesBlueDieCommand(rolledValue, effectiveValue, tokenCost, preview);
     }
 
-    private GameCommand CreateOrangeCommand(int value)
+    private GameCommand CreateOrangeCommand(int rolledValue, int effectiveValue, int tokenCost)
     {
         EnginesPlacementPreview? preview = null;
 
         if (_blueDie is not null)
-            preview = GetPreview((int)_blueDie + value);
+            preview = GetPreview((int)_blueDie + effectiveValue);
 
-        return new AssignEnginesOrangeDieCommand(value, preview);
+        return new AssignEnginesOrangeDieCommand(rolledValue, effectiveValue, tokenCost, preview);
     }
 
     private EnginesPlacementPreview GetPreview(int speed)
@@ -116,21 +144,45 @@ sealed class EnginesModule(Airport airport) : GameModule
 
     private sealed record EnginesPlacementPreview(int Speed, int AdvanceBy, int ResultingPosition);
 
-    private sealed record AssignEnginesBlueDieCommand(int Value, EnginesPlacementPreview? Preview) : GameCommand
+    private sealed record AssignEnginesBlueDieCommand(
+        int RolledValue,
+        int EffectiveValue,
+        int TokenCost,
+        EnginesPlacementPreview? Preview) : GameCommand
     {
-        public override string CommandId => $"Engines.AssignBlue:{Value}";
+        public override string CommandId => TokenCost == 0
+            ? $"Engines.AssignBlue:{RolledValue}"
+            : $"Engines.AssignBlue:{RolledValue}>{EffectiveValue}";
 
-        public override string DisplayName => Preview is null
-            ? $"Engines: place blue {Value}"
-            : $"Engines: place blue {Value} (speed {Preview.Speed}, advance {Preview.AdvanceBy})";
+        public override string DisplayName => CreateDisplayName("blue", RolledValue, EffectiveValue, TokenCost, Preview);
     }
 
-    private sealed record AssignEnginesOrangeDieCommand(int Value, EnginesPlacementPreview? Preview) : GameCommand
+    private sealed record AssignEnginesOrangeDieCommand(
+        int RolledValue,
+        int EffectiveValue,
+        int TokenCost,
+        EnginesPlacementPreview? Preview) : GameCommand
     {
-        public override string CommandId => $"Engines.AssignOrange:{Value}";
+        public override string CommandId => TokenCost == 0
+            ? $"Engines.AssignOrange:{RolledValue}"
+            : $"Engines.AssignOrange:{RolledValue}>{EffectiveValue}";
 
-        public override string DisplayName => Preview is null
-            ? $"Engines: place orange {Value}"
-            : $"Engines: place orange {Value} (speed {Preview.Speed}, advance {Preview.AdvanceBy})";
+        public override string DisplayName => CreateDisplayName("orange", RolledValue, EffectiveValue, TokenCost, Preview);
+    }
+
+    private static string CreateDisplayName(
+        string color,
+        int rolledValue,
+        int effectiveValue,
+        int tokenCost,
+        EnginesPlacementPreview? preview)
+    {
+        var label = tokenCost == 0
+            ? $"Engines: place {color} {rolledValue}"
+            : $"Engines: place {color} {rolledValue} as {effectiveValue} (cost {tokenCost})";
+
+        return preview is null
+            ? label
+            : $"{label} (speed {preview.Speed}, advance {preview.AdvanceBy})";
     }
 }

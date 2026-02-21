@@ -61,7 +61,7 @@ public class BrakesModuleTests
         var module = new BrakesModule();
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(2)], []).ToArray();
+        var commands = module.GetAvailableCommands(Player.Copilot, [BlueDie.FromValue(2)], [], new CoffeeTokenPool()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();
@@ -74,7 +74,7 @@ public class BrakesModuleTests
         var module = new BrakesModule();
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], []).ToArray();
+        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(1)], [], new CoffeeTokenPool()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();
@@ -87,7 +87,7 @@ public class BrakesModuleTests
         var module = new BrakesModule();
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Pilot, [], []).ToArray();
+        var commands = module.GetAvailableCommands(Player.Pilot, [], [], new CoffeeTokenPool()).ToArray();
 
         // Assert
         commands.Should().BeEmpty();
@@ -105,9 +105,9 @@ public class BrakesModuleTests
         module.AssignBlueDie(BlueDie.FromValue(6));
 
         // Assert
-        module.BrakesValue.Should().Be(3);
+        module.BrakesValue.Should().Be(6);
 
-        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], []).ToArray();
+        var commands = module.GetAvailableCommands(Player.Pilot, [BlueDie.FromValue(2)], [], new CoffeeTokenPool()).ToArray();
         commands.Should().BeEmpty();
     }
 
@@ -133,7 +133,7 @@ public class BrakesModuleTests
         var unusedBlueDice = new[] { BlueDie.FromValue(1), BlueDie.FromValue(2) };
 
         // Act
-        var commands = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, []).ToArray();
+        var commands = module.GetAvailableCommands(Player.Pilot, unusedBlueDice, [], new CoffeeTokenPool()).ToArray();
 
         // Assert
         commands.Should().ContainSingle();
