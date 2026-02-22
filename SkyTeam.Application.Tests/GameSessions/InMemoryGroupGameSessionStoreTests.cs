@@ -116,6 +116,45 @@ public sealed class InMemoryGroupGameSessionStoreTests
     }
 
     [Fact]
+    public void CockpitMessageId_ShouldBePersistedPerGroupSession()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        const long firstGroupChatId = 123;
+        const long secondGroupChatId = 456;
+
+        // Act
+        store.SetCockpitMessageId(firstGroupChatId, cockpitMessageId: 11);
+        store.SetCockpitMessageId(secondGroupChatId, cockpitMessageId: 22);
+
+        var hasFirst = store.TryGetCockpitMessageId(firstGroupChatId, out var firstCockpitMessageId);
+        var hasSecond = store.TryGetCockpitMessageId(secondGroupChatId, out var secondCockpitMessageId);
+
+        // Assert
+        hasFirst.Should().BeTrue();
+        firstCockpitMessageId.Should().Be(11);
+        hasSecond.Should().BeTrue();
+        secondCockpitMessageId.Should().Be(22);
+    }
+
+    [Fact]
+    public void CockpitMessageId_ShouldKeepSingleLatestValue_WhenRecreated()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+
+        // Act
+        store.SetCockpitMessageId(GroupChatId, cockpitMessageId: 100);
+        store.SetCockpitMessageId(GroupChatId, cockpitMessageId: 200);
+
+        var found = store.TryGetCockpitMessageId(GroupChatId, out var cockpitMessageId);
+
+        // Assert
+        found.Should().BeTrue();
+        cockpitMessageId.Should().Be(200);
+    }
+
+    [Fact]
     public void PlaceDie_ShouldNotAdvanceRound_WhenFewerThanEightPlacementsAreMade()
     {
         // Arrange
