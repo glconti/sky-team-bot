@@ -436,33 +436,126 @@ public sealed class InMemoryGroupGameSessionStoreTests
     }
 
     [Fact]
-    public void CockpitMessageId_ShouldBePersistedPerGroupSession()
+    public void OpenLobbyStartRollPlaceUndo_ShouldKeepRoundInProgress_WhenUndoingFirstPlacement()
     {
         // Arrange
-        var store = new InMemoryGroupGameSessionStore();
+        var lobbyStore = new InMemoryGroupLobbyStore();
+        var gameStore = new InMemoryGroupGameSessionStore();
+
+        var createLobby = lobbyStore.CreateNew(GroupChatId);
+        var pilot = new LobbyPlayer(1, "Pilot");
+        var copilot = new LobbyPlayer(2, "Copilot");
+        var joinPilot = lobbyStore.Join(GroupChatId, pilot);
+        var joinCopilot = lobbyStore.Join(GroupChatId, copilot);
+
+        var start = gameStore.Start(GroupChatId, lobbyStore.GetSnapshot(GroupChatId), requestingUserId: pilot.UserId);
+        var roll = gameStore.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        var firstUser = roll.StartingPlayer == PlayerSeat.Pilot ? pilot.UserId : copilot.UserId;
+        var commandId = GetCommandIdForDie(gameStore, firstUser, dieIndex: 0);
 
         // Act
-        store.SetCockpitMessageId(GroupChatId, cockpitMessageId: 777);
-        var found = store.TryGetCockpitMessageId(GroupChatId, out var cockpitMessageId);
+        var place = gameStore.PlaceDie(firstUser, dieIndex: 0, commandId);
+        var undo = gameStore.UndoLastPlacement(firstUser);
+
+        var state = gameStore.GetPublicState(GroupChatId);
+        var hand = gameStore.GetHand(firstUser);
 
         // Assert
-        found.Should().BeTrue();
-        cockpitMessageId.Should().Be(777);
+        createLobby.Status.Should().Be(LobbyCreateStatus.Created);
+        joinPilot.Status.Should().Be(LobbyJoinStatus.JoinedAsPilot);
+        joinCopilot.Status.Should().Be(LobbyJoinStatus.JoinedAsCopilot);
+        start.Status.Should().Be(GameSessionStartStatus.Started);
+        roll.Status.Should().Be(GameSessionRollStatus.Rolled);
+        place.Status.Should().Be(GamePlacementStatus.Placed);
+        undo.Status.Should().Be(GameUndoStatus.Undone);
+        state!.Session.Round.Status.Should().Be(GameRoundStatus.AwaitingPlacements);
+        state.PlacementsMade.Should().Be(0);
+        hand.Hand!.Dice[0].IsUsed.Should().BeFalse();
     }
 
     [Fact]
-    public void CockpitMessageId_ShouldKeepSingleLatestValue_WhenRecreated()
+    public void PlaceDie_ShouldReturnNotPlayersTurn_WhenPlacementIsReplayedBySamePlayer()
     {
         // Arrange
         var store = new InMemoryGroupGameSessionStore();
+        var (pilot, copilot, lobby) = CreateReadyLobby();
+        store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        var currentUser = roll.StartingPlayer == PlayerSeat.Pilot ? pilot.UserId : copilot.UserId;
+        var commandId = GetCommandIdForDie(store, currentUser, dieIndex: 0);
+
+        store.PlaceDie(currentUser, dieIndex: 0, commandId);
 
         // Act
-        store.SetCockpitMessageId(GroupChatId, cockpitMessageId: 111);
-        store.SetCockpitMessageId(GroupChatId, cockpitMessageId: 222);
-        var found = store.TryGetCockpitMessageId(GroupChatId, out var cockpitMessageId);
+        var replay = store.PlaceDie(currentUser, dieIndex: 0, commandId);
+        var state = store.GetPublicState(GroupChatId);
 
         // Assert
-        found.Should().BeTrue();
-        cockpitMessageId.Should().Be(222);
+        replay.Status.Should().Be(GamePlacementStatus.NotPlayersTurn);
+        state!.PlacementsMade.Should().Be(1);
+    }
+
+    [Fact]
+    public void PlaceDie_ShouldBeIdempotent_WhenIdempotencyKeyIsReused()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        var (pilot, copilot, lobby) = CreateReadyLobby();
+        store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        var currentUser = roll.StartingPlayer == PlayerSeat.Pilot ? pilot.UserId : copilot.UserId;
+        var commandId = GetCommandIdForDie(store, currentUser, dieIndex: 0);
+        const string idempotencyKey = "place-1";
+
+        // Act
+        var first = store.PlaceDie(currentUser, dieIndex: 0, commandId, idempotencyKey);
+        var replay = store.PlaceDie(currentUser, dieIndex: 0, commandId, idempotencyKey);
+        var state = store.GetPublicState(GroupChatId);
+
+        // Assert
+        first.Status.Should().Be(GamePlacementStatus.Placed);
+        replay.Should().Be(first);
+        state!.PlacementsMade.Should().Be(1);
+    }
+
+    [Fact]
+    public void RegisterRoll_ShouldReturnRoundNotAwaitingRoll_WhenRollIsReplayed()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        var (pilot, _, lobby) = CreateReadyLobby();
+        store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
+        store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        // Act
+        var replayedRoll = store.RegisterRoll(GroupChatId, new([6, 6, 6, 6], [6, 6, 6, 6]));
+
+        // Assert
+        replayedRoll.Status.Should().Be(GameSessionRollStatus.RoundNotAwaitingRoll);
+        replayedRoll.Snapshot!.Round.Status.Should().Be(GameRoundStatus.AwaitingPlacements);
+    }
+
+    [Fact]
+    public void GetHand_ShouldReturnNoActiveSession_WhenUserIsNotSeatedInAnyGame()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        var (pilot, _, lobby) = CreateReadyLobby();
+        store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
+        store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        // Act
+        var spectatorHand = store.GetHand(requestingUserId: 999);
+
+        // Assert
+        spectatorHand.Status.Should().Be(GameHandStatus.NoActiveSession);
+    }
+
+    [Fact(Skip = "Auth expiry UX is implemented in Telegram/WebApp transport layer, not in application store.")]
+    public void AuthExpiryUx_ShouldPromptReopenFlow_WhenSessionTokenIsExpired()
+    {
     }
 }
