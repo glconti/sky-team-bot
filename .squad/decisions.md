@@ -2518,3 +2518,36 @@ Slices (vertical, shippable):
 **Outcome:** Issue #62 acceptance criteria fully implemented and tested. CI green. Ready for PR integration.
 
 **Rationale:** Completing #62 unblocks WebApp feature parity with Mini App in-game play. Private hand scoping maintains player privacy; WebApp endpoint remains decoupled from DM flow per architecture intent.
+## 2026-02-23T01:30:00Z: PR #72 Review & Merge Approval (Sully)
+
+**By:** Sully (Lead Reviewer)  
+**Decision:** ✅ APPROVE — PR #72 (Issue #64: WebApp placement + undo) is merge-ready.  
+**Scope:** WebApp Mini App endpoints for placement/undo + button-first HTML UI  
+**PR:** https://github.com/glconti/sky-team-bot/pull/72
+
+**Acceptance Criteria:** All 7 passed
+1. Mini App placement flow (select die → target → option → execute) — POST /api/webapp/game/place + UI ✅
+2. Token adjustment support — commandId path carries variants; test passes ✅
+3. Undo supported from Mini App — POST /api/webapp/game/undo + button ✅
+4. Group cockpit edited after each placement/undo — both handlers call RefreshGroupCockpitFromWebAppAsync(...) ✅
+5. No secret options leak to group chat — endpoints return viewer-scoped WebAppGameStateResponse ✅
+
+**Code Quality:**
+- Architecture consistent with Slice #59/#61/#63 pattern (resolve → validate → mutate → refresh → return viewer-scoped)
+- Domain boundary respected: placement/undo delegates to store; no leakage to endpoint layer
+- Token-adjusted commands properly surface via existing commandId (no new domain types)
+- Validation complete: die index bounds, empty commandId guards, 409 Conflict on error
+- Tests: 2 files, 8 new tests (AAA + FluentAssertions); seeded game state; token-adjusted + undo-restore scenarios covered
+
+**Test Results:**
+- Total: 247 (102 Application + 145 Domain)
+- Passed: 230, Failed: 0, Skipped: 17 (pre-existing)
+- Build: Release ✅ (zero new warnings)
+
+**Frontend:** Button-first die→target→option→place flow; undo button gated on seated player; try/catch error handling + disabled state during async.
+
+**Minor Observations (Non-Blocking):**
+1. xUnit1051 warnings on CancellationToken — pre-existing across WebApp test files, not from this PR
+2. Undo button permissive visibility (shows even when no placement to undo) — safe, server-side UndoNotAllowed status handles it
+
+**Recommendation:** Merge to master. All criteria satisfied; build green; tests pass; mergeable state clean; PR body includes Closes #64.
