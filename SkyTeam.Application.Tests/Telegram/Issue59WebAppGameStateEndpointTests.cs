@@ -16,10 +16,9 @@ using SkyTeam.TelegramBot.WebApp;
 
 public sealed class Issue59WebAppGameStateEndpointTests
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
-        PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter() }
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
     };
     private const string TestBotToken = "TEST_BOT_TOKEN:123456";
 

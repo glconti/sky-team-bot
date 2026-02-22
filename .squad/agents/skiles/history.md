@@ -271,3 +271,12 @@
 **Key Learnings:**
 - Publishing in-place on the existing draft branch keeps review continuity for #50/#51/#52 cockpit work.
 - Test evidence is strongest when combining executable checks and explicit skipped-contract rationale for remaining callback test seams.
+
+### Session 14: Slice #59 WebApp foundation (2026-02-22)
+
+**Outcome:** Converted `SkyTeam.TelegramBot` into an ASP.NET Core host serving `wwwroot/` + `/api/webapp/*` while continuing Telegram update processing via a `BackgroundService`; added Telegram Mini App `initData` validation and a read-only `GET /api/webapp/game-state` endpoint per Sully contract.
+
+**Key Learnings:**
+- Convert host in-place (Web SDK) to keep in-memory stores shared via DI; move polling logic into hosted service to avoid static singletons.
+- Telegram `initData` validation is sensitive to HMAC key/data order (`secret_key = HMAC("WebAppData", bot_token)`); use constant-time compare and `auth_date` max age.
+- Tests that reflect on `Program` break with top-level statements; point brittle source-string assertions at a stable class (`TelegramBotService`) instead.
