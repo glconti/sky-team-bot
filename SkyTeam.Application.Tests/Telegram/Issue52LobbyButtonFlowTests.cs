@@ -14,7 +14,7 @@ public sealed class Issue52LobbyButtonFlowTests
         var buildKeyboard = GetPrivateMethod("BuildGroupStateKeyboard");
 
         // Act
-        var keyboard = (InlineKeyboardMarkup)buildKeyboard.Invoke(null, null)!;
+        var keyboard = (InlineKeyboardMarkup)buildKeyboard.Invoke(null, [123L, "sky_team_bot"])!;
         var buttons = keyboard.InlineKeyboard.SelectMany(row => row).ToList();
 
         // Assert
@@ -45,7 +45,7 @@ public sealed class Issue52LobbyButtonFlowTests
     {
         // Arrange
         var expiredMenuToast = GetPrivateConst("ExpiredMenuToast");
-        var programSourcePath = ResolveProgramSourcePath();
+        var programSourcePath = ResolveTelegramBotServiceSourcePath();
         var source = File.ReadAllText(programSourcePath);
 
         // Act
@@ -60,22 +60,22 @@ public sealed class Issue52LobbyButtonFlowTests
 
     private static string GetPrivateConst(string name)
     {
-        var field = ProgramType.GetField(name, BindingFlags.NonPublic | BindingFlags.Static);
+        var field = TelegramBotServiceType.GetField(name, BindingFlags.NonPublic | BindingFlags.Static);
         field.Should().NotBeNull();
         return (string)field!.GetRawConstantValue()!;
     }
 
     private static MethodInfo GetPrivateMethod(string name)
     {
-        var method = ProgramType.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static);
+        var method = TelegramBotServiceType.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static);
         method.Should().NotBeNull();
         return method!;
     }
 
-    private static string ResolveProgramSourcePath()
+    private static string ResolveTelegramBotServiceSourcePath()
         => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "SkyTeam.TelegramBot",
-            "Program.cs"));
+            "TelegramBotService.cs"));
 
-    private static Type ProgramType
-        => Assembly.Load("SkyTeam.TelegramBot").GetType("SkyTeam.TelegramBot.Program", throwOnError: true)!;
+    private static Type TelegramBotServiceType
+        => Assembly.Load("SkyTeam.TelegramBot").GetType("SkyTeam.TelegramBot.TelegramBotService", throwOnError: true)!;
 }

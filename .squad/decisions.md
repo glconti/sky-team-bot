@@ -2235,3 +2235,260 @@ Publish both issues together in one draft PR because they converge in SkyTeam.Te
 **Follow-up:**
 - Replace skipped Telegram contract tests in SkyTeam.Application.Tests\Telegram\Issue50CallbackQueryFlowTests.cs and SkyTeam.Application.Tests\Telegram\Issue51CockpitLifecycleTests.cs with executable integration tests after introducing Telegram client seams.
 
+---
+## 2026-02-22: PR #58 publication update for issue #52
+
+**By:** Skiles (Domain Dev)  
+**Context:** Publish completed issue #52 lobby cockpit button slice on existing draft PR #58.
+
+### Decision
+- Keep PR #58 as the single draft vehicle for issues #50, #51, and #52.
+- Extend PR title/body/checklist to explicitly include issue #52 scope:
+  - Group cockpit buttons: New, Join, Start, Refresh
+  - Callback routing + legality toasts + no-op on invalid callbacks
+  - Cockpit refresh via existing edit-first lifecycle
+  - /sky new|join|start fallback parity
+- Include current test evidence from SkyTeam.Application.Tests and note skipped-contract tests for remaining callback seam coverage.
+- Add Closes #52 in PR body because #52 implementation scope shipped in this branch.
+
+### Rationale
+- Preserves reviewer context on one branch and avoids splitting tightly coupled cockpit/callback work.
+- Makes completion status explicit for issue tracking and release notes.
+
+---
+## 2026-02-22: Issue #52 Slice 3 — Lobby cockpit button semantics
+
+**By:** Skiles (Domain Dev)  
+**Context:** Implementing lobby cockpit buttons (New, Join, Start, Refresh) in group chat while preserving /sky command fallback behavior.
+
+### Decision
+- Group cockpit always renders all four lobby controls: New, Join, Start, Refresh.
+- Buttons are pressable by any group member; legality is enforced server-side in callback handlers via existing InMemoryGroupLobbyStore and InMemoryGroupGameSessionStore operations.
+- Invalid callback actions are handled as no-op + toast via AnswerCallbackQuery text (no group message spam, no cockpit mutation).
+- Successful callback actions refresh cockpit through the existing edit-first lifecycle (RefreshGroupCockpitAsync), preserving single-cockpit-message behavior.
+- /sky new|join|start fallback commands remain supported and continue to refresh cockpit state.
+
+### Rationale
+- Aligns with Epic #49 constraints: visible/pressable group controls, server-side authorization, graceful callback failure, and text-command regression safety.
+- Keeps implementation minimal by reusing current lobby/session command paths and cockpit refresh pipeline.
+
+### Implications
+- Callback toasts now carry user-facing legality feedback for lobby actions.
+- Cockpit button surface is stable while future slices can add in-game controls without changing this contract.
+
+---
+## 2026-02-22: Issue #52 test contract status
+
+**By:** Aloha (Tester)  
+**Context:** Implementing tests for lobby button callback flow (New, Join, Start, Refresh) and fallback behavior.
+
+### Decision
+- Add issue-52 test coverage as mixed verification + contract scaffold:
+  - Active checks for currently verifiable behavior (Refresh callback button presence and /sky state fallback contract).
+  - Skipped contract tests (with explicit rationale) for callback paths not yet fully testable/implemented (New/Join/Start callbacks, invalid press no-op side effects, successful callback integration with existing handlers and cockpit edit lifecycle).
+
+### Rationale
+- Keeps CI green while making the missing behavior explicit and traceable.
+- Allows fast unskip once callback handlers and injectable seams for side-effect assertions are available.
+
+### Implications
+- Issue #52 has concrete executable acceptance placeholders in Issue52LobbyButtonFlowTests.
+- Team can treat skip reasons as implementation checklist for callback completion.
+
+
+---
+
+# Decision: Slice #59 — WebApp Foundation Design Review
+
+**Date:** 2026-02-22  
+**By:** Sully (Architect)  
+**Epic:** #57 · Slice: #59
+
+## Status
+**Approved for implementation**
+
+---
+
+## 1. Hosting Strategy
+
+### Decision: Convert \SkyTeam.TelegramBot\ to ASP.NET Core (no new project)
+
+**Rationale:**
+- The in-memory stores (\InMemoryGroupGameSessionStore\, \InMemoryGroupLobbyStore\) are static fields in \Program.cs\. Creating a second host project would require shared-state plumbing (IPC, shared DI container, or extraction to a shared process). That's unnecessary complexity for an in-memory MVP.
+- Converting the existing project from \Microsoft.NET.Sdk\ → \Microsoft.NET.Sdk.Web\ is a one-line SDK change. The Telegram polling loop moves into an \IHostedService\, and Kestrel serves the Mini App endpoints alongside.
+- Single process = single deployment unit = simpler ops.
+
+### Static File Strategy
+
+- Add \wwwroot/\ folder inside \SkyTeam.TelegramBot\ project.
+- Minimal shell: \wwwroot/index.html\ (~30 lines).
+- \UseStaticFiles()\ serves them; no bundler, no SPA framework yet.
+- Future slices (#62+) will add richer UI; this slice ships the bare minimum to prove hosting + auth.
+
+---
+
+## 2. WebApp API Contract
+
+### Endpoint: \GET /api/webapp/game-state\
+
+| Aspect | Value |
+|--------|-------|
+| Method | \GET\ |
+| Path | \/api/webapp/game-state\ |
+| Query | \gameId\ — the group chat ID (from \start_param\) |
+| Auth header | \X-Telegram-Init-Data: <raw initData query string>\ |
+| Success | \200 OK\ with JSON body |
+| Auth failure | \401 Unauthorized\ (invalid hash, stale auth_date, missing header) |
+| Not found | \404 Not Found\ (no lobby or game session for the given gameId) |
+
+**Key design rules:**
+- **No secret data** in this response (no dice hands, no available commands). Those come in Slice #62.
+- All field names use camelCase (standard JSON convention; \System.Text.Json\ defaults).
+
+### How the Mini App sends initData
+
+**Header: \X-Telegram-Init-Data\**
+
+The raw \Telegram.WebApp.initData\ query string is sent as-is in a custom header on every API request.
+
+---
+
+## 3. Security Details
+
+### initData Validation Algorithm
+
+**Steps (per Telegram spec):**
+1. Parse the raw \initData\ string as a URL-encoded query string.
+2. Extract \hash\ field; remove it from the collection.
+3. Sort remaining fields alphabetically by key (ordinal).
+4. Build \data_check_string\ = \key1=value1\nkey2=value2\n...\ (joined by \\n\).
+5. Compute \secret_key = HMAC-SHA256(key: UTF8(\"WebAppData\"), data: UTF8(bot_token))\.
+6. Compute \xpected = HMAC-SHA256(key: secret_key, data: UTF8(data_check_string))\.
+7. **Constant-time comparison:** \CryptographicOperations.FixedTimeEquals(expected, parsedHash)\.
+8. Parse \uth_date\ (Unix timestamp); reject if \
+ow - auth_date > maxAge\.
+
+### auth_date max age
+
+- **Default: 5 minutes** (\TimeSpan.FromMinutes(5)\).
+- Configurable via \ppsettings.json\ key \WebApp:InitDataMaxAgeSeconds\ (int, default 300).
+
+---
+
+## 4. Risks & Edge Cases
+
+| # | Risk / Edge Case | Mitigation |
+|---|-----------------|------------|
+| 1 | **HTTPS requirement** — Telegram Mini Apps require HTTPS. | Document in README. Not a code issue. |
+| 2 | **Replay attacks** — Stolen initData reused. | \uth_date\ freshness check (5 min). |
+| 3 | **start_param spoofing** — User crafts a direct link with a different group's ID. | Cross-check after validation; public state only in Slice #59. |
+| 4 | **Bot token in memory** — Needed for HMAC validation. | Via env var TELEGRAM_BOT_TOKEN (existing pattern). |
+| 5 | **Concurrent access to stores** — ASP.NET Core requests are multi-threaded. | Existing \lock(_sync)\ guards sufficient. |
+| 6 | **gameId parse failure** — \start_param\ may be empty/invalid. | Return 400 Bad Request. |
+| 7 | **No lobby AND no game** — Group exists but no one created a lobby yet. | Return 404. |
+| 8 | **initData missing or empty** — Browser-direct access (not from Telegram). | Filter returns 401. Expected; page only functional inside Telegram. |
+| 9 | **Clock skew** — Server clock vs Telegram \uth_date\. | 5-minute window is generous. |
+
+---
+
+## 5. Action Items
+
+### Skiles (Backend)
+1. Convert \SkyTeam.TelegramBot.csproj\ SDK to \Microsoft.NET.Sdk.Web\.
+2. Refactor \Program.cs\ to \WebApplication.CreateBuilder()\ pattern.
+3. Implement \TelegramInitDataValidator\ service.
+4. Implement \TelegramInitDataFilter : IEndpointFilter\.
+5. Implement \GET /api/webapp/game-state\ endpoint.
+6. Add \WebApp:InitDataMaxAgeSeconds\ config.
+
+### Gimli (WebApp Shell)
+1. Create \wwwroot/index.html\ per the design.
+2. Keep it minimal: no build tools, no bundler, no framework.
+
+### Aloha (Tests)
+1. Unit tests for \TelegramInitDataValidator\.
+2. Integration tests for \GET /api/webapp/game-state\ endpoint.
+3. Use \WebApplicationFactory<Program>\.
+
+---
+
+## Summary
+
+Single-host approach (convert existing TelegramBot to ASP.NET Core Web SDK), minimal static shell, one read-only endpoint behind HMAC-validated initData auth, 5-minute replay window.
+
+---
+
+# Decision: Slice #59 Mini App shell URL
+
+**Date:** 2026-02-22  
+**By:** Gimli (Mini App)
+
+## Decision
+Until the host explicitly enables default documents (\UseDefaultFiles()\ / \UseFileServer()\), configure the Telegram WebApp URL to point to \/index.html\ (not just \/\).
+
+## Rationale
+ASP.NET Core \UseStaticFiles()\ alone serves static assets but won't map \/\ to \wwwroot/index.html\; using \/index.html\ avoids a "404 on launch" footgun while we keep Slice #59 hosting minimal.
+
+---
+
+# Decision: Aloha — Slice #59 initData tests
+
+**Date:** 2026-02-22  
+**By:** Aloha (Tester)
+
+## Context
+Slice #59 introduces Telegram Mini App auth for \GET /api/webapp/game-state\ using \X-Telegram-Init-Data\.
+
+## Decisions / Notes
+1. **Integration-test hosting:** Use \WebApplicationFactory<SkyTeam.TelegramBot.Program>\ to test the endpoint end-to-end.
+2. **Disable polling in tests:** Remove the \TelegramBotService\ \IHostedService\ from DI inside \ConfigureWebHost\.
+3. **Deterministic initData generation:** Tests generate signed initData using a fake bot token; signature algorithm must match production.
+
+## Why
+- Keeps HTTP tests hermetic and fast (no outbound network).
+- Ensures auth behavior is enforced exactly at the API boundary.
+
+---
+
+# Decision: Pivot to Telegram Mini App as primary UI (no DM secrets)
+
+**Date:** 2026-02-22  
+**By:** Sully (Architect)
+
+## Context
+Previously: group chat shows single edited **Cockpit** message; secret interactions (dice hand + placement choices) happen in **DM**.
+
+Now: **Telegram Mini App (WebApp)** becomes the primary UI. Secret interactions happen **inside the mini app** (no separate DM chats).
+
+## Decision
+1) **Primary UI = Mini App**
+   - The Mini App renders: lobby, cockpit, private hand (dice), available placements, token adjustments, and undo.
+   - The group chat cockpit remains **low-noise** and becomes mostly **read-only + "Open app"** launchpad.
+
+2) **No secret DM flows**
+   - The bot must not DM dice hands or secret placement options.
+   - Fallback commands redirect users to the Mini App.
+
+3) **Auth & security model (per Telegram WebApp spec)**
+   - The Mini App sends \Telegram.WebApp.initData\ to our backend.
+   - Backend MUST validate init data before using it.
+
+4) **Chat context routing**
+   - Pass the group/game id via \start_param\ when launching the Mini App.
+   - The Mini App uses that \start_param\ to select the correct in-memory game session.
+
+## Impact on existing work (#49–#57, PR #58)
+- **Still useful (keep):** #50–#52 and PR #58, #56
+- **Obsolete (close / supersede):** #49, #53–#55
+- **Repurpose:** #57 → Mini App epic
+
+## Proposed incremental backlog (Epic #57)
+Slices (vertical, shippable):
+1) #59 — WebApp foundation (hosting + \initData\ validation + read-only API) ✅ COMPLETE
+2) #60 — Launch surface ("Open app" + \start_param\ wiring)
+3) #61 — Mini app lobby (New/Join/Start)
+4) #62 — Mini app in-game view (cockpit + private hand, no DMs)
+5) #63 — Mini app actions (Roll + refresh + group cockpit update)
+6) #64 — Mini app placement (place die + token adjust) + undo
+7) #65 — Hardening + tests + command redirects
+

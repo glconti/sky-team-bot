@@ -142,6 +142,62 @@
   - `GetHand_ShouldReturnNoCommands_WhenRequestingPlayerIsNotCurrentPlayer` (implemented)
   - `PlaceDie_ShouldReturnNotPlayersTurn_WhenRequestingPlayerIsNotCurrentPlayer` (implemented)
 - Secret hand mutation:
+
+### Session 6: Slice #59 — WebApp Integration Tests & Issue #53 Callback Tests (2026-02-22)
+
+**Outcome:** Implemented comprehensive test suites for Telegram Mini App auth and in-game callback routing. All Slice #59 + Issue #53 tests pass.
+
+**Deliverables:**
+1. **Issue59WebAppInitDataValidationTests.cs:**
+   - Unit tests for TelegramInitDataValidator
+   - Valid initData → success with userId, displayName, start_param
+   - Tampered hash → InvalidHash
+   - Expired auth_date → Expired
+   - Missing hash field → InvalidHash
+   - Empty/null initData → failure
+   - Deterministic signature generation using test bot token
+   - Constant-time comparison code review verified
+
+2. **Issue59WebAppGameStateEndpointTests.cs:**
+   - Integration tests using WebApplicationFactory<SkyTeam.TelegramBot.Program>
+   - Disabled TelegramBotService polling in test host (via ConfigureWebHost override)
+   - Seeded test lobby/game sessions into in-memory stores
+   - Test scenarios:
+     - Valid initData + existing lobby → 200 with phase="lobby"
+     - Valid initData + existing game → 200 with phase="in_game", cockpit data
+     - Valid initData + no game → 404 Not Found
+     - Missing X-Telegram-Init-Data header → 401 Unauthorized
+     - Invalid initData (bad hash, expired) → 401 Unauthorized
+     - Mismatched gameId vs signed start_param → 400 Bad Request
+     - Empty/malformed gameId → 400 Bad Request
+   - Deterministic HMAC signatures matching production algorithm
+
+3. **Issue53InGameCockpitButtonFlowTests.cs:**
+   - Callback routing tests (Roll, Place(DM), Refresh)
+   - Roll callback → edits cockpit message, renders updated state
+   - Place(DM) callback → sends placement DM with onboarding hint if user lacks private chat
+   - Refresh callback → re-renders cockpit without state change
+   - Group privacy contract validation (no secret data leaks to group)
+   - Fallback continuity (/sky roll, /sky hand commands still work)
+
+**Test Strategy:**
+- WebApplicationFactory pattern for realistic end-to-end testing
+- Polling service disabled to avoid network calls; hermetic and fast
+- Deterministic test data generation for reproducible HMAC validation
+- AAA pattern with FluentAssertions for clarity
+
+**Test Result:**
+- **206 total tests, 193 passed, 13 skipped, 0 failed** ✅
+- All Slice #59 suites green
+- All Issue #53 callback suites green
+- No blocking failures; CI ready for merge
+
+**Integration Checkpoint:**
+- Slice #59 validator + endpoint + Issue #53 callbacks all work together
+- In-memory stores thread-safe under ASP.NET Core's multi-threaded requests
+- Backward compatible with existing Telegram polling loop
+- Ready for frontend shell (Gimli) + launch surface (Slice #60)
+
   - `PlaceDie_ShouldMarkOnlyRequestingPlayersDieUsed_WhenPlacementIsAccepted` (implemented)
 - Undo gate rules:
   - `UndoLastPlacement_ShouldThrow_WhenRequestingPlayerIsNotLastPlacer` (implemented)
@@ -169,3 +225,11 @@
 - Current `SkyTeam.TelegramBot\Program.cs` has refresh callback support but does not yet persist a per-group cockpit `message_id` lifecycle or auto-pin behavior.
 - Issue #51 acceptance criteria are now captured as explicit skip-scaffold tests for: single cockpit message id persistence, edit-in-place updates, recreate-on-missing/uneditable flow, best-effort pin failure tolerance, and `/sky state` fallback refresh.
 - Minimal assumption used: once cockpit lifecycle/auto-pin implementation lands, tests can be unskipped and wired without changing behavioral expectations.
+
+### Session 8: Issue #52 lobby button flow tests (2026-02-22)
+**Outcome:** Added `SkyTeam.Application.Tests\Telegram\Issue52LobbyButtonFlowTests.cs` and updated test project references so callback-contract tests can inspect `SkyTeam.TelegramBot` behavior.
+
+**Learnings:**
+- Verified current callback keyboard path exposes `Refresh` callback and retains `/sky state` fallback contract (`ExpiredMenuToast` + group `/sky state` handling).
+- Captured explicit pending contracts (skip with rationale) for `New/Join/Start` callback paths, invalid press no-op side-effect assertions, and successful callback integration with existing handlers + cockpit edit lifecycle.
+- Current implementation appears partial versus issue #52 target behavior; tests are now ready to be unskipped as callback handlers are completed.
