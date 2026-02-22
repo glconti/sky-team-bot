@@ -18,15 +18,24 @@ public sealed class TelegramBotService(
     ILogger<TelegramBotService> logger) : BackgroundService
 {
     private const int MaxRecentUpdateIds = 1_000;
-    private const string NewCallbackData = "v1:grp:new";
-    private const string JoinCallbackData = "v1:grp:join";
-    private const string StartCallbackData = "v1:grp:start";
-    private const string RollCallbackData = "v1:grp:roll";
-    private const string PlaceDmCallbackData = "v1:grp:place-dm";
-    private const string RefreshCallbackData = "v1:grp:refresh";
+    private const string NewCallbackAction = "new";
+    private const string JoinCallbackAction = "join";
+    private const string StartCallbackAction = "start";
+    private const string RollCallbackAction = "roll";
+    private const string PlaceDmCallbackAction = "place-dm";
+    private const string RefreshCallbackAction = "refresh";
     private const string ExpiredMenuToast = "Menu expired — press /sky state";
+    private const string DuplicateCallbackToast = "Already processed.";
+
+    private static readonly string NewCallbackData = CallbackDataCodec.EncodeGroupAction(NewCallbackAction);
+    private static readonly string JoinCallbackData = CallbackDataCodec.EncodeGroupAction(JoinCallbackAction);
+    private static readonly string StartCallbackData = CallbackDataCodec.EncodeGroupAction(StartCallbackAction);
+    private static readonly string RollCallbackData = CallbackDataCodec.EncodeGroupAction(RollCallbackAction);
+    private static readonly string PlaceDmCallbackData = CallbackDataCodec.EncodeGroupAction(PlaceDmCallbackAction);
+    private static readonly string RefreshCallbackData = CallbackDataCodec.EncodeGroupAction(RefreshCallbackAction);
 
     private readonly ConcurrentDictionary<long, SemaphoreSlim> _chatLocks = new();
+    private readonly CallbackMenuStateStore _callbackMenuStateStore = new();
 
     private ITelegramBotClient? _botClient;
     private string? _botUsername;
@@ -152,14 +161,30 @@ public sealed class TelegramBotService(
         CancellationToken cancellationToken)
     {
         var groupChatId = callbackQuery.Message!.Chat.Id;
-        return callbackQuery.Data switch
+
+        if (!CallbackDataCodec.TryDecodeGroupAction(callbackQuery.Data, out var callbackData))
+            return ExpiredMenuToast;
+
+        var menuValidation = _callbackMenuStateStore.ValidateAndMarkProcessed(
+            callbackQuery.From.Id,
+            groupChatId,
+            callbackQuery.Message.MessageId,
+            callbackData);
+
+        if (menuValidation == CallbackMenuValidationStatus.UnknownOrExpired)
+            return ExpiredMenuToast;
+
+        if (menuValidation == CallbackMenuValidationStatus.Duplicate)
+            return DuplicateCallbackToast;
+
+        return callbackData switch
         {
-            NewCallbackData => await HandleLobbyNewFromCallbackAsync(botClient, groupChatId, cancellationToken),
-            JoinCallbackData => await HandleLobbyJoinFromCallbackAsync(botClient, callbackQuery.From, groupChatId, cancellationToken),
-            StartCallbackData => await HandleLobbyStartFromCallbackAsync(botClient, callbackQuery.From, groupChatId, cancellationToken),
-            RollCallbackData => await HandleInGameRollFromCallbackAsync(botClient, groupChatId, cancellationToken),
-            PlaceDmCallbackData => await HandleInGamePlaceFromCallbackAsync(botClient, callbackQuery.From, cancellationToken),
-            RefreshCallbackData => await HandleLobbyRefreshFromCallbackAsync(botClient, groupChatId, cancellationToken),
+            var data when data == NewCallbackData => await HandleLobbyNewFromCallbackAsync(botClient, groupChatId, cancellationToken),
+            var data when data == JoinCallbackData => await HandleLobbyJoinFromCallbackAsync(botClient, callbackQuery.From, groupChatId, cancellationToken),
+            var data when data == StartCallbackData => await HandleLobbyStartFromCallbackAsync(botClient, callbackQuery.From, groupChatId, cancellationToken),
+            var data when data == RollCallbackData => await HandleInGameRollFromCallbackAsync(botClient, groupChatId, cancellationToken),
+            var data when data == PlaceDmCallbackData => await HandleInGamePlaceFromCallbackAsync(botClient, callbackQuery.From, cancellationToken),
+            var data when data == RefreshCallbackData => await HandleLobbyRefreshFromCallbackAsync(botClient, groupChatId, cancellationToken),
             _ => ExpiredMenuToast
         };
     }
@@ -570,7 +595,10 @@ public sealed class TelegramBotService(
 
         if (gameSessionStore.TryGetCockpitMessageId(groupChatId, out var cockpitMessageId))
             if (await TryEditCockpitAsync(botClient, groupChatId, cockpitMessageId, text, replyMarkup, cancellationToken))
+            {
+                RegisterGroupCockpitMenuState(groupChatId, cockpitMessageId);
                 return;
+            }
 
         var cockpitMessage = await botClient.SendMessage(
             groupChatId,
@@ -579,6 +607,7 @@ public sealed class TelegramBotService(
             cancellationToken: cancellationToken);
 
         gameSessionStore.SetCockpitMessageId(groupChatId, cockpitMessage.MessageId);
+        RegisterGroupCockpitMenuState(groupChatId, cockpitMessage.MessageId);
         await TryPinCockpitAsync(botClient, groupChatId, cockpitMessage.MessageId, cancellationToken);
     }
 
@@ -690,6 +719,14 @@ public sealed class TelegramBotService(
 
     private string RenderGroupState(long groupChatId)
         => RenderGroupState(groupChatId, lobbyStore, gameSessionStore);
+
+    private void RegisterGroupCockpitMenuState(long groupChatId, int messageId)
+    {
+        _callbackMenuStateStore.RegisterGroupMenu(
+            groupChatId,
+            messageId,
+            [NewCallbackData, JoinCallbackData, StartCallbackData, RollCallbackData, PlaceDmCallbackData, RefreshCallbackData]);
+    }
 
     private static InlineKeyboardMarkup BuildGroupStateKeyboard(long groupChatId, string? botUsername)
     {

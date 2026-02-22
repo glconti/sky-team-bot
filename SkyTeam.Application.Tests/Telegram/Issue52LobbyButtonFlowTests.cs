@@ -62,7 +62,7 @@ public sealed class Issue52LobbyButtonFlowTests
     {
         var field = TelegramBotServiceType.GetField(name, BindingFlags.NonPublic | BindingFlags.Static);
         field.Should().NotBeNull();
-        return (string)field!.GetRawConstantValue()!;
+        return (string)field!.GetValue(null)!;
     }
 
     private static MethodInfo GetPrivateMethod(string name)
