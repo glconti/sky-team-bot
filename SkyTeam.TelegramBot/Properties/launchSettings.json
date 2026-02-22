@@ -1,0 +1,11 @@
+﻿{
+  "profiles": {
+    "SkyTeam.TelegramBot": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
