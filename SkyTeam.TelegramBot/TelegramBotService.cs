@@ -667,6 +667,10 @@ public sealed class TelegramBotService(
         CancellationToken cancellationToken)
     {
         var text = RenderGroupState(groupChatId);
+
+        if (string.IsNullOrWhiteSpace(_botUsername))
+            _botUsername = await GetBotUsernameAsync(botClient, cancellationToken);
+
         var replyMarkup = BuildGroupStateKeyboard(groupChatId, _botUsername);
 
         if (gameSessionStore.TryGetCockpitMessageId(groupChatId, out var cockpitMessageId))
