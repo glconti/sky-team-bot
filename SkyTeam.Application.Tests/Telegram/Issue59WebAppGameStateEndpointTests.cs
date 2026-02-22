@@ -174,7 +174,7 @@ public sealed class Issue59WebAppGameStateEndpointTests
             {
                 // Prevent Telegram polling during integration tests.
                 var hostedServiceDescriptors = services
-                    .Where(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(TelegramBotService))
+                    .Where(d => d.ServiceType == typeof(IHostedService))
                     .ToList();
 
                 foreach (var descriptor in hostedServiceDescriptors)

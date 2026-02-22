@@ -18,7 +18,8 @@ builder.Services.Configure<TelegramBotOptions>(options =>
 builder.Services.Configure<WebAppOptions>(builder.Configuration.GetSection("WebApp"));
 
 builder.Services.AddSingleton<TelegramInitDataValidator>();
-builder.Services.AddHostedService<TelegramBotService>();
+builder.Services.AddSingleton<TelegramBotService>();
+builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<TelegramBotService>());
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {

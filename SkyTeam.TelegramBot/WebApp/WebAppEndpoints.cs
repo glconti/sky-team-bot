@@ -55,6 +55,9 @@ public static class WebAppEndpoints
             .AddEndpointFilter<TelegramInitDataFilter>();
 
         group.MapGet("/game-state", GetGameState);
+        group.MapPost("/lobby/new", CreateLobby);
+        group.MapPost("/lobby/join", JoinLobby);
+        group.MapPost("/lobby/start", StartGame);
     }
 
     private static IResult GetGameState(
@@ -63,57 +66,99 @@ public static class WebAppEndpoints
         InMemoryGroupLobbyStore lobbyStore,
         InMemoryGroupGameSessionStore gameSessionStore)
     {
-        if (string.IsNullOrWhiteSpace(gameId))
-            return Results.BadRequest(new { error = "Missing gameId." });
+        var result = ResolveRequestContext(gameId, httpContext);
+        if (result.Error is not null)
+            return result.Error;
 
-        var tg = httpContext.GetTelegramInitDataContext();
-
-        if (string.IsNullOrWhiteSpace(tg.StartParam))
-            return Results.BadRequest(new { error = "Missing signed start_param." });
-
-        if (!string.Equals(gameId, tg.StartParam, StringComparison.Ordinal))
-            return Results.BadRequest(new { error = "gameId does not match signed start_param." });
-
-        if (!long.TryParse(tg.StartParam, NumberStyles.Integer, CultureInfo.InvariantCulture, out var groupChatId))
-            return Results.BadRequest(new { error = "Invalid gameId." });
-
-        var sessionState = gameSessionStore.GetPublicState(groupChatId);
+        var sessionState = gameSessionStore.GetPublicState(result.GroupChatId!.Value);
         if (sessionState is not null)
         {
-            var phase = sessionState.GameStatus is "Won" or "Lost" || sessionState.Session.Round.Status == GameRoundStatus.GameOver
-                ? WebAppGamePhase.GameOver
-                : WebAppGamePhase.InGame;
-
-            var cockpit = MapCockpit(sessionState);
-            var seat = MapViewerSeat(sessionState.Session, tg.Viewer.UserId);
-
-            return Results.Ok(new WebAppGameStateResponse(
-                GameId: groupChatId,
-                Phase: phase,
-                Lobby: null,
-                Cockpit: cockpit,
-                GameStatus: sessionState.GameStatus,
-                Viewer: new WebAppViewer(tg.Viewer.UserId, seat)));
+            return Results.Ok(MapStateResponse(sessionState, result.GroupChatId.Value, result.Context!.Viewer.UserId));
         }
 
-        var lobby = lobbyStore.GetSnapshot(groupChatId);
+        var lobby = lobbyStore.GetSnapshot(result.GroupChatId.Value);
         if (lobby is null)
             return Results.NotFound();
 
-        var lobbyState = new WebAppLobbyState(
-            Pilot: lobby.Pilot is null ? null : new WebAppLobbySeat(lobby.Pilot.UserId, lobby.Pilot.DisplayName),
-            Copilot: lobby.Copilot is null ? null : new WebAppLobbySeat(lobby.Copilot.UserId, lobby.Copilot.DisplayName),
-            IsReady: lobby.IsReady);
+        return Results.Ok(MapStateResponse(lobby, result.GroupChatId.Value, result.Context!.Viewer.UserId));
+    }
 
-        var lobbySeat = MapViewerSeat(lobby, tg.Viewer.UserId);
+    private static async Task<IResult> CreateLobby(
+        string? gameId,
+        HttpContext httpContext,
+        InMemoryGroupLobbyStore lobbyStore,
+        InMemoryGroupGameSessionStore gameSessionStore,
+        TelegramBotService telegramBotService,
+        CancellationToken cancellationToken)
+    {
+        var result = ResolveRequestContext(gameId, httpContext);
+        if (result.Error is not null)
+            return result.Error;
 
-        return Results.Ok(new WebAppGameStateResponse(
-            GameId: groupChatId,
-            Phase: WebAppGamePhase.Lobby,
-            Lobby: lobbyState,
-            Cockpit: null,
-            GameStatus: "InProgress",
-            Viewer: new WebAppViewer(tg.Viewer.UserId, lobbySeat)));
+        var createResult = lobbyStore.CreateNew(result.GroupChatId!.Value);
+        if (createResult.Status == LobbyCreateStatus.Created)
+            await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId.Value, cancellationToken);
+
+        return Results.Ok(MapStateResponse(createResult.Snapshot, result.GroupChatId.Value, result.Context!.Viewer.UserId));
+    }
+
+    private static async Task<IResult> JoinLobby(
+        string? gameId,
+        HttpContext httpContext,
+        InMemoryGroupLobbyStore lobbyStore,
+        InMemoryGroupGameSessionStore gameSessionStore,
+        TelegramBotService telegramBotService,
+        CancellationToken cancellationToken)
+    {
+        var result = ResolveRequestContext(gameId, httpContext);
+        if (result.Error is not null)
+            return result.Error;
+
+        var player = new LobbyPlayer(result.Context!.Viewer.UserId, result.Context.Viewer.DisplayName);
+        var joinResult = lobbyStore.Join(result.GroupChatId!.Value, player);
+
+        if (joinResult.Status is LobbyJoinStatus.JoinedAsPilot or LobbyJoinStatus.JoinedAsCopilot)
+            await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId.Value, cancellationToken);
+
+        return joinResult.Status switch
+        {
+            LobbyJoinStatus.JoinedAsPilot or LobbyJoinStatus.JoinedAsCopilot or LobbyJoinStatus.AlreadySeated
+                => Results.Ok(MapStateResponse(lobbyStore.GetSnapshot(result.GroupChatId.Value)!, result.GroupChatId.Value, result.Context.Viewer.UserId)),
+            LobbyJoinStatus.NoLobby => Results.Conflict(new { error = "No lobby yet. Press New first." }),
+            LobbyJoinStatus.Full => Results.Conflict(new { error = "Lobby is full." }),
+            _ => Results.Conflict(new { error = "Cannot join lobby." })
+        };
+    }
+
+    private static async Task<IResult> StartGame(
+        string? gameId,
+        HttpContext httpContext,
+        InMemoryGroupLobbyStore lobbyStore,
+        InMemoryGroupGameSessionStore gameSessionStore,
+        TelegramBotService telegramBotService,
+        CancellationToken cancellationToken)
+    {
+        var result = ResolveRequestContext(gameId, httpContext);
+        if (result.Error is not null)
+            return result.Error;
+
+        var lobby = lobbyStore.GetSnapshot(result.GroupChatId!.Value);
+        var startResult = gameSessionStore.Start(result.GroupChatId.Value, lobby, result.Context!.Viewer.UserId);
+
+        if (startResult.Status is GameSessionStartStatus.Started or GameSessionStartStatus.AlreadyStarted)
+        {
+            await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId.Value, cancellationToken);
+            var state = gameSessionStore.GetPublicState(result.GroupChatId.Value)!;
+            return Results.Ok(MapStateResponse(state, result.GroupChatId.Value, result.Context.Viewer.UserId));
+        }
+
+        return startResult.Status switch
+        {
+            GameSessionStartStatus.NoLobby => Results.Conflict(new { error = "No lobby yet. Press New first." }),
+            GameSessionStartStatus.LobbyNotReady => Results.Conflict(new { error = "Lobby needs two players before start." }),
+            GameSessionStartStatus.NotSeated => Results.Conflict(new { error = "Only seated players can start." }),
+            _ => Results.Conflict(new { error = "Cannot start game." })
+        };
     }
 
     private static WebAppCockpitState MapCockpit(GameSessionPublicState state)
@@ -152,5 +197,55 @@ public static class WebAppEndpoints
         if (lobby.Pilot?.UserId == userId) return "Pilot";
         if (lobby.Copilot?.UserId == userId) return "Copilot";
         return null;
+    }
+
+    private static WebAppGameStateResponse MapStateResponse(GameSessionPublicState sessionState, long groupChatId, long viewerUserId)
+    {
+        var phase = sessionState.GameStatus is "Won" or "Lost" || sessionState.Session.Round.Status == GameRoundStatus.GameOver
+            ? WebAppGamePhase.GameOver
+            : WebAppGamePhase.InGame;
+
+        return new WebAppGameStateResponse(
+            GameId: groupChatId,
+            Phase: phase,
+            Lobby: null,
+            Cockpit: MapCockpit(sessionState),
+            GameStatus: sessionState.GameStatus,
+            Viewer: new WebAppViewer(viewerUserId, MapViewerSeat(sessionState.Session, viewerUserId)));
+    }
+
+    private static WebAppGameStateResponse MapStateResponse(LobbySnapshot lobby, long groupChatId, long viewerUserId)
+    {
+        var lobbyState = new WebAppLobbyState(
+            Pilot: lobby.Pilot is null ? null : new WebAppLobbySeat(lobby.Pilot.UserId, lobby.Pilot.DisplayName),
+            Copilot: lobby.Copilot is null ? null : new WebAppLobbySeat(lobby.Copilot.UserId, lobby.Copilot.DisplayName),
+            IsReady: lobby.IsReady);
+
+        return new WebAppGameStateResponse(
+            GameId: groupChatId,
+            Phase: WebAppGamePhase.Lobby,
+            Lobby: lobbyState,
+            Cockpit: null,
+            GameStatus: "InProgress",
+            Viewer: new WebAppViewer(viewerUserId, MapViewerSeat(lobby, viewerUserId)));
+    }
+
+    private static (long? GroupChatId, TelegramInitDataContext? Context, IResult? Error) ResolveRequestContext(string? gameId, HttpContext httpContext)
+    {
+        if (string.IsNullOrWhiteSpace(gameId))
+            return (null, null, Results.BadRequest(new { error = "Missing gameId." }));
+
+        var tg = httpContext.GetTelegramInitDataContext();
+
+        if (string.IsNullOrWhiteSpace(tg.StartParam))
+            return (null, tg, Results.BadRequest(new { error = "Missing signed start_param." }));
+
+        if (!string.Equals(gameId, tg.StartParam, StringComparison.Ordinal))
+            return (null, tg, Results.BadRequest(new { error = "gameId does not match signed start_param." }));
+
+        if (!long.TryParse(tg.StartParam, NumberStyles.Integer, CultureInfo.InvariantCulture, out var groupChatId))
+            return (null, tg, Results.BadRequest(new { error = "Invalid gameId." }));
+
+        return (groupChatId, tg, null);
     }
 }
