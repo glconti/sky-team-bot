@@ -102,6 +102,48 @@
         });
       }
 
+      function renderInGameActions(gameId, state) {
+        actionsEl.innerHTML = '';
+
+        const refreshBtn = document.createElement('button');
+        refreshBtn.type = 'button';
+        refreshBtn.textContent = 'Refresh';
+        refreshBtn.onclick = loadState;
+        actionsEl.appendChild(refreshBtn);
+
+        const canRoll = String(state.cockpit && state.cockpit.roundStatus).toLowerCase() === 'awaitingroll'
+          && !!(state.viewer && state.viewer.seat);
+        if (!canRoll) return;
+
+        const rollBtn = document.createElement('button');
+        rollBtn.type = 'button';
+        rollBtn.textContent = 'Roll';
+        rollBtn.style.marginLeft = '8px';
+        rollBtn.onclick = async () => {
+          rollBtn.disabled = true;
+          try {
+            const r = await fetch(`/api/webapp/game/roll?gameId=${encodeURIComponent(gameId)}`, {
+              method: 'POST',
+              headers: withInitDataHeaders(),
+              cache: 'no-store'
+            });
+
+            const result = await parseResponse(r);
+            if (!result.ok) {
+              throw new Error((result.json && result.json.error) || `${result.status} action failed`);
+            }
+
+            await loadState();
+          } catch (err) {
+            setText('Action failed:\n\n' + (err && err.message ? err.message : String(err)));
+          } finally {
+            rollBtn.disabled = false;
+          }
+        };
+
+        actionsEl.appendChild(rollBtn);
+      }
+
       function renderState(state) {
         if (String(state.phase).toLowerCase() === 'lobby') {
           setText(JSON.stringify(state, null, 2));
@@ -166,7 +208,7 @@
         if (String(state.phase).toLowerCase() === 'lobby')
           renderLobbyActions(gameId);
         else
-          actionsEl.innerHTML = '';
+          renderInGameActions(gameId, state);
 
         renderState(state);
       }

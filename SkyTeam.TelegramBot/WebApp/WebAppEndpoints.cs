@@ -1,6 +1,7 @@
 using System.Globalization;
 using SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
+using SkyTeam.Application.Round;
 
 namespace SkyTeam.TelegramBot.WebApp;
 
@@ -70,6 +71,7 @@ public static class WebAppEndpoints
         group.MapPost("/lobby/new", CreateLobby);
         group.MapPost("/lobby/join", JoinLobby);
         group.MapPost("/lobby/start", StartGame);
+        group.MapPost("/game/roll", RollGame);
     }
 
     private static IResult GetGameState(
@@ -179,6 +181,45 @@ public static class WebAppEndpoints
             GameSessionStartStatus.NotSeated => Results.Conflict(new { error = "Only seated players can start." }),
             _ => Results.Conflict(new { error = "Cannot start game." })
         };
+    }
+
+    private static async Task<IResult> RollGame(
+        string? gameId,
+        HttpContext httpContext,
+        InMemoryGroupLobbyStore lobbyStore,
+        InMemoryGroupGameSessionStore gameSessionStore,
+        TelegramBotService telegramBotService,
+        CancellationToken cancellationToken)
+    {
+        var result = ResolveRequestContext(gameId, httpContext);
+        if (result.Error is not null)
+            return result.Error;
+
+        var lobby = lobbyStore.GetSnapshot(result.GroupChatId!.Value);
+        if (lobby is null)
+            return Results.Conflict(new { error = "No lobby yet. Press New first." });
+
+        if (!lobby.IsReady)
+            return Results.Conflict(new { error = "Lobby needs two players before roll." });
+
+        if (gameSessionStore.GetSnapshot(result.GroupChatId.Value) is null)
+            return Results.Conflict(new { error = "Game is not started yet. Press Start first." });
+
+        var rollResult = gameSessionStore.RegisterRoll(result.GroupChatId.Value, SecretDiceRoller.Roll(() => Random.Shared.Next(1, 7)));
+        if (rollResult.Status == GameSessionRollStatus.RoundNotAwaitingRoll)
+            return Results.Conflict(new { error = "This round has already been rolled." });
+
+        if (rollResult.Status == GameSessionRollStatus.NoSession)
+            return Results.Conflict(new { error = "Game is not started yet. Press Start first." });
+
+        await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId.Value, cancellationToken);
+        var state = gameSessionStore.GetPublicState(result.GroupChatId.Value)!;
+
+        return Results.Ok(MapStateResponse(
+            state,
+            result.GroupChatId.Value,
+            result.Context!.Viewer.UserId,
+            gameSessionStore.GetHand(result.GroupChatId.Value, result.Context.Viewer.UserId)));
     }
 
     private static WebAppCockpitState MapCockpit(GameSessionPublicState state)

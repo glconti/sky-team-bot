@@ -495,28 +495,12 @@ public sealed class TelegramBotService(
 
         if (rollResult.Status == GameSessionRollStatus.RoundNotAwaitingRoll)
         {
-            await botClient.SendMessage(groupChatId, "This round has already been rolled. Place dice with /sky place (in private chat).", cancellationToken: cancellationToken);
+            await botClient.SendMessage(groupChatId, "This round has already been rolled. Open /sky app to view your private hand and place dice.", cancellationToken: cancellationToken);
             return;
         }
 
-        var startingPlayer = rollResult.StartingPlayer ?? PlayerSeat.Pilot;
-
-        var failedRecipients = new List<string>(2);
-
-        if (!await TrySendSecretDiceAsync(botClient, snapshot.Pilot!, "Pilot", roll.PilotDice, isYourTurn: startingPlayer == PlayerSeat.Pilot, cancellationToken))
-            failedRecipients.Add(snapshot.Pilot!.DisplayName);
-
-        if (!await TrySendSecretDiceAsync(botClient, snapshot.Copilot!, "Copilot", roll.CopilotDice, isYourTurn: startingPlayer == PlayerSeat.Copilot, cancellationToken))
-            failedRecipients.Add(snapshot.Copilot!.DisplayName);
-
         await RefreshGroupCockpitAsync(botClient, groupChatId, cancellationToken);
-
-        if (failedRecipients.Count == 0) return;
-
-        var text =
-            $"Dice rolled, but I couldn't DM: {string.Join(", ", failedRecipients)}. Each seated player must /start me in a private chat first.";
-
-        await botClient.SendMessage(groupChatId, text, cancellationToken: cancellationToken);
+        await botClient.SendMessage(groupChatId, "Dice rolled. Open /sky app to view your private hand and continue.", cancellationToken: cancellationToken);
     }
 
     private async Task HandleSkyHandAsync(
