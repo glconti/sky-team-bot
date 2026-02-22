@@ -14,11 +14,13 @@
 </head>
 <body>
   <div id="meta"></div>
+  <div id="actions"></div>
   <pre id="app">Loading…</pre>
 
   <script>
     (function () {
       const metaEl = document.getElementById('meta');
+      const actionsEl = document.getElementById('actions');
       const appEl = document.getElementById('app');
 
       function setText(text) {
@@ -52,28 +54,87 @@
         setText('Calling backend…');
       }
 
-      const url = `/api/webapp/game-state?gameId=${encodeURIComponent(startParam)}`;
+      function withInitDataHeaders() {
+        return { 'X-Telegram-Init-Data': initData };
+      }
 
-      fetch(url, {
-        method: 'GET',
-        headers: { 'X-Telegram-Init-Data': initData },
-        cache: 'no-store'
-      })
-        .then(async (r) => {
-          const bodyText = await r.text();
+      async function parseResponse(r) {
+        const bodyText = await r.text();
+        const json = bodyText ? JSON.parse(bodyText) : null;
+        return { ok: r.ok, status: r.status, json };
+      }
 
-          if (!r.ok) {
-            throw new Error(`${r.status} ${r.statusText}${bodyText ? `\n\n${bodyText}` : ''}`);
-          }
+      function renderLobbyActions(gameId) {
+        actionsEl.innerHTML = '';
 
-          return bodyText ? JSON.parse(bodyText) : null;
-        })
-        .then((state) => {
-          setText(JSON.stringify(state, null, 2));
-        })
-        .catch((err) => {
-          setText('Error calling backend:\n\n' + (err && err.message ? err.message : String(err)));
+        const labels = [
+          ['New', '/api/webapp/lobby/new'],
+          ['Join', '/api/webapp/lobby/join'],
+          ['Start', '/api/webapp/lobby/start']
+        ];
+
+        labels.forEach(([label, path]) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = label;
+          btn.style.marginRight = '8px';
+          btn.onclick = async () => {
+            btn.disabled = true;
+            try {
+              const r = await fetch(`${path}?gameId=${encodeURIComponent(gameId)}`, {
+                method: 'POST',
+                headers: withInitDataHeaders(),
+                cache: 'no-store'
+              });
+              const result = await parseResponse(r);
+              if (!result.ok) {
+                throw new Error((result.json && result.json.error) || `${result.status} action failed`);
+              }
+
+              await loadState();
+            } catch (err) {
+              setText('Action failed:\n\n' + (err && err.message ? err.message : String(err)));
+            } finally {
+              btn.disabled = false;
+            }
+          };
+          actionsEl.appendChild(btn);
         });
+      }
+
+      async function loadState() {
+        const gameId = startParam;
+        const r = await fetch(`/api/webapp/game-state?gameId=${encodeURIComponent(gameId)}`, {
+          method: 'GET',
+          headers: withInitDataHeaders(),
+          cache: 'no-store'
+        });
+
+        const result = await parseResponse(r);
+        if (!result.ok && result.status !== 404) {
+          throw new Error((result.json && result.json.error) || `${result.status} game-state failed`);
+        }
+
+        const state = result.status === 404 ? {
+          gameId: Number(gameId),
+          phase: 'Lobby',
+          lobby: { pilot: null, copilot: null, isReady: false },
+          cockpit: null,
+          gameStatus: 'InProgress',
+          viewer: { userId: (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || 0, seat: null }
+        } : result.json;
+
+        if (String(state.phase).toLowerCase() === 'lobby')
+          renderLobbyActions(gameId);
+        else
+          actionsEl.innerHTML = '';
+
+        setText(JSON.stringify(state, null, 2));
+      }
+
+      loadState().catch((err) => {
+        setText('Error calling backend:\n\n' + (err && err.message ? err.message : String(err)));
+      });
     })();
   </script>
 </body>

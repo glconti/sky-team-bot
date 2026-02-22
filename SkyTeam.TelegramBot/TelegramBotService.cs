@@ -28,6 +28,7 @@ public sealed class TelegramBotService(
 
     private readonly ConcurrentDictionary<long, SemaphoreSlim> _chatLocks = new();
 
+    private ITelegramBotClient? _botClient;
     private string? _botUsername;
 
     private readonly Lock _updateDedupSync = new();
@@ -44,6 +45,7 @@ public sealed class TelegramBotService(
         }
 
         var botClient = new TelegramBotClient(token);
+        _botClient = botClient;
 
         botClient.StartReceiving(
             HandleUpdateAsync,
@@ -685,6 +687,14 @@ public sealed class TelegramBotService(
 
         gameSessionStore.SetCockpitMessageId(groupChatId, cockpitMessage.MessageId);
         await TryPinCockpitAsync(botClient, groupChatId, cockpitMessage.MessageId, cancellationToken);
+    }
+
+    internal async Task RefreshGroupCockpitFromWebAppAsync(long groupChatId, CancellationToken cancellationToken)
+    {
+        if (_botClient is null)
+            return;
+
+        await RefreshGroupCockpitAsync(_botClient, groupChatId, cancellationToken);
     }
 
     private static async Task<bool> TryEditCockpitAsync(
