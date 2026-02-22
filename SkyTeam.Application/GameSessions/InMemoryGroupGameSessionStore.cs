@@ -248,33 +248,49 @@ public sealed class InMemoryGroupGameSessionStore
             if (!TryGetSessionByUserId(requestingUserId, out var session))
                 return new(GameHandStatus.NoActiveSession, Seat: null, Hand: null, CurrentPlayer: null, PlacementsRemaining: null, AvailableCommands: null);
 
-            if (!session.TryGetSeat(requestingUserId, out var seat, out _))
-                return new(GameHandStatus.NotSeated, Seat: null, Hand: null, CurrentPlayer: null, PlacementsRemaining: null, AvailableCommands: null);
-
-            if (session.TurnState is null)
-                return new(GameHandStatus.RoundNotRolled, seat, Hand: null, CurrentPlayer: null, PlacementsRemaining: null, AvailableCommands: null);
-
-            var hand = seat == PlayerSeat.Pilot
-                ? session.TurnState.PilotHand
-                : session.TurnState.CopilotHand;
-
-            IReadOnlyList<AvailableGameCommand> commands = [];
-
-            if (seat == session.TurnState.CurrentPlayer)
-            {
-                commands = session.DomainGame.GetAvailableCommands()
-                    .Select(c => new AvailableGameCommand(c.CommandId, c.DisplayName))
-                    .ToArray();
-            }
-
-            return new(
-                GameHandStatus.Ok,
-                seat,
-                hand,
-                session.TurnState.CurrentPlayer,
-                session.TurnState.PlacementsRemaining,
-                commands);
+            return GetHandForSession(session, requestingUserId);
         }
+    }
+
+    public GameHandResult GetHand(long groupChatId, long requestingUserId)
+    {
+        lock (_sync)
+        {
+            if (!_sessions.TryGetValue(groupChatId, out var session))
+                return new(GameHandStatus.NoActiveSession, Seat: null, Hand: null, CurrentPlayer: null, PlacementsRemaining: null, AvailableCommands: null);
+
+            return GetHandForSession(session, requestingUserId);
+        }
+    }
+
+    private static GameHandResult GetHandForSession(GameSession session, long requestingUserId)
+    {
+        if (!session.TryGetSeat(requestingUserId, out var seat, out _))
+            return new(GameHandStatus.NotSeated, Seat: null, Hand: null, CurrentPlayer: null, PlacementsRemaining: null, AvailableCommands: null);
+
+        if (session.TurnState is null)
+            return new(GameHandStatus.RoundNotRolled, seat, Hand: null, CurrentPlayer: null, PlacementsRemaining: null, AvailableCommands: null);
+
+        var hand = seat == PlayerSeat.Pilot
+            ? session.TurnState.PilotHand
+            : session.TurnState.CopilotHand;
+
+        IReadOnlyList<AvailableGameCommand> commands = [];
+
+        if (seat == session.TurnState.CurrentPlayer)
+        {
+            commands = session.DomainGame.GetAvailableCommands()
+                .Select(c => new AvailableGameCommand(c.CommandId, c.DisplayName))
+                .ToArray();
+        }
+
+        return new(
+            GameHandStatus.Ok,
+            seat,
+            hand,
+            session.TurnState.CurrentPlayer,
+            session.TurnState.PlacementsRemaining,
+            commands);
     }
 
     public GamePlacementResult PlaceDie(long requestingUserId, int dieIndex, string commandId)

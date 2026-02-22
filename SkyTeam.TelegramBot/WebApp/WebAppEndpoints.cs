@@ -39,13 +39,25 @@ public sealed record WebAppCockpitState(
 
 public sealed record WebAppViewer(long UserId, string? Seat);
 
+public sealed record WebAppHandDie(int Index, int Value, bool IsUsed);
+
+public sealed record WebAppHandCommand(string CommandId, string DisplayName);
+
+public sealed record WebAppPrivateHandState(
+    string Seat,
+    string CurrentPlayer,
+    int PlacementsRemaining,
+    IReadOnlyList<WebAppHandDie> Dice,
+    IReadOnlyList<WebAppHandCommand> AvailableCommands);
+
 public sealed record WebAppGameStateResponse(
     long GameId,
     WebAppGamePhase Phase,
     WebAppLobbyState? Lobby,
     WebAppCockpitState? Cockpit,
     string GameStatus,
-    WebAppViewer Viewer);
+    WebAppViewer Viewer,
+    WebAppPrivateHandState? PrivateHand = null);
 
 public static class WebAppEndpoints
 {
@@ -73,7 +85,11 @@ public static class WebAppEndpoints
         var sessionState = gameSessionStore.GetPublicState(result.GroupChatId!.Value);
         if (sessionState is not null)
         {
-            return Results.Ok(MapStateResponse(sessionState, result.GroupChatId.Value, result.Context!.Viewer.UserId));
+            return Results.Ok(MapStateResponse(
+                sessionState,
+                result.GroupChatId.Value,
+                result.Context!.Viewer.UserId,
+                gameSessionStore.GetHand(result.GroupChatId.Value, result.Context.Viewer.UserId)));
         }
 
         var lobby = lobbyStore.GetSnapshot(result.GroupChatId.Value);
@@ -149,7 +165,11 @@ public static class WebAppEndpoints
         {
             await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId.Value, cancellationToken);
             var state = gameSessionStore.GetPublicState(result.GroupChatId.Value)!;
-            return Results.Ok(MapStateResponse(state, result.GroupChatId.Value, result.Context.Viewer.UserId));
+            return Results.Ok(MapStateResponse(
+                state,
+                result.GroupChatId.Value,
+                result.Context.Viewer.UserId,
+                gameSessionStore.GetHand(result.GroupChatId.Value, result.Context.Viewer.UserId)));
         }
 
         return startResult.Status switch
@@ -199,7 +219,7 @@ public static class WebAppEndpoints
         return null;
     }
 
-    private static WebAppGameStateResponse MapStateResponse(GameSessionPublicState sessionState, long groupChatId, long viewerUserId)
+    private static WebAppGameStateResponse MapStateResponse(GameSessionPublicState sessionState, long groupChatId, long viewerUserId, GameHandResult handResult)
     {
         var phase = sessionState.GameStatus is "Won" or "Lost" || sessionState.Session.Round.Status == GameRoundStatus.GameOver
             ? WebAppGamePhase.GameOver
@@ -211,7 +231,8 @@ public static class WebAppEndpoints
             Lobby: null,
             Cockpit: MapCockpit(sessionState),
             GameStatus: sessionState.GameStatus,
-            Viewer: new WebAppViewer(viewerUserId, MapViewerSeat(sessionState.Session, viewerUserId)));
+            Viewer: new WebAppViewer(viewerUserId, MapViewerSeat(sessionState.Session, viewerUserId)),
+            PrivateHand: MapPrivateHand(handResult));
     }
 
     private static WebAppGameStateResponse MapStateResponse(LobbySnapshot lobby, long groupChatId, long viewerUserId)
@@ -227,7 +248,21 @@ public static class WebAppEndpoints
             Lobby: lobbyState,
             Cockpit: null,
             GameStatus: "InProgress",
-            Viewer: new WebAppViewer(viewerUserId, MapViewerSeat(lobby, viewerUserId)));
+            Viewer: new WebAppViewer(viewerUserId, MapViewerSeat(lobby, viewerUserId)),
+            PrivateHand: null);
+    }
+
+    private static WebAppPrivateHandState? MapPrivateHand(GameHandResult handResult)
+    {
+        if (handResult.Status != GameHandStatus.Ok || handResult.Seat is null || handResult.Hand is null || handResult.CurrentPlayer is null || handResult.PlacementsRemaining is null)
+            return null;
+
+        return new(
+            Seat: handResult.Seat.Value.ToString(),
+            CurrentPlayer: handResult.CurrentPlayer.Value.ToString(),
+            PlacementsRemaining: handResult.PlacementsRemaining.Value,
+            Dice: handResult.Hand.Dice.Select(d => new WebAppHandDie(d.Index, d.Value.Value, d.IsUsed)).ToArray(),
+            AvailableCommands: (handResult.AvailableCommands ?? []).Select(c => new WebAppHandCommand(c.CommandId, c.DisplayName)).ToArray());
     }
 
     private static (long? GroupChatId, TelegramInitDataContext? Context, IResult? Error) ResolveRequestContext(string? gameId, HttpContext httpContext)

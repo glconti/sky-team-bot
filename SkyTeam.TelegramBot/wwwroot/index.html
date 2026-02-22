@@ -102,6 +102,45 @@
         });
       }
 
+      function renderState(state) {
+        if (String(state.phase).toLowerCase() === 'lobby') {
+          setText(JSON.stringify(state, null, 2));
+          return;
+        }
+
+        const lines = [];
+        lines.push(`Phase: ${state.phase}`);
+        lines.push(`Viewer seat: ${(state.viewer && state.viewer.seat) || 'Spectator'}`);
+        lines.push('');
+
+        if (state.cockpit) {
+          lines.push('Public cockpit');
+          lines.push(`- Round: ${state.cockpit.roundNumber} (${state.cockpit.roundStatus})`);
+          lines.push(`- Axis: ${state.cockpit.axisPosition}`);
+          lines.push(`- Engines speed: ${state.cockpit.enginesSpeed ?? 'n/a'}`);
+          lines.push(`- Approach: ${state.cockpit.approachPosition}/${state.cockpit.approachSegments}`);
+          lines.push(`- Planes remaining: ${state.cockpit.planesRemaining}`);
+          lines.push(`- Coffee tokens: ${state.cockpit.coffeeTokens}`);
+          lines.push('');
+        }
+
+        if (state.privateHand) {
+          lines.push('Private hand (only you)');
+          lines.push(`- Seat: ${state.privateHand.seat}`);
+          lines.push(`- Current player: ${state.privateHand.currentPlayer}`);
+          lines.push(`- Placements remaining: ${state.privateHand.placementsRemaining}`);
+          lines.push(`- Dice: ${state.privateHand.dice.map(d => `${d.index}:${d.value}${d.isUsed ? '✓' : ''}`).join(', ')}`);
+          lines.push(`- Commands: ${state.privateHand.availableCommands.length}`);
+        } else {
+          lines.push('Private hand unavailable (not seated or round not rolled).');
+        }
+
+        lines.push('');
+        lines.push('Raw payload:');
+        lines.push(JSON.stringify(state, null, 2));
+        setText(lines.join('\n'));
+      }
+
       async function loadState() {
         const gameId = startParam;
         const r = await fetch(`/api/webapp/game-state?gameId=${encodeURIComponent(gameId)}`, {
@@ -129,7 +168,7 @@
         else
           actionsEl.innerHTML = '';
 
-        setText(JSON.stringify(state, null, 2));
+        renderState(state);
       }
 
       loadState().catch((err) => {

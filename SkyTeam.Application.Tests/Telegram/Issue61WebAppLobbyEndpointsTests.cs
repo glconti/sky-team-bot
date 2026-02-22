@@ -10,7 +10,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
+using SkyTeam.Application.Round;
 using SkyTeam.TelegramBot;
 using SkyTeam.TelegramBot.WebApp;
 
@@ -96,6 +98,69 @@ public sealed class Issue61WebAppLobbyEndpointsTests
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         state!.Phase.Should().Be(WebAppGamePhase.InGame);
         state.Cockpit.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GameStateEndpoint_ShouldIncludePrivateHand_WhenViewerIsSeated()
+    {
+        // Arrange
+        const long groupChatId = 123;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var lobbyStore = factory.Services.GetRequiredService<InMemoryGroupLobbyStore>();
+        var gameSessionStore = factory.Services.GetRequiredService<InMemoryGroupGameSessionStore>();
+        lobbyStore.CreateNew(groupChatId);
+        lobbyStore.Join(groupChatId, new LobbyPlayer(111, "Alice"));
+        lobbyStore.Join(groupChatId, new LobbyPlayer(222, "Bob"));
+        gameSessionStore.Start(groupChatId, lobbyStore.GetSnapshot(groupChatId), requestingUserId: 111);
+        gameSessionStore.RegisterRoll(groupChatId, new SecretDiceRoll([1, 2, 3, 4], [5, 6, 1, 2]));
+
+        var initData = BuildInitData(TestBotToken, DateTimeOffset.UtcNow, viewerUserId: 111, viewerDisplayName: "Alice", startParam: groupChatId.ToString());
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/webapp/game-state?gameId={groupChatId}");
+        request.Headers.Add("X-Telegram-Init-Data", initData);
+
+        // Act
+        var response = await client.SendAsync(request);
+        var state = await response.Content.ReadFromJsonAsync<WebAppGameStateResponse>(JsonOptions);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        state!.Phase.Should().Be(WebAppGamePhase.InGame);
+        state.PrivateHand.Should().NotBeNull();
+        state.PrivateHand!.Seat.Should().Be("Pilot");
+        state.PrivateHand.Dice.Should().HaveCount(4);
+    }
+
+    [Fact]
+    public async Task GameStateEndpoint_ShouldNotIncludePrivateHand_WhenViewerIsNotSeated()
+    {
+        // Arrange
+        const long groupChatId = 123;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var lobbyStore = factory.Services.GetRequiredService<InMemoryGroupLobbyStore>();
+        var gameSessionStore = factory.Services.GetRequiredService<InMemoryGroupGameSessionStore>();
+        lobbyStore.CreateNew(groupChatId);
+        lobbyStore.Join(groupChatId, new LobbyPlayer(111, "Alice"));
+        lobbyStore.Join(groupChatId, new LobbyPlayer(222, "Bob"));
+        gameSessionStore.Start(groupChatId, lobbyStore.GetSnapshot(groupChatId), requestingUserId: 111);
+        gameSessionStore.RegisterRoll(groupChatId, new SecretDiceRoll([1, 2, 3, 4], [5, 6, 1, 2]));
+
+        var initData = BuildInitData(TestBotToken, DateTimeOffset.UtcNow, viewerUserId: 333, viewerDisplayName: "Eve", startParam: groupChatId.ToString());
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/webapp/game-state?gameId={groupChatId}");
+        request.Headers.Add("X-Telegram-Init-Data", initData);
+
+        // Act
+        var response = await client.SendAsync(request);
+        var state = await response.Content.ReadFromJsonAsync<WebAppGameStateResponse>(JsonOptions);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        state!.Phase.Should().Be(WebAppGamePhase.InGame);
+        state.Viewer.Seat.Should().BeNull();
+        state.PrivateHand.Should().BeNull();
     }
 
     private static WebApplicationFactory<Program> CreateFactory()
