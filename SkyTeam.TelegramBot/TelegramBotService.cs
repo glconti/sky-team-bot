@@ -28,6 +28,8 @@ public sealed class TelegramBotService(
 
     private readonly ConcurrentDictionary<long, SemaphoreSlim> _chatLocks = new();
 
+    private string? _botUsername;
+
     private readonly Lock _updateDedupSync = new();
     private readonly Queue<int> _recentUpdateIds = new();
     private readonly HashSet<int> _recentUpdateIdSet = [];
@@ -50,6 +52,7 @@ public sealed class TelegramBotService(
             stoppingToken);
 
         var me = await botClient.GetMe(stoppingToken);
+        _botUsername = me.Username;
         logger.LogInformation("Started Telegram bot @{Username}.", me.Username);
 
         try
@@ -289,7 +292,7 @@ public sealed class TelegramBotService(
                 default:
                     await botClient.SendMessage(
                         message.Chat.Id,
-                        "In a group chat, try: /sky new\n\nIn private chat: /sky hand | /sky place <dieIndex> <commandId> | /sky undo",
+                        "In a group chat, try: /sky new | /sky app\n\nIn private chat: /sky hand | /sky place <dieIndex> <commandId> | /sky undo",
                         cancellationToken: cancellationToken);
                     return;
             }
@@ -325,6 +328,10 @@ public sealed class TelegramBotService(
                 await HandleSkyRollAsync(botClient, message, cancellationToken);
                 return;
 
+            case "app":
+                await HandleSkyAppAsync(botClient, message, cancellationToken);
+                return;
+
             case "hand":
             case "place":
                 await botClient.SendMessage(
@@ -343,7 +350,7 @@ public sealed class TelegramBotService(
             default:
                 await botClient.SendMessage(
                     message.Chat.Id,
-                    "Usage: /sky new | /sky join | /sky state | /sky start | /sky roll",
+                    "Usage: /sky new | /sky join | /sky state | /sky start | /sky roll | /sky app",
                     cancellationToken: cancellationToken);
                 return;
         }
@@ -386,6 +393,37 @@ public sealed class TelegramBotService(
         Message message,
         CancellationToken cancellationToken)
         => await RefreshGroupCockpitAsync(botClient, message.Chat.Id, cancellationToken);
+
+    private async Task HandleSkyAppAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        CancellationToken cancellationToken)
+    {
+        var botUsername = await GetBotUsernameAsync(botClient, cancellationToken);
+        if (string.IsNullOrWhiteSpace(botUsername))
+        {
+            await botClient.SendMessage(message.Chat.Id, "Bot username is not available yet. Try again in a moment.", cancellationToken: cancellationToken);
+            return;
+        }
+
+        var groupChatId = message.Chat.Id;
+
+        await botClient.SendMessage(
+            groupChatId,
+            "Open the Sky Team Mini App:",
+            replyMarkup: BuildOpenAppKeyboard(groupChatId, botUsername),
+            cancellationToken: cancellationToken);
+    }
+
+    private async Task<string?> GetBotUsernameAsync(ITelegramBotClient botClient, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(_botUsername))
+            return _botUsername;
+
+        var me = await botClient.GetMe(cancellationToken);
+        _botUsername = me.Username;
+        return _botUsername;
+    }
 
     private async Task HandleSkyStartAsync(
         ITelegramBotClient botClient,
@@ -629,15 +667,16 @@ public sealed class TelegramBotService(
         CancellationToken cancellationToken)
     {
         var text = RenderGroupState(groupChatId);
+        var replyMarkup = BuildGroupStateKeyboard(groupChatId, _botUsername);
 
         if (gameSessionStore.TryGetCockpitMessageId(groupChatId, out var cockpitMessageId))
-            if (await TryEditCockpitAsync(botClient, groupChatId, cockpitMessageId, text, cancellationToken))
+            if (await TryEditCockpitAsync(botClient, groupChatId, cockpitMessageId, text, replyMarkup, cancellationToken))
                 return;
 
         var cockpitMessage = await botClient.SendMessage(
             groupChatId,
             text,
-            replyMarkup: BuildGroupStateKeyboard(),
+            replyMarkup: replyMarkup,
             cancellationToken: cancellationToken);
 
         gameSessionStore.SetCockpitMessageId(groupChatId, cockpitMessage.MessageId);
@@ -649,6 +688,7 @@ public sealed class TelegramBotService(
         long groupChatId,
         int cockpitMessageId,
         string text,
+        InlineKeyboardMarkup replyMarkup,
         CancellationToken cancellationToken)
     {
         try
@@ -657,7 +697,7 @@ public sealed class TelegramBotService(
                 groupChatId,
                 cockpitMessageId,
                 text,
-                replyMarkup: BuildGroupStateKeyboard(),
+                replyMarkup: replyMarkup,
                 cancellationToken: cancellationToken);
 
             return true;
@@ -744,15 +784,34 @@ public sealed class TelegramBotService(
     private string RenderGroupState(long groupChatId)
         => RenderGroupState(groupChatId, lobbyStore, gameSessionStore);
 
-    private static InlineKeyboardMarkup BuildGroupStateKeyboard()
-        => new([
+    private static InlineKeyboardMarkup BuildGroupStateKeyboard(long groupChatId, string? botUsername)
+    {
+        InlineKeyboardButton[] secondRow = string.IsNullOrWhiteSpace(botUsername)
+            ? [InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)]
+            :
+            [
+                InlineKeyboardButton.WithUrl("Open app", BuildStartAppUrl(botUsername, groupChatId)),
+                InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)
+            ];
+
+        return new([
             [
                 InlineKeyboardButton.WithCallbackData("New", NewCallbackData),
                 InlineKeyboardButton.WithCallbackData("Join", JoinCallbackData),
                 InlineKeyboardButton.WithCallbackData("Start", StartCallbackData)
             ],
-            [InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)]
+            secondRow
         ]);
+    }
+
+    private static InlineKeyboardMarkup BuildOpenAppKeyboard(long groupChatId, string botUsername)
+        => new([[InlineKeyboardButton.WithUrl("Open app", BuildStartAppUrl(botUsername, groupChatId))]]);
+
+    private static string BuildStartAppUrl(string botUsername, long groupChatId)
+    {
+        var username = botUsername.TrimStart('@');
+        return $"https://t.me/{username}?startapp={Uri.EscapeDataString(groupChatId.ToString())}";
+    }
 
     private long? GetLockKey(Update update)
     {

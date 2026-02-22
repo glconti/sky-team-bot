@@ -15,7 +15,7 @@ public sealed class Issue53InGameCockpitButtonFlowTests
             "RollCallbackData => await HandleInGameRollFromCallbackAsync(",
             StringComparison.Ordinal);
         var usesEditFirstCockpitLifecycle = programSource.Contains(
-                                             "if (await TryEditCockpitAsync(botClient, groupChatId, cockpitMessageId, text, cancellationToken))",
+                                             "if (await TryEditCockpitAsync(botClient, groupChatId, cockpitMessageId, text, replyMarkup, cancellationToken))",
                                              StringComparison.Ordinal) &&
                                          programSource.Contains("await botClient.EditMessageText(", StringComparison.Ordinal);
 

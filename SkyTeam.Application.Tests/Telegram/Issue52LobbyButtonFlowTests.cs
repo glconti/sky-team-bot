@@ -14,7 +14,7 @@ public sealed class Issue52LobbyButtonFlowTests
         var buildKeyboard = GetPrivateMethod("BuildGroupStateKeyboard");
 
         // Act
-        var keyboard = (InlineKeyboardMarkup)buildKeyboard.Invoke(null, System.Array.Empty<object>())!;
+        var keyboard = (InlineKeyboardMarkup)buildKeyboard.Invoke(null, [123L, "sky_team_bot"])!;
         var buttons = keyboard.InlineKeyboard.SelectMany(row => row).ToList();
 
         // Assert
