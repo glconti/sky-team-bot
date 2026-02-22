@@ -48,20 +48,18 @@ public sealed class Issue53InGameCockpitButtonFlowTests
     }
 
     [Fact]
-    public void GroupRollFlow_ShouldUseDmOnboardingHintWithoutLeakingSecretDiceToGroup()
+    public void GroupRollFlow_ShouldRedirectToMiniAppWithoutLeakingSecretDiceToGroup()
     {
         // Arrange
         var programSource = File.ReadAllText(ResolveProgramSourcePath());
 
         // Act
-        var hasOnboardingHint = programSource.Contains("must /start me in a private chat first.", StringComparison.Ordinal);
-        var hasNonLeakingGroupWarning = programSource.Contains(
-            "Dice rolled, but I couldn't DM: {string.Join(\", \", failedRecipients)}. Each seated player must /start me in a private chat first.",
-            StringComparison.Ordinal);
+        var hasMiniAppHint = programSource.Contains("Open /sky app to view your private hand", StringComparison.Ordinal);
+        var hasLegacyDmWarning = programSource.Contains("Dice rolled, but I couldn't DM:", StringComparison.Ordinal);
 
         // Assert
-        hasOnboardingHint.Should().BeTrue("group users should be told how to onboard DM when roll DM delivery fails");
-        hasNonLeakingGroupWarning.Should().BeTrue("group warning must not reveal secret dice payload");
+        hasMiniAppHint.Should().BeTrue("group users should be directed to the Mini App for secret hand interactions");
+        hasLegacyDmWarning.Should().BeFalse("roll fallback should avoid DM-secret delivery warnings");
     }
 
     [Fact]
