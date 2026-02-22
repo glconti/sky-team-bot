@@ -213,6 +213,62 @@
 
 **Constraints & Mitigations:**
 - **Retry dedup:** idempotency key prevents duplicate actions
+
+### Session 4: Slice #59 — WebApp Foundation Implementation (2026-02-22)
+
+**Outcome:** Converted TelegramBot to ASP.NET Core Web SDK; implemented TelegramInitDataValidator, TelegramInitDataFilter, and GET /api/webapp/game-state endpoint.
+
+**Deliverables:**
+1. **Project SDK conversion:** `SkyTeam.TelegramBot.csproj` → `Microsoft.NET.Sdk.Web`
+2. **Program.cs refactor:**
+   - WebApplication.CreateBuilder() pattern (vs. Host.CreateDefaultBuilder)
+   - InMemoryGroupLobbyStore, InMemoryGroupGameSessionStore registered as singletons
+   - TelegramBotService (IHostedService) wraps existing polling loop
+   - UseStaticFiles() for wwwroot/ serving
+   - MapWebAppEndpoints() for /api/webapp/* routing
+3. **TelegramInitDataValidator service:**
+   - Pure, testable validation logic
+   - HMAC-SHA256 per Telegram spec
+   - FixedTimeEquals constant-time comparison
+   - auth_date freshness check (default 5 min, configurable)
+   - Returns InitDataValidationResult (success or specific failure reason)
+4. **TelegramInitDataFilter (IEndpointFilter):**
+   - Reads X-Telegram-Init-Data header
+   - Delegates to validator
+   - On success: injects TelegramWebAppUser into HttpContext.Items
+   - On failure: returns 401 Unauthorized
+5. **GET /api/webapp/game-state endpoint:**
+   - Query param: gameId (from start_param)
+   - Cross-check signed start_param against query gameId (reject 400 if mismatch)
+   - Query in-memory stores; return public game state (200)
+   - Return 404 if no lobby/session, 400 if invalid gameId, 401 if auth fails
+6. **TelegramBotOptions configuration class:**
+   - BotToken (from env TELEGRAM_BOT_TOKEN)
+   - WebApp section (InitDataMaxAgeSeconds, etc.)
+7. **appsettings.json:** Added WebApp:InitDataMaxAgeSeconds (default 300)
+
+**Architecture Decisions:**
+- **Single host process:** No IPC needed; in-memory stores are DI singletons
+- **Hosted service for polling:** ASP.NET Core lifecycle management + graceful shutdown
+- **Filter-based auth:** Clean separation; reusable across endpoints
+- **Read-only in Slice #59:** Public state only; no secrets. Write endpoints deferred to Slice #64
+
+**Testing:**
+- Issue #59 validator tests: Valid initData, tampered hash, expired auth_date, missing hash, empty initData, constant-time comparison ✅
+- Issue #59 endpoint integration tests: Valid (200), no game (404), missing header (401), invalid initData (401), mismatched gameId (400) ✅
+- Issue #53 callback tests: Roll/Place(DM)/Refresh callbacks, privacy contract, fallback continuity ✅
+- Result: 206 total, 193 passed, 13 skipped, 0 failed
+
+**Integrations:**
+- Backward compatible with existing Telegram callback routing (Issues #50–#53)
+- Lock guards in stores ensure no race conditions under ASP.NET Core's multi-threaded requests
+- Static files served alongside Telegram polling in single process
+
+**Next Steps:**
+- Slice #60: Launch surface ("Open app" button + start_param wiring in group cockpit)
+- Slice #61: Mini app lobby UI (New/Join/Start buttons)
+- Slice #62: Mini app in-game UI (cockpit + private hand, no DMs)
+
 - **Restart recovery:** stale buttons → "menu expired" toast; retry from `/sky hand`
 - **Concurrency:** per-group serialization + async/await on all Telegram API calls
 
