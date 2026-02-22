@@ -89,6 +89,60 @@ public sealed class Issue64WebAppPlacementFlowTests
         state.PrivateHand!.Dice.Single(d => d.Index == dieIndex).IsUsed.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task WebAppTransportFlow_ShouldCoverOpenLobbyStartRollPlaceUndo()
+    {
+        // Arrange
+        const long groupChatId = 123;
+        const long pilotUserId = 111;
+        const long copilotUserId = 222;
+
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        // Act
+        var createLobbyResponse = await client.SendAsync(CreateActionRequest(HttpMethod.Post, $"/api/webapp/lobby/new?gameId={groupChatId}", pilotUserId, "Alice"));
+        var joinPilotResponse = await client.SendAsync(CreateActionRequest(HttpMethod.Post, $"/api/webapp/lobby/join?gameId={groupChatId}", pilotUserId, "Alice"));
+        var joinCopilotResponse = await client.SendAsync(CreateActionRequest(HttpMethod.Post, $"/api/webapp/lobby/join?gameId={groupChatId}", copilotUserId, "Bob"));
+        var startResponse = await client.SendAsync(CreateActionRequest(HttpMethod.Post, $"/api/webapp/lobby/start?gameId={groupChatId}", pilotUserId, "Alice"));
+        var rollResponse = await client.SendAsync(CreateActionRequest(HttpMethod.Post, $"/api/webapp/game/roll?gameId={groupChatId}", pilotUserId, "Alice"));
+
+        var pilotStateResponse = await client.SendAsync(CreateActionRequest(HttpMethod.Get, $"/api/webapp/game-state?gameId={groupChatId}", pilotUserId, "Alice"));
+        var pilotState = await pilotStateResponse.Content.ReadFromJsonAsync<WebAppGameStateResponse>(JsonOptions);
+        var currentPlayer = pilotState!.PrivateHand!.CurrentPlayer;
+        var currentUserId = currentPlayer == "Pilot" ? pilotUserId : copilotUserId;
+        var currentDisplayName = currentUserId == pilotUserId ? "Alice" : "Bob";
+
+        var currentStateResponse = await client.SendAsync(CreateActionRequest(HttpMethod.Get, $"/api/webapp/game-state?gameId={groupChatId}", currentUserId, currentDisplayName));
+        var currentState = await currentStateResponse.Content.ReadFromJsonAsync<WebAppGameStateResponse>(JsonOptions);
+        var commandId = currentState!.PrivateHand!.AvailableCommands.First().CommandId;
+        var dieIndex = FindDieIndex(currentState.PrivateHand.Dice, commandId);
+
+        var placeResponse = await client.SendAsync(CreateActionRequest(
+            HttpMethod.Post,
+            $"/api/webapp/game/place?gameId={groupChatId}",
+            currentUserId,
+            currentDisplayName,
+            new { dieIndex, commandId }));
+        var placedState = await placeResponse.Content.ReadFromJsonAsync<WebAppGameStateResponse>(JsonOptions);
+
+        var undoResponse = await client.SendAsync(CreateActionRequest(HttpMethod.Post, $"/api/webapp/game/undo?gameId={groupChatId}", currentUserId, currentDisplayName));
+        var undoneState = await undoResponse.Content.ReadFromJsonAsync<WebAppGameStateResponse>(JsonOptions);
+
+        // Assert
+        createLobbyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        joinPilotResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        joinCopilotResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        startResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        rollResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        placeResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        undoResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        placedState!.Phase.Should().Be(WebAppGamePhase.InGame);
+        placedState.PrivateHand!.Dice.Single(d => d.Index == dieIndex).IsUsed.Should().BeTrue();
+        undoneState!.PrivateHand!.Dice.Single(d => d.Index == dieIndex).IsUsed.Should().BeFalse();
+    }
+
     private static (long UserId, string CommandId, int DieIndex) SeedTurnWithTokenAdjustedOption(WebApplicationFactory<Program> factory, long groupChatId)
     {
         var lobbyStore = factory.Services.GetRequiredService<InMemoryGroupLobbyStore>();
@@ -158,6 +212,21 @@ public sealed class Issue64WebAppPlacementFlowTests
         return hand.Dice.First(d => !d.IsUsed && d.Value.Value == rolledValue).Index;
     }
 
+    private static int FindDieIndex(IReadOnlyList<WebAppHandDie> dice, string commandId)
+    {
+        var markerStart = commandId.LastIndexOf(':');
+        markerStart.Should().BeGreaterThanOrEqualTo(0);
+
+        var markerEnd = commandId.IndexOf('>', markerStart + 1);
+        if (markerEnd < 0)
+            markerEnd = commandId.Length;
+
+        var rolledValueText = commandId[(markerStart + 1)..markerEnd];
+        var rolledValue = int.Parse(rolledValueText);
+
+        return dice.First(d => !d.IsUsed && d.Value == rolledValue).Index;
+    }
+
     private static HttpRequestMessage CreatePlaceRequest(long groupChatId, long viewerUserId, string viewerDisplayName, int dieIndex, string commandId)
     {
         var initData = BuildInitData(TestBotToken, DateTimeOffset.UtcNow, viewerUserId, viewerDisplayName, groupChatId.ToString());
@@ -174,6 +243,20 @@ public sealed class Issue64WebAppPlacementFlowTests
 
         var request = new HttpRequestMessage(HttpMethod.Post, $"/api/webapp/game/undo?gameId={groupChatId}");
         request.Headers.Add("X-Telegram-Init-Data", initData);
+        return request;
+    }
+
+    private static HttpRequestMessage CreateActionRequest(HttpMethod method, string url, long viewerUserId, string viewerDisplayName, object? content = null)
+    {
+        var gameId = url[(url.LastIndexOf("gameId=", StringComparison.Ordinal) + "gameId=".Length)..];
+        var initData = BuildInitData(TestBotToken, DateTimeOffset.UtcNow, viewerUserId, viewerDisplayName, gameId);
+
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.Add("X-Telegram-Init-Data", initData);
+
+        if (content is not null)
+            request.Content = JsonContent.Create(content);
+
         return request;
     }
 

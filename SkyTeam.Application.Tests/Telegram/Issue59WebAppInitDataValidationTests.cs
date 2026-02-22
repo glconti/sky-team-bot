@@ -72,6 +72,28 @@ public sealed class Issue59WebAppInitDataValidationTests
     }
 
     [Fact]
+    public void TelegramInitDataValidator_ShouldExposeExpiredStatus_ForAuthDateFreshnessUx()
+    {
+        // Arrange
+        var validate = ResolveValidateMethodOrSkip();
+        var expiredAuthDate = Now - MaxAge - TimeSpan.FromSeconds(1);
+        var initData = BuildInitData(
+            botToken: TestBotToken,
+            authDate: expiredAuthDate,
+            userId: 111,
+            displayName: "Alice",
+            startParam: "123456789");
+
+        // Act
+        var result = validate(initData, TestBotToken, MaxAge, Now);
+
+        // Assert
+        AssertValidationFailed(result);
+        ReadEnumName(result!, "Status", "ValidationStatus").Should().Be("Expired");
+        ReadDateTimeOffset(result!, "AuthDate", "ValidatedAt").Should().Be(expiredAuthDate);
+    }
+
+    [Fact]
     public void TelegramInitDataValidator_ShouldUseFixedTimeEquals_WhenSlice59IsImplemented()
     {
         // Arrange
@@ -249,6 +271,43 @@ public sealed class Issue59WebAppInitDataValidationTests
 
         throw new XunitException(
             "InitDataValidationResult must expose a boolean success flag (IsValid/IsSuccess/Succeeded/Success) so callers and tests can reason about accept/reject.");
+    }
+
+    private static string ReadEnumName(object result, params string[] names)
+    {
+        var prop = FindProperty(result, names, typeof(Enum)) ??
+                   result.GetType()
+                       .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                       .FirstOrDefault(p => names.Any(name => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)) && p.PropertyType.IsEnum);
+
+        if (prop is null)
+            throw new XunitException($"Expected validation result to expose {string.Join("/", names)} enum.");
+
+        var value = prop.GetValue(result);
+        value.Should().NotBeNull();
+        return value!.ToString()!;
+    }
+
+    private static DateTimeOffset ReadDateTimeOffset(object result, params string[] names)
+    {
+        var prop = FindProperty(result, names, typeof(DateTimeOffset)) ??
+                   FindProperty(result, names, typeof(DateTimeOffset?));
+
+        if (prop is null)
+            throw new XunitException($"Expected validation result to expose {string.Join("/", names)}.");
+
+        var value = prop.GetValue(result);
+        if (value is DateTimeOffset dto)
+            return dto;
+
+        if (value is null)
+            throw new XunitException($"Expected {string.Join("/", names)} to contain a DateTimeOffset value.");
+
+        var nullableValue = (DateTimeOffset?)value;
+        if (nullableValue.HasValue)
+            return nullableValue.Value;
+
+        throw new XunitException($"Expected {string.Join("/", names)} to contain a DateTimeOffset value.");
     }
 
     private static long ReadLong(object result, params string[] names)

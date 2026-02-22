@@ -25,7 +25,7 @@ public sealed class Issue53InGameCockpitButtonFlowTests
     }
 
     [Fact]
-    public void PlaceDmCallback_ShouldShowOnboardingHint_WhenPrivateChatIsUnavailable()
+    public void PlaceDmCallback_ShouldRedirectToMiniApp_WhenSecretFlowsAreMiniAppOnly()
     {
         // Arrange
         var programSource = File.ReadAllText(ResolveProgramSourcePath());
@@ -34,17 +34,13 @@ public sealed class Issue53InGameCockpitButtonFlowTests
         var routesPlaceDmCallback = programSource.Contains(
             "PlaceDmCallbackData => await HandleInGamePlaceFromCallbackAsync(",
             StringComparison.Ordinal);
-        var triesSendingDm = programSource.Contains(
-            "TrySendDirectMessageAsync(botClient, user.Id, text, cancellationToken)",
-            StringComparison.Ordinal);
-        var hasOnboardingHint = programSource.Contains(
-            "Open a private chat with me and send /start, then press Place (DM) again.",
+        var hasMiniAppOnlyHint = programSource.Contains(
+            "Secret hand/place/undo actions are Mini App-only. Press Open app.",
             StringComparison.Ordinal);
 
         // Assert
         routesPlaceDmCallback.Should().BeTrue("Place(DM) callback should be wired in callback dispatcher");
-        triesSendingDm.Should().BeTrue("Place(DM) path should send private hand details via DM");
-        hasOnboardingHint.Should().BeTrue("failed DM delivery should explain onboarding step");
+        hasMiniAppOnlyHint.Should().BeTrue("Place(DM) callback should enforce Mini App-only secret flows");
     }
 
     [Fact]

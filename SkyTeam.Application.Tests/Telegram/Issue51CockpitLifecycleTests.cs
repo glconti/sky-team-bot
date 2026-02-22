@@ -1,33 +1,42 @@
 namespace SkyTeam.Application.Tests.Telegram;
 
 using FluentAssertions;
+using SkyTeam.Application.GameSessions;
 
 public sealed class Issue51CockpitLifecycleTests
 {
-    [Fact(Skip = "Issue #51 cockpit lifecycle is not implemented yet in SkyTeam.TelegramBot.Program.")]
-    public void CockpitLifecycle_ShouldPersistSingleCockpitMessageIdPerGroup()
+    [Fact]
+    public void CockpitMessageId_ShouldBePersistedPerGroupSession()
     {
         // Arrange
-        var implemented = false;
+        const long groupChatId = 123;
+        const int cockpitMessageId = 456;
+        var store = new InMemoryGroupGameSessionStore();
 
         // Act
-        // TODO(issue-51): create lobby/game transitions and assert single stored cockpit message id per group.
+        store.SetCockpitMessageId(groupChatId, cockpitMessageId);
+        var found = store.TryGetCockpitMessageId(groupChatId, out var storedMessageId);
 
         // Assert
-        implemented.Should().BeTrue("group state should track one cockpit message id for edit-in-place updates");
+        found.Should().BeTrue();
+        storedMessageId.Should().Be(cockpitMessageId);
     }
 
-    [Fact(Skip = "Issue #51 edit-in-place lifecycle is not implemented yet in SkyTeam.TelegramBot.Program.")]
-    public void CockpitLifecycle_ShouldEditInPlace_WhenGroupStateChanges()
+    [Fact]
+    public void CockpitMessageId_ShouldKeepSingleLatestValue_WhenRecreated()
     {
         // Arrange
-        var implemented = false;
+        const long groupChatId = 123;
+        var store = new InMemoryGroupGameSessionStore();
 
         // Act
-        // TODO(issue-51): trigger state transitions and assert EditMessageText is used for cockpit refreshes.
+        store.SetCockpitMessageId(groupChatId, cockpitMessageId: 111);
+        store.SetCockpitMessageId(groupChatId, cockpitMessageId: 222);
+        var found = store.TryGetCockpitMessageId(groupChatId, out var storedMessageId);
 
         // Assert
-        implemented.Should().BeTrue("state changes should update the same cockpit message instead of sending new ones");
+        found.Should().BeTrue();
+        storedMessageId.Should().Be(222);
     }
 
     [Fact(Skip = "Issue #51 recreate-on-missing-message flow is not implemented yet in SkyTeam.TelegramBot.Program.")]

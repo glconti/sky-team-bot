@@ -294,6 +294,9 @@ public sealed class InMemoryGroupGameSessionStore
     }
 
     public GamePlacementResult PlaceDie(long requestingUserId, int dieIndex, string commandId)
+        => PlaceDie(requestingUserId, dieIndex, commandId, idempotencyKey: null);
+
+    public GamePlacementResult PlaceDie(long requestingUserId, int dieIndex, string commandId, string? idempotencyKey)
     {
         if (string.IsNullOrWhiteSpace(commandId))
             return new(GamePlacementStatus.InvalidTarget, PublicInfo: null, ResolutionInfo: null, ErrorMessage: null);
@@ -302,6 +305,10 @@ public sealed class InMemoryGroupGameSessionStore
         {
             if (!TryGetSessionByUserId(requestingUserId, out var session))
                 return new(GamePlacementStatus.NoActiveSession, PublicInfo: null, ResolutionInfo: null, ErrorMessage: null);
+
+            if (!string.IsNullOrWhiteSpace(idempotencyKey) &&
+                session.TryGetPlacementResult(idempotencyKey, out var replayedPlacement))
+                return replayedPlacement;
 
             if (!session.TryGetSeat(requestingUserId, out var seat, out var player))
                 return new(GamePlacementStatus.NotSeated, PublicInfo: null, ResolutionInfo: null, ErrorMessage: null);
@@ -372,7 +379,12 @@ public sealed class InMemoryGroupGameSessionStore
                 NextPlayer: nextPlayer,
                 PlacementsRemaining: placementsRemaining);
 
-            return new(GamePlacementStatus.Placed, publicInfo, resolutionInfo, ErrorMessage: null);
+            var result = new GamePlacementResult(GamePlacementStatus.Placed, publicInfo, resolutionInfo, ErrorMessage: null);
+
+            if (!string.IsNullOrWhiteSpace(idempotencyKey))
+                session.RememberPlacementResult(idempotencyKey, result);
+
+            return result;
         }
     }
 
@@ -447,6 +459,7 @@ public sealed class InMemoryGroupGameSessionStore
 
     private sealed class GameSession
     {
+        private const int MaxRecentPlacementResults = 256;
         private sealed record LoggedPlacement(string CommandId, string CommandDisplayName);
 
         private sealed class RoundLog
@@ -477,6 +490,8 @@ public sealed class InMemoryGroupGameSessionStore
         private ConcentrationModule _concentration = null!;
 
         private readonly List<RoundLog> _roundLogs = [];
+        private readonly Queue<string> _recentPlacementResultKeys = [];
+        private readonly Dictionary<string, GamePlacementResult> _recentPlacementResults = new(StringComparer.Ordinal);
 
         public GameSession(long groupChatId, LobbyPlayer pilot, LobbyPlayer copilot)
         {
@@ -525,6 +540,8 @@ public sealed class InMemoryGroupGameSessionStore
 
             DomainGame.SetRoundDice(roll.PilotDice, roll.CopilotDice);
             _roundLogs.Add(new(Round.RoundNumber, roll.PilotDice, roll.CopilotDice));
+            _recentPlacementResultKeys.Clear();
+            _recentPlacementResults.Clear();
 
             var actualStartingPlayer = ToSeat(DomainGame.CurrentPlayer);
 
@@ -537,6 +554,23 @@ public sealed class InMemoryGroupGameSessionStore
             Round = Round with { Status = GameRoundStatus.AwaitingPlacements };
 
             return actualStartingPlayer;
+        }
+
+        public bool TryGetPlacementResult(string idempotencyKey, out GamePlacementResult result)
+            => _recentPlacementResults.TryGetValue(idempotencyKey, out result);
+
+        public void RememberPlacementResult(string idempotencyKey, GamePlacementResult result)
+        {
+            if (!_recentPlacementResults.TryAdd(idempotencyKey, result))
+                return;
+
+            _recentPlacementResultKeys.Enqueue(idempotencyKey);
+
+            while (_recentPlacementResultKeys.Count > MaxRecentPlacementResults)
+            {
+                var oldestKey = _recentPlacementResultKeys.Dequeue();
+                _recentPlacementResults.Remove(oldestKey);
+            }
         }
 
         public void LogPlacement(string commandId, string commandDisplayName)

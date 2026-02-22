@@ -248,24 +248,10 @@ public sealed class TelegramBotService(
         User user,
         CancellationToken cancellationToken)
     {
-        var hand = gameSessionStore.GetHand(user.Id);
-        var text = hand.Status switch
-        {
-            GameHandStatus.NoActiveSession => "No active game session found for you.",
-            GameHandStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
-            GameHandStatus.RoundNotRolled => "Round not rolled yet. Press Roll first.",
-            GameHandStatus.Ok =>
-                $"{hand.Seat} hand:\n{RenderHand(hand.Hand!)}\n\nCurrent turn: {hand.CurrentPlayer}\nPlacements remaining: {hand.PlacementsRemaining}\n\nAvailable commands:\n{RenderCommands(hand.AvailableCommands!)}",
-            _ => "Cannot open DM hand right now."
-        };
+        if (!gameSessionStore.TryGetGroupChatIdForUserId(user.Id, out _))
+            return "No active game session found for you.";
 
-        if (hand.Status is not GameHandStatus.Ok)
-            return text;
-
-        if (await TrySendDirectMessageAsync(botClient, user.Id, text, cancellationToken))
-            return "Sent you a DM with your hand.";
-
-        return "Open a private chat with me and send /start, then press Place (DM) again.";
+        return "Secret hand/place/undo actions are Mini App-only. Press Open app.";
     }
 
     private async Task HandleSkyAsync(
@@ -336,17 +322,11 @@ public sealed class TelegramBotService(
 
             case "hand":
             case "place":
-                await botClient.SendMessage(
-                    message.Chat.Id,
-                    "Use /sky hand and /sky place in a private chat with me.",
-                    cancellationToken: cancellationToken);
+                await RedirectSecretPathToMiniAppAsync(botClient, message, cancellationToken);
                 return;
 
             case "undo":
-                await botClient.SendMessage(
-                    message.Chat.Id,
-                    "Use /sky undo in a private chat with me.",
-                    cancellationToken: cancellationToken);
+                await RedirectSecretPathToMiniAppAsync(botClient, message, cancellationToken);
                 return;
 
             default:
@@ -508,25 +488,7 @@ public sealed class TelegramBotService(
         Message message,
         CancellationToken cancellationToken)
     {
-        if (message.From is null)
-        {
-            await botClient.SendMessage(message.Chat.Id, "Cannot identify you in this chat.", cancellationToken: cancellationToken);
-            return;
-        }
-
-        var result = gameSessionStore.GetHand(message.From.Id);
-
-        var text = result.Status switch
-        {
-            GameHandStatus.NoActiveSession => "No active game session found for you.",
-            GameHandStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
-            GameHandStatus.RoundNotRolled => "Round not rolled yet. In the group chat, run: /sky roll",
-            GameHandStatus.Ok =>
-                $"{result.Seat} hand:\n{RenderHand(result.Hand!)}\n\nCurrent turn: {result.CurrentPlayer}\nPlacements remaining: {result.PlacementsRemaining}\n\nAvailable commands:\n{RenderCommands(result.AvailableCommands!)}",
-            _ => "Cannot get hand right now."
-        };
-
-        await botClient.SendMessage(message.Chat.Id, text, cancellationToken: cancellationToken);
+        await RedirectSecretPathToMiniAppAsync(botClient, message, cancellationToken);
     }
 
     private async Task HandleSkyPlaceAsync(
@@ -535,65 +497,18 @@ public sealed class TelegramBotService(
         string[] args,
         CancellationToken cancellationToken)
     {
-        if (message.From is null)
-        {
-            await botClient.SendMessage(message.Chat.Id, "Cannot identify you in this chat.", cancellationToken: cancellationToken);
-            return;
-        }
-
-        if (args.Length < 2)
-        {
-            await botClient.SendMessage(message.Chat.Id, "Usage: /sky place <dieIndex> <commandId>\nTip: /sky undo", cancellationToken: cancellationToken);
-            return;
-        }
-
-        if (!int.TryParse(args[0], out var dieIndex))
-        {
-            await botClient.SendMessage(message.Chat.Id, "Invalid die index. Usage: /sky place <dieIndex> <commandId>", cancellationToken: cancellationToken);
-            return;
-        }
-
-        var commandId = string.Join(" ", args.Skip(1));
-        var result = gameSessionStore.PlaceDie(message.From.Id, dieIndex, commandId);
-
-        if (result.Status != GamePlacementStatus.Placed)
-        {
-            var hand = gameSessionStore.GetHand(message.From.Id);
-            var currentTurnText = hand.Status == GameHandStatus.Ok ? $" Current turn: {hand.CurrentPlayer}." : string.Empty;
-
-            var errorText = result.Status switch
-            {
-                GamePlacementStatus.NoActiveSession => "No active game session found for you. Start a game in a group chat first.",
-                GamePlacementStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
-                GamePlacementStatus.RoundNotRolled => "This round has not been rolled yet. In the group chat, run: /sky roll",
-                GamePlacementStatus.RoundNotAcceptingPlacements => "This round is not accepting placements.",
-                GamePlacementStatus.NotPlayersTurn => "It is not your turn." + currentTurnText,
-                GamePlacementStatus.InvalidDieIndex => "Invalid die index (expected 0-3).",
-                GamePlacementStatus.DieAlreadyUsed => "That die has already been used.",
-                GamePlacementStatus.InvalidTarget => "A command id is required.",
-                GamePlacementStatus.CommandDoesNotMatchDie => "That command does not match the selected die.",
-                GamePlacementStatus.CommandNotAvailable => "That command is not currently available.",
-                GamePlacementStatus.DomainError => result.ErrorMessage ?? "Cannot place die (domain error).",
-                _ => "Cannot place die."
-            };
-
-            await botClient.SendMessage(message.Chat.Id, errorText, cancellationToken: cancellationToken);
-            return;
-        }
-
-        var info = result.PublicInfo!;
-
-        await RefreshGroupCockpitAsync(botClient, info.GroupChatId, cancellationToken);
-
-        var updatedHand = gameSessionStore.GetHand(message.From.Id);
-        var dmText = updatedHand.Status == GameHandStatus.Ok
-            ? $"Placement recorded: {info.CommandDisplayName} ({info.CommandId})\n\nYour hand:\n{RenderHand(updatedHand.Hand!)}\n\nCurrent turn: {updatedHand.CurrentPlayer}\n\nPlacements remaining: {updatedHand.PlacementsRemaining}\n\nAvailable commands:\n{RenderCommands(updatedHand.AvailableCommands!)}"
-            : $"Placement recorded: {info.CommandDisplayName} ({info.CommandId})";
-
-        await botClient.SendMessage(message.Chat.Id, dmText, cancellationToken: cancellationToken);
+        await RedirectSecretPathToMiniAppAsync(botClient, message, cancellationToken);
     }
 
     private async Task HandleSkyUndoAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        CancellationToken cancellationToken)
+    {
+        await RedirectSecretPathToMiniAppAsync(botClient, message, cancellationToken);
+    }
+
+    private async Task RedirectSecretPathToMiniAppAsync(
         ITelegramBotClient botClient,
         Message message,
         CancellationToken cancellationToken)
@@ -604,36 +519,30 @@ public sealed class TelegramBotService(
             return;
         }
 
-        var result = gameSessionStore.UndoLastPlacement(message.From.Id);
-        if (result.Status != GameUndoStatus.Undone)
+        if (!TryResolveSecretFlowGroupChatId(message, out var groupChatId))
         {
-            var hand = gameSessionStore.GetHand(message.From.Id);
-            var currentTurnText = hand.Status == GameHandStatus.Ok ? $" Current turn: {hand.CurrentPlayer}." : string.Empty;
-
-            var errorText = result.Status switch
-            {
-                GameUndoStatus.NoActiveSession => "No active game session found for you. Start a game in a group chat first.",
-                GameUndoStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
-                GameUndoStatus.RoundNotRolled => "This round has not been rolled yet. In the group chat, run: /sky roll",
-                GameUndoStatus.UndoNotAllowed => "Undo not allowed. You can only undo your last placement before the other player places." + currentTurnText,
-                GameUndoStatus.DomainError => result.ErrorMessage ?? "Cannot undo (domain error).",
-                _ => "Cannot undo."
-            };
-
-            await botClient.SendMessage(message.Chat.Id, errorText, cancellationToken: cancellationToken);
+            await botClient.SendMessage(
+                message.Chat.Id,
+                "Secret hand/place/undo actions are Mini App-only. Start or reopen the game from the group chat with /sky app.",
+                cancellationToken: cancellationToken);
             return;
         }
 
-        var info = result.PublicInfo!;
+        var botUsername = await GetBotUsernameAsync(botClient, cancellationToken);
+        if (string.IsNullOrWhiteSpace(botUsername))
+        {
+            await botClient.SendMessage(
+                message.Chat.Id,
+                "Secret hand/place/undo actions are Mini App-only. Use /sky app in your group chat.",
+                cancellationToken: cancellationToken);
+            return;
+        }
 
-        await RefreshGroupCockpitAsync(botClient, info.GroupChatId, cancellationToken);
-
-        var updatedHand = gameSessionStore.GetHand(message.From.Id);
-        var dmText = updatedHand.Status == GameHandStatus.Ok
-            ? $"Undo recorded: {info.CommandDisplayName} ({info.CommandId})\n\nYour hand:\n{RenderHand(updatedHand.Hand!)}\n\nCurrent turn: {updatedHand.CurrentPlayer}\n\nPlacements remaining: {updatedHand.PlacementsRemaining}\n\nAvailable commands:\n{RenderCommands(updatedHand.AvailableCommands!)}"
-            : $"Undo recorded: {info.CommandDisplayName} ({info.CommandId})";
-
-        await botClient.SendMessage(message.Chat.Id, dmText, cancellationToken: cancellationToken);
+        await botClient.SendMessage(
+            message.Chat.Id,
+            "Secret hand/place/undo actions are Mini App-only. Open the Sky Team Mini App:",
+            replyMarkup: BuildOpenAppKeyboard(groupChatId, botUsername),
+            cancellationToken: cancellationToken);
     }
 
     private static string RenderHand(SecretDiceHand hand)
@@ -809,6 +718,22 @@ public sealed class TelegramBotService(
     {
         var username = botUsername.TrimStart('@');
         return $"https://t.me/{username}?startapp={Uri.EscapeDataString(groupChatId.ToString())}";
+    }
+
+    private bool TryResolveSecretFlowGroupChatId(Message message, out long groupChatId)
+    {
+        switch (message.Chat.Type)
+        {
+            case ChatType.Group:
+            case ChatType.Supergroup:
+                groupChatId = message.Chat.Id;
+                return true;
+            case ChatType.Private when message.From is not null:
+                return gameSessionStore.TryGetGroupChatIdForUserId(message.From.Id, out groupChatId);
+            default:
+                groupChatId = default;
+                return false;
+        }
     }
 
     private long? GetLockKey(Update update)

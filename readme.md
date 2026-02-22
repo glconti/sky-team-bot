@@ -29,11 +29,9 @@ The bot uses long polling and keeps in-memory state while the process is running
    - `/sky start`
    - `/sky roll`
 
-### Private chat flow (for seated players)
-Each seated player must open a private chat with the bot and run `/start` once (so the bot can DM dice), then use:
-- `/sky hand` to view current dice and available commands
-- `/sky place <dieIndex> <commandId>` to place a die
-- `/sky undo` to undo the last placement (only before the opponent places)
+### Mini App flow (for seated players)
+Set `SKYTEAM_MINI_APP_URL` and use the Mini App for secret actions (hand/dice/place/undo).
+Bot commands remain as fallback and will redirect you to the Mini App when secret info is required.
 
 ### Useful command
 - `/sky state` in group chat to view current lobby/game status.
