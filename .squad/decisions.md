@@ -2492,3 +2492,29 @@ Slices (vertical, shippable):
 6) #64 — Mini app placement (place die + token adjust) + undo
 7) #65 — Hardening + tests + command redirects
 
+---
+
+## 2026-02-22T23:30:00Z: Issue #62 backend implementation & test coverage (Skiles & Aloha)
+
+**By:** Skiles (Implementation) & Aloha (Testing)  
+**Epic:** #57 — Mini App Foundation  
+**Issue:** #62 — WebApp In-Game View with Private Hand
+
+**Decision:** Completed Issue #62 scope: extended `GET /api/webapp/game-state` to expose in-game state (public cockpit, viewer role, private hand for seated players only); added WebApp DTOs; updated Mini App UI; added 3 active deterministic tests; resolved interim compile blocker.
+
+**Key Implementation Details:**
+- **Backend:** `GET /api/webapp/game-state` returns public cockpit, viewer seat (Pilot/Copilot/Spectator), and `privateHand` (dice + commands) only for authenticated seated requesters.
+- **Privacy layer:** `InMemoryGroupGameSessionStore.GetHand(groupChatId, requestingUserId)` returns `null` for spectators/non-participants.
+- **WebApp UI:** Updated `wwwroot/index.html` to render in-game view with cockpit summary, role display, and conditional hand section.
+- **No DM integration:** WebApp path remains independent of text-command fallback; no DM-based hand delivery in Mini App flow.
+
+**Test Coverage (Issue #62 suite):**
+- ✅ `GameStateEndpoint_ShouldDetectViewerRole_WhenViewerIsPilotCopilotOrSpectator` — All three seat states covered
+- ✅ `GameStateEndpoint_ShouldNotExposePrivateHandData_WhenViewerIsSpectator` — Security boundary verified
+- ✅ `WebAppEndpointSource_ShouldAvoidDirectMessageHandFlows_WhenServingInGameView` — WebApp/DM separation guard
+
+**Interim Blocker:** Aloha's proactive tests surfaced compile error (`CS1503` in `WebAppEndpoints.cs`); Skiles resolved in same batch. Full test suite now passes: 234 total, 217 passed, 17 skipped, 0 failed.
+
+**Outcome:** Issue #62 acceptance criteria fully implemented and tested. CI green. Ready for PR integration.
+
+**Rationale:** Completing #62 unblocks WebApp feature parity with Mini App in-game play. Private hand scoping maintains player privacy; WebApp endpoint remains decoupled from DM flow per architecture intent.
