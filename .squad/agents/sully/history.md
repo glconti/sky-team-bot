@@ -170,6 +170,47 @@
 **Team Readiness:**
 - ✅ PR #37 token wiring fixed and validated
 - ✅ Loss semantics documented; ready for implementation validation
+
+### Session 4: Slice #59 — WebApp Foundation Design Review (2026-02-22)
+
+**Outcome:** Architected Telegram Mini App (WebApp) as primary UI. Designed read-only API endpoint, HMAC validation strategy, and single-host hosting model.
+
+**Key Decisions:**
+- **Hosting:** Convert existing `SkyTeam.TelegramBot` from console app to ASP.NET Core Web SDK. In-memory stores become singletons in DI; Telegram polling moves to `IHostedService`. Single process, single deployment unit.
+- **Static files:** Minimal `wwwroot/index.html` shell (vanilla HTML + Telegram.WebApp.js). No bundler, no SPA framework yet. Slice #62 adds real UI.
+- **WebApp API:** Single read-only endpoint `GET /api/webapp/game-state?gameId=...` with `X-Telegram-Init-Data` header auth. Returns public game state (no secrets). 200/400/401/404 responses.
+- **Security:** HMAC-SHA256 validation per Telegram spec (FixedTimeEquals constant-time comparison), 5-minute auth_date freshness window, cross-check signed `start_param` against query gameId.
+- **Risk mitigation:** 9 edge cases identified (HTTPS requirement, replay, spoofing, token exposure, concurrency, parse failure, missing state, missing initData, clock skew) with documented mitigations.
+
+**Strategic Pivot:**
+- **Old design:** Group chat cockpit + secret interactions in DM.
+- **New design:** Mini App is primary UI; all secrets (dice hand, placements) stay inside mini app. Group chat becomes low-noise "Open app" launchpad. DM flows obsolete.
+
+**Action Items Delivered:**
+- Sully: Comprehensive design doc + risk analysis (approved for implementation)
+- Gimli: Created `wwwroot/index.html` shell + configuration decision
+- Skiles: Web SDK conversion + TelegramInitDataValidator + TelegramInitDataFilter + GET /api/webapp/game-state endpoint
+- Aloha: Unit tests (validator), integration tests (endpoint), Issue #53 callback tests (passing)
+
+**Backlog Restructure:**
+- Slice #59 ✅ COMPLETE: WebApp foundation (hosting + validation + read-only API)
+- Slice #60: Launch surface ("Open app" button + start_param wiring)
+- Slice #61: Mini app lobby (New/Join/Start UI)
+- Slice #62: Mini app in-game view (cockpit + private hand)
+- Slice #63: Mini app actions (Roll + refresh + group update)
+- Slice #64: Mini app placement (place die + token adjust + undo)
+- Slice #65: Hardening + tests + command redirects
+
+**Test Status:**
+- 206 total tests, 193 passed, 13 skipped, 0 failed
+- New Issue #59 suites (validator, endpoint) ✅ green
+- Issue #53 callback tests ✅ green (in-game rolls, DM placement, privacy contract)
+
+**Team Readiness:**
+- ✅ Slice #59 complete and tested
+- ✅ Strategic UI pivot locked (Mini App primary, DM flows obsolete)
+- ✅ Ready for merge to main
+
 - ✅ ExecuteCommand baseline established; smoke tests passing
 - ✅ Next phase unblocked: Skiles integration testing + altitude/reroll redesign
 
