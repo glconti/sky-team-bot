@@ -51,6 +51,8 @@ public sealed record WebAppPrivateHandState(
     IReadOnlyList<WebAppHandDie> Dice,
     IReadOnlyList<WebAppHandCommand> AvailableCommands);
 
+public sealed record WebAppPlaceDieRequest(int DieIndex, string CommandId);
+
 public sealed record WebAppGameStateResponse(
     long GameId,
     WebAppGamePhase Phase,
@@ -72,6 +74,8 @@ public static class WebAppEndpoints
         group.MapPost("/lobby/join", JoinLobby);
         group.MapPost("/lobby/start", StartGame);
         group.MapPost("/game/roll", RollGame);
+        group.MapPost("/game/place", PlaceDie);
+        group.MapPost("/game/undo", UndoLastPlacement);
     }
 
     private static IResult GetGameState(
@@ -222,6 +226,63 @@ public static class WebAppEndpoints
             gameSessionStore.GetHand(result.GroupChatId.Value, result.Context.Viewer.UserId)));
     }
 
+    private static async Task<IResult> PlaceDie(
+        string? gameId,
+        WebAppPlaceDieRequest request,
+        HttpContext httpContext,
+        InMemoryGroupGameSessionStore gameSessionStore,
+        TelegramBotService telegramBotService,
+        CancellationToken cancellationToken)
+    {
+        var result = ResolveRequestContext(gameId, httpContext);
+        if (result.Error is not null)
+            return result.Error;
+
+        if (request.DieIndex is < 0 or >= SecretDiceHand.DicePerHand)
+            return Results.BadRequest(new { error = "Invalid die index." });
+
+        if (string.IsNullOrWhiteSpace(request.CommandId))
+            return Results.BadRequest(new { error = "Missing commandId." });
+
+        var placement = gameSessionStore.PlaceDie(result.Context!.Viewer.UserId, request.DieIndex, request.CommandId);
+        if (placement.Status != GamePlacementStatus.Placed)
+            return Results.Conflict(new { error = MapPlacementError(placement) });
+
+        await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId!.Value, cancellationToken);
+
+        var state = gameSessionStore.GetPublicState(result.GroupChatId.Value)!;
+        return Results.Ok(MapStateResponse(
+            state,
+            result.GroupChatId.Value,
+            result.Context.Viewer.UserId,
+            gameSessionStore.GetHand(result.GroupChatId.Value, result.Context.Viewer.UserId)));
+    }
+
+    private static async Task<IResult> UndoLastPlacement(
+        string? gameId,
+        HttpContext httpContext,
+        InMemoryGroupGameSessionStore gameSessionStore,
+        TelegramBotService telegramBotService,
+        CancellationToken cancellationToken)
+    {
+        var result = ResolveRequestContext(gameId, httpContext);
+        if (result.Error is not null)
+            return result.Error;
+
+        var undo = gameSessionStore.UndoLastPlacement(result.Context!.Viewer.UserId);
+        if (undo.Status != GameUndoStatus.Undone)
+            return Results.Conflict(new { error = MapUndoError(undo) });
+
+        await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId!.Value, cancellationToken);
+
+        var state = gameSessionStore.GetPublicState(result.GroupChatId.Value)!;
+        return Results.Ok(MapStateResponse(
+            state,
+            result.GroupChatId.Value,
+            result.Context.Viewer.UserId,
+            gameSessionStore.GetHand(result.GroupChatId.Value, result.Context.Viewer.UserId)));
+    }
+
     private static WebAppCockpitState MapCockpit(GameSessionPublicState state)
     {
         var cockpit = state.Cockpit;
@@ -305,6 +366,34 @@ public static class WebAppEndpoints
             Dice: handResult.Hand.Dice.Select(d => new WebAppHandDie(d.Index, d.Value.Value, d.IsUsed)).ToArray(),
             AvailableCommands: (handResult.AvailableCommands ?? []).Select(c => new WebAppHandCommand(c.CommandId, c.DisplayName)).ToArray());
     }
+
+    private static string MapPlacementError(GamePlacementResult result)
+        => result.Status switch
+        {
+            GamePlacementStatus.NoActiveSession => "No active game session found.",
+            GamePlacementStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
+            GamePlacementStatus.RoundNotRolled => "This round has not been rolled yet.",
+            GamePlacementStatus.RoundNotAcceptingPlacements => "This round is not accepting placements.",
+            GamePlacementStatus.NotPlayersTurn => "It is not your turn.",
+            GamePlacementStatus.InvalidDieIndex => "Invalid die index.",
+            GamePlacementStatus.DieAlreadyUsed => "That die has already been used.",
+            GamePlacementStatus.InvalidTarget => "A command id is required.",
+            GamePlacementStatus.CommandDoesNotMatchDie => "That command does not match the selected die.",
+            GamePlacementStatus.CommandNotAvailable => "That command is not currently available.",
+            GamePlacementStatus.DomainError => result.ErrorMessage ?? "Cannot place die (domain error).",
+            _ => "Cannot place die."
+        };
+
+    private static string MapUndoError(GameUndoResult result)
+        => result.Status switch
+        {
+            GameUndoStatus.NoActiveSession => "No active game session found.",
+            GameUndoStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
+            GameUndoStatus.RoundNotRolled => "This round has not been rolled yet.",
+            GameUndoStatus.UndoNotAllowed => "Undo not allowed. You can only undo your last placement before the other player places.",
+            GameUndoStatus.DomainError => result.ErrorMessage ?? "Cannot undo (domain error).",
+            _ => "Cannot undo."
+        };
 
     private static (long? GroupChatId, TelegramInitDataContext? Context, IResult? Error) ResolveRequestContext(string? gameId, HttpContext httpContext)
     {
