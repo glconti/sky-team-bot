@@ -111,20 +111,201 @@
         refreshBtn.onclick = loadState;
         actionsEl.appendChild(refreshBtn);
 
+        const canUndo = !!(state.privateHand && state.viewer && state.viewer.seat);
+        if (canUndo) {
+          const undoBtn = document.createElement('button');
+          undoBtn.type = 'button';
+          undoBtn.textContent = 'Undo';
+          undoBtn.style.marginLeft = '8px';
+          undoBtn.onclick = async () => {
+            undoBtn.disabled = true;
+            try {
+              const r = await fetch(`/api/webapp/game/undo?gameId=${encodeURIComponent(gameId)}`, {
+                method: 'POST',
+                headers: withInitDataHeaders(),
+                cache: 'no-store'
+              });
+
+              const result = await parseResponse(r);
+              if (!result.ok) {
+                throw new Error((result.json && result.json.error) || `${result.status} action failed`);
+              }
+
+              await loadState();
+            } catch (err) {
+              setText('Action failed:\n\n' + (err && err.message ? err.message : String(err)));
+            } finally {
+              undoBtn.disabled = false;
+            }
+          };
+
+          actionsEl.appendChild(undoBtn);
+        }
+
         const canRoll = String(state.cockpit && state.cockpit.roundStatus).toLowerCase() === 'awaitingroll'
           && !!(state.viewer && state.viewer.seat);
-        if (!canRoll) return;
+        if (canRoll) {
+          const rollBtn = document.createElement('button');
+          rollBtn.type = 'button';
+          rollBtn.textContent = 'Roll';
+          rollBtn.style.marginLeft = '8px';
+          rollBtn.onclick = async () => {
+            rollBtn.disabled = true;
+            try {
+              const r = await fetch(`/api/webapp/game/roll?gameId=${encodeURIComponent(gameId)}`, {
+                method: 'POST',
+                headers: withInitDataHeaders(),
+                cache: 'no-store'
+              });
 
-        const rollBtn = document.createElement('button');
-        rollBtn.type = 'button';
-        rollBtn.textContent = 'Roll';
-        rollBtn.style.marginLeft = '8px';
-        rollBtn.onclick = async () => {
-          rollBtn.disabled = true;
+              const result = await parseResponse(r);
+              if (!result.ok) {
+                throw new Error((result.json && result.json.error) || `${result.status} action failed`);
+              }
+
+              await loadState();
+            } catch (err) {
+              setText('Action failed:\n\n' + (err && err.message ? err.message : String(err)));
+            } finally {
+              rollBtn.disabled = false;
+            }
+          };
+
+          actionsEl.appendChild(rollBtn);
+        }
+
+        if (!state.privateHand || !state.privateHand.availableCommands || !state.viewer || !state.viewer.seat) return;
+        if (String(state.privateHand.currentPlayer).toLowerCase() !== String(state.privateHand.seat).toLowerCase()) return;
+
+        const availableDice = state.privateHand.dice.filter(d => !d.isUsed);
+        if (availableDice.length === 0) return;
+
+        const placementBox = document.createElement('div');
+        placementBox.style.marginTop = '12px';
+        placementBox.style.paddingTop = '8px';
+        placementBox.style.borderTop = '1px solid rgba(127,127,127,.35)';
+        actionsEl.appendChild(placementBox);
+
+        const heading = document.createElement('div');
+        heading.textContent = 'Placement flow: die → target → option';
+        heading.style.marginBottom = '8px';
+        placementBox.appendChild(heading);
+
+        let selectedDieIndex = availableDice[0].index;
+        let selectedTarget = '';
+        let selectedCommandId = '';
+
+        const dieRow = document.createElement('div');
+        const targetRow = document.createElement('div');
+        const optionRow = document.createElement('div');
+        const actionRow = document.createElement('div');
+        dieRow.style.marginBottom = '8px';
+        targetRow.style.marginBottom = '8px';
+        optionRow.style.marginBottom = '8px';
+
+        placementBox.appendChild(dieRow);
+        placementBox.appendChild(targetRow);
+        placementBox.appendChild(optionRow);
+        placementBox.appendChild(actionRow);
+
+        const getCommandsForDie = (dieIndex) => {
+          const die = state.privateHand.dice.find(d => d.index === dieIndex);
+          if (!die) return [];
+          const marker = `:${die.value}`;
+          return state.privateHand.availableCommands.filter(c => String(c.commandId).includes(marker));
+        };
+
+        const parseOptionLabel = (command) => {
+          const commandId = String(command.commandId);
+          const displayName = String(command.displayName || commandId);
+          const tokenPart = commandId.includes('>') ? ' • token adjust' : '';
+          return `${displayName}${tokenPart}`;
+        };
+
+        const renderTargetsAndOptions = () => {
+          const commands = getCommandsForDie(selectedDieIndex);
+          const groups = {};
+          commands.forEach(c => {
+            const key = String(c.commandId).split(':')[0] || 'Target';
+            groups[key] = groups[key] || [];
+            groups[key].push(c);
+          });
+
+          targetRow.innerHTML = '';
+          optionRow.innerHTML = '';
+          selectedTarget = Object.keys(groups)[0] || '';
+          const targetCommands = groups[selectedTarget] || [];
+          selectedCommandId = targetCommands[0] ? targetCommands[0].commandId : '';
+
+          Object.keys(groups).forEach(target => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = target;
+            btn.style.marginRight = '6px';
+            btn.style.marginBottom = '6px';
+            if (target === selectedTarget) btn.disabled = true;
+            btn.onclick = () => {
+              selectedTarget = target;
+              renderOptions(groups[selectedTarget] || []);
+              Array.from(targetRow.querySelectorAll('button')).forEach(b => { b.disabled = b.textContent === selectedTarget; });
+            };
+            targetRow.appendChild(btn);
+          });
+
+          function renderOptions(targetOptions) {
+            optionRow.innerHTML = '';
+            selectedCommandId = targetOptions[0] ? targetOptions[0].commandId : '';
+
+            targetOptions.forEach(option => {
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.textContent = parseOptionLabel(option);
+              btn.style.marginRight = '6px';
+              btn.style.marginBottom = '6px';
+              if (option.commandId === selectedCommandId) btn.disabled = true;
+              btn.onclick = () => {
+                selectedCommandId = option.commandId;
+                Array.from(optionRow.querySelectorAll('button')).forEach(b => { b.disabled = b.dataset.commandId === selectedCommandId; });
+              };
+              btn.dataset.commandId = option.commandId;
+              optionRow.appendChild(btn);
+            });
+          }
+
+          renderOptions(targetCommands);
+        };
+
+        dieRow.innerHTML = '';
+        availableDice.forEach(die => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = `Die ${die.index}: ${die.value}`;
+          btn.style.marginRight = '6px';
+          btn.style.marginBottom = '6px';
+          if (die.index === selectedDieIndex) btn.disabled = true;
+          btn.onclick = () => {
+            selectedDieIndex = die.index;
+            Array.from(dieRow.querySelectorAll('button')).forEach(b => { b.disabled = b.dataset.dieIndex === String(selectedDieIndex); });
+            renderTargetsAndOptions();
+          };
+          btn.dataset.dieIndex = String(die.index);
+          dieRow.appendChild(btn);
+        });
+
+        renderTargetsAndOptions();
+
+        const placeBtn = document.createElement('button');
+        placeBtn.type = 'button';
+        placeBtn.textContent = 'Place selected die';
+        placeBtn.onclick = async () => {
+          placeBtn.disabled = true;
           try {
-            const r = await fetch(`/api/webapp/game/roll?gameId=${encodeURIComponent(gameId)}`, {
+            if (!selectedCommandId) throw new Error('No command option available for selected die.');
+
+            const r = await fetch(`/api/webapp/game/place?gameId=${encodeURIComponent(gameId)}`, {
               method: 'POST',
-              headers: withInitDataHeaders(),
+              headers: { ...withInitDataHeaders(), 'Content-Type': 'application/json' },
+              body: JSON.stringify({ dieIndex: selectedDieIndex, commandId: selectedCommandId }),
               cache: 'no-store'
             });
 
@@ -137,11 +318,11 @@
           } catch (err) {
             setText('Action failed:\n\n' + (err && err.message ? err.message : String(err)));
           } finally {
-            rollBtn.disabled = false;
+            placeBtn.disabled = false;
           }
         };
 
-        actionsEl.appendChild(rollBtn);
+        actionRow.appendChild(placeBtn);
       }
 
       function renderState(state) {
