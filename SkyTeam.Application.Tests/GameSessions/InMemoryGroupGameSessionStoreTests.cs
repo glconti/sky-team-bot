@@ -434,4 +434,35 @@ public sealed class InMemoryGroupGameSessionStoreTests
         // Assert
         result.Should().Be(new GameUndoResult(GameUndoStatus.RoundNotRolled, PublicInfo: null, ErrorMessage: null));
     }
+
+    [Fact]
+    public void CockpitMessageId_ShouldBePersistedPerGroupSession()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+
+        // Act
+        store.SetCockpitMessageId(GroupChatId, cockpitMessageId: 777);
+        var found = store.TryGetCockpitMessageId(GroupChatId, out var cockpitMessageId);
+
+        // Assert
+        found.Should().BeTrue();
+        cockpitMessageId.Should().Be(777);
+    }
+
+    [Fact]
+    public void CockpitMessageId_ShouldKeepSingleLatestValue_WhenRecreated()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+
+        // Act
+        store.SetCockpitMessageId(GroupChatId, cockpitMessageId: 111);
+        store.SetCockpitMessageId(GroupChatId, cockpitMessageId: 222);
+        var found = store.TryGetCockpitMessageId(GroupChatId, out var cockpitMessageId);
+
+        // Assert
+        found.Should().BeTrue();
+        cockpitMessageId.Should().Be(222);
+    }
 }

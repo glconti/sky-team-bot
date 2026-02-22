@@ -1976,3 +1976,262 @@ These will require a domain snapshot/broadcast model and/or an application servi
 - Callback routing must bind actions to the pressing user.
 - Any payload/state that would reveal private information stays server-side or DM-only.
 - Group cockpit acts as a "control hub"; sensitive operations delegate to DM.
+## 2026-02-22T00:00:00Z: Epic #49 vertical slices reframing (Sully)
+
+**By:** Sully (Architect)  
+**Decision:** Reframe Epic #49 (Button-first Telegram UX) and child issues #50–#57 as incremental vertical slices where each issue delivers a shippable UX improvement end-to-end.
+
+**Rationale:** Purely horizontal infrastructure issues stall value delivery; vertical slices allow shipping and validating UX improvements continuously while keeping /sky ... as a safe fallback.
+
+**Slice Order (Issue Mapping):**
+1. **Slice 1 — #50:** CallbackQuery support + one safe **Refresh** button end-to-end.
+2. **Slice 2 — #51:** Cockpit lifecycle (single edited group message) + **best-effort auto-pin**.
+3. **Slice 3 — #52:** Lobby buttons (**New / Join / Start**) end-to-end.
+4. **Slice 4 — #53:** In-game cockpit buttons (**Roll / Place (DM) / Refresh**) + DM onboarding hint/link.
+5. **Slice 5 — #54:** DM Hand menu v1 (**Refresh / Undo**) via buttons.
+6. **Slice 6 — #55:** DM placement flow via buttons (**die → command → place**).
+7. **Slice 7 — #56:** Hardening: callback_data encoding + menu state store (**expiry / dedup / validation**) so stale buttons show "menu expired".
+
+**Stretch:** #57 (Telegram Menu Button / WebApp cockpit).
+
+**Guardrails / Confirmed Constraints (Applied to All Slices):**
+- Group chat UX uses a **single edited cockpit message**; auto-pin if possible.
+- **Anyone can press** group buttons; server-side rules enforce seat/turn validity.
+- Group **"Place (DM)"** only refreshes the pressing user's DM UI; **no secret leakage** in group.
+- callback_data must stay **<= 64 bytes**; use short versioned tokens and server-side mappings.
+- /sky ... text commands remain fully supported as fallback.
+
+---
+
+## 2026-02-22T00:10:56Z: UX interview decisions — group chat & DM placement (Sully)
+
+**By:** Sully (Architect)  
+**Decision:** Three UX patterns confirmed for Telegram MVP and related child issues #49/#50–#57.
+
+### 1. Group Chat UX is a Single Cockpit Message
+- The bot maintains **one cockpit message per group chat**.
+- All state changes **edit this message** (no chat spam).
+- Cockpit contains: seat assignments, current round state, button actions.
+
+### 2. Group Cockpit Buttons are Pressable by Anyone
+- Buttons are visible to all group members.
+- **Anyone may press** a group button (not restricted by role/seat).
+- Server enforces seating, turn rules, and permissions.
+- Invalid presses → **no-op + toast** (fail gracefully; user sees why action was rejected).
+
+### 3. "Placement from Group Cockpit" Drives Private DM UI
+- Group cockpit includes a **"Place (DM)" action button**.
+- Pressing it **triggers/refreshes the user's private DM placement UI**.
+- Private placement menu lives **in DM only** — no secret dice and no command IDs leak to group chat.
+- Callback routing/validation binds actions to pressing user + current game state.
+
+**Rationale:** Separation of concerns (group visibility vs. private gameplay) reduces UX friction and prevents information leaks.
+
+**Implications:**
+- Callback routing must bind actions to the pressing user.
+- Any payload/state that would reveal private information stays server-side or DM-only.
+- Group cockpit acts as a "control hub"; sensitive operations delegate to DM.
+
+---
+
+## 2026-02-22T00:15:00Z: Epic #49 vertical slices — detailed review & acceptance criteria tightening (Aloha)
+
+**By:** Aloha (Tester)  
+**Context:** Comprehensive review of Epic #49 (#50–#57) for shippability, acceptance criteria clarity, and test strategy.
+
+**Key Finding:** Stories are largely well-designed, but clustering into 3 delivery tiers improves testability and release flow:
+1. **Foundation (must ship first):** Callback routing (#50) + cockpit message storage (#51) + callback encoding (#56)
+2. **Core UX (vertical slices, each shippable):** Group buttons (#52), DM hand (#53), placement flow (#54)
+3. **Hardening / Polish:** Undo (#55), stretch WebApp (#57)
+
+**Critical Acceptance Criteria Gaps Identified:**
+1. **E2E State Mutation Contracts:** Most stories lack explicit end-to-end state contracts (e.g., "Roll does what?").
+2. **Regression Test Suite Coverage:** No story explicitly commits to "all existing /sky ... commands still work."
+3. **Chat/User Binding Validation:** #50, #56 mention validation but don't specify cross-chat-boundary scenarios.
+4. **Concurrency / Race Conditions:** No explicit tests for concurrent callbacks in one chat.
+5. **Hand/Cockpit Sync:** #53 and #52 render independently; no atomicity contract.
+6. **Message Deletion / Edit Failures:** #51 says "handle gracefully" but doesn't define it.
+
+**Suggested Per-Issue Edits (Summary):**
+- **#50:** Add validation middleware tests; concurrent callback serialization via per-chat lock.
+- **#51:** Tighten "recreate on missing message" with explicit error toast and ID refresh.
+- **#52:** Define button visibility rules (Create/Join/Start/Roll/State per game state); regression test vs. /sky commands.
+- **#53:** Clarify hand auto-refresh on opponent placement; regression vs. /sky hand.
+- **#54:** Define multi-step ephemeral state storage (die selection → command selection → place); atomicity contract.
+- **#55:** Conditional "Undo" button rendering based on CanUndo() rules.
+- **#56:** Specify callback versioning (v1:, v2: in future), token expiry, ephemeral state store location.
+- **#57:** Lower priority; do not block #50–#56. Document as research-first, implementation-optional.
+
+**Recommended Test Strategy (Per Slice):**
+- **Unit tests:** Callback validation, encoding/decoding, state mutation.
+- **Integration tests:** Message updates (edit cockpit, send hand DM), callback routing, per-chat lock serialization.
+- **E2E tests:** End-to-end user flows (create → join → start → roll → place → undo) using deterministic test transcripts. Compare button path vs. /sky command path; results must match.
+- **Regression tests:** All existing /sky commands continue to work; no behavior change.
+
+**Key Recommendations:**
+1. Define vertical slices as working end-to-end features (not just infrastructure).
+2. Add regression test contracts to every story.
+3. Tighten acceptance criteria around atomicity, validation, and error handling.
+4. Define ephemeral state storage strategy (in #54 + #56).
+5. Clarify interview gaps from epic #49.
+
+---
+
+## 2026-02-22T00:20:00Z: Rule guardrails for button-first vertical slices (Tenerife)
+
+**By:** Tenerife (Rules Expert)  
+**Context:** Sanity-check of proposed button-first UX (#49–#57) for game rules compliance and fairness.
+
+**Executive Summary:** The button-first design is sound from a rules perspective **if and only if** the following guardrails are enforced:
+1. **Server-side turn/seat validation** (not UI-enforced)
+2. **DM-only secret dice rendering** (no group cockpit leaks)
+3. **Command availability as truth** (prevents illegal placements)
+4. **Idempotent callback handlers** (safe to Telegram retries)
+5. **Mid-round loss ends game immediately**
+6. **No undo after game loss or round resolve**
+
+All 6 are explicitly called out in existing decisions (#30, #32, #50, #53) but need explicit acceptance criteria in each vertical-slice issue.
+
+**Guard 1: Server-Side Turn Ownership Validation**
+- Risk: Any user (spectators, wrong seat) can press "Place (DM)" → leaks action or allows out-of-turn placement.
+- Safeguard: Server revalidates seat + turn on every callback. If callback user ≠ current player's Telegram ID, reject silently (DM: "Not your turn") or toast + no-op.
+- Affected Issues: #50 (Callback handler), #53 (Callback data design), #57 (E2E tests).
+
+**Guard 2: DM-Only Secret Dice & Command IDs**
+- Risk: Group cockpit button menu reveals full placement options or callback_data leaks die values.
+- Safeguard: Group cockpit buttons are generic (e.g., "Place (DM)", "Undo", "View Hand" → all delegate to DM). Secret placement menu lives in DM only.
+- Affected Issues: #51 (Cockpit renderer), #52 (DM menu), #53 (Callback data design), #56 (Button lifecycle).
+
+**Guard 3: Domain Command Availability is the Single Source of Truth for Legality**
+- Risk: Callback handler accepts placement but domain rejects it → state desync or rule violation.
+- Safeguard: On every successful placement, execute domain command immediately. If domain command fails, reject the placement (no die consumed, no log entry, turn does not advance).
+- Affected Issues: #50 (Callback handler), #52 (DM menu), #54 (State store), #57 (E2E tests).
+
+**Guard 4: Idempotent Callback Handlers for Telegram Retries**
+- Risk: Telegram delivers duplicate callback_query updates; handler applies same placement twice.
+- Safeguard: All callback handlers are idempotent. Placement deduplication tracked by (userId, groupChatId, roundNumber, actionId, nonce).
+- Affected Issues: #50 (Callback handler), #54 (State store), #57 (E2E tests).
+
+**Guard 5: Mid-Round Loss Ends Game Immediately**
+- Risk: Player places die that triggers rule loss; game should end immediately, but button flow might continue accepting placements.
+- Safeguard: Domain ExecuteCommand returns GameRuleLossException immediately. Callback handler catches loss exceptions and broadcasts to group.
+- Affected Issues: #50 (Callback handler), #51 (Cockpit renderer), #57 (E2E tests).
+
+**Guard 6: No Undo After Game Loss or Round Resolve**
+- Risk: Player undoes placement that was the losing move; game is "unlosn" → breaks fairness.
+- Safeguard: Undo is only available during active gameplay (before round 8/8). Once RoundTurnState reaches ReadyToResolve or game-loss exception is thrown, undo is disabled.
+- Affected Issues: #52 (DM menu), #56 (Button lifecycle), #57 (E2E tests).
+
+**Acceptance Criteria by Issue (Summary):**
+- **#50 (Callback Handler):** Validate userId, wrap domain execution in try/catch, deduplicate callbacks, catch mid-round loss, disable future placements.
+- **#51 (Cockpit Renderer):** No secret information, action buttons delegate to DM, show only public state, disable buttons after game loss.
+- **#52 (DM Menu):** Drive button availability from Game.AvailableCommands(), conditionally render "Undo" button.
+- **#53 (Callback Data Design):** Versioned format (no die values, command IDs, token counts), server-side state mapping, button expiration.
+- **#54 (State Store):** Fresh Game state on every query, deduplication storage, session timeout clears menu state.
+- **#55 (Deep-Link Onboarding):** Only show DM hand if round is active; cannot join lost games.
+- **#56 (Button Lifecycle & Versioning):** Menu versioning, old buttons rejected with "Menu expired", action buttons replaced after 8/8.
+- **#57 (E2E Tests):** Turn ownership, secret dice, command availability, idempotency, mid-round loss, undo gating.
+
+**Summary: Rule Violations Prevented**
+By enforcing these guardrails, the button-first UX prevents:
+1. ✅ Spectators or wrong-seat players placing dice.
+2. ✅ Secret dice values leaking to group chat.
+3. ✅ Illegal placements (full slots, insufficient tokens) being accepted.
+4. ✅ Telegram retries causing phantom duplicate placements.
+5. ✅ Mid-round losses being undone or ignored.
+6. ✅ Turn order desync (server state disagrees with visible cockpit).
+7. ✅ Stale buttons accepting actions after round ends.
+
+**Trust Model:** Buttons are UI only; server is the referee. Every callback must revalidate turn ownership, command legality, and idempotency before executing any domain change.
+
+**Cross-Issue Notes:**
+- **#30** (Public placements) already defines turn ownership; callback handler (#50) must implement enforcement.
+- **#32** (Round resolution) already defines when round ends; button lifecycle (#56) must implement menu version expiration.
+- **#31** (Domain modules) already enforces rule invariants; callback handler (#50) must catch and broadcast losses.
+- **#33** (Undo) already gates undo by seat + round state; DM menu (#52) must conditionally render undo button.
+
+**No new rules are needed.** These guardrails are restatements of existing decisions (#30, #31, #32, #33) in terms of button-first callback validation.
+
+---
+
+## 2026-02-22T00:25:00Z: Issue #50 — callback plumbing implementation decision (Skiles)
+
+**By:** Skiles (Implementer)  
+**Decision:** For slice #50, expose a single safe callback action 1:grp:refresh on /sky state messages and process callbacks through the same per-group serialization model used for text commands.
+
+**Why:**
+- Keeps callback payload within Telegram's 64-byte limit.
+- Delivers immediate value without coupling to unimplemented menu-state store slices.
+- Guarantees spinner stop UX by always calling AnswerCallbackQuery for handled, unknown, and expired callbacks.
+
+**Implementation Scope:**
+- Route both Update.Message and Update.CallbackQuery in HandleUpdateAsync.
+- Add callback handler with graceful fallback toast: Menu expired — press /sky state.
+- Refresh action edits the originating message with current state + same refresh button.
+
+---
+
+## 2026-02-22T00:25:00Z: Issue #50 — test contract scaffolding decision (Aloha)
+
+**By:** Aloha (Tester)  
+**Decision:** Scaffold issue #50 behavior tests as skipped contract tests in SkyTeam.Application.Tests\Telegram\Issue50CallbackQueryFlowTests.cs, because callback routing is not yet implemented in SkyTeam.TelegramBot\Program.cs.
+
+**Why:**
+- Protects acceptance criteria as executable test contracts before implementation lands.
+- Makes expected behaviors explicit: CallbackQuery routing, AnswerCallbackQuery on success/error, refresh message edit path, graceful unknown/expired callbacks, and /sky state fallback.
+
+**Follow-up:**
+When callback plumbing is implemented, unskip these tests and wire them to the concrete callback handler/client abstraction.
+
+---
+
+
+---
+
+## 2026-02-22T02:00:00Z: Issue #51 — cockpit lifecycle implementation decision (Skiles)
+
+**By:** Skiles (Implementer)
+
+**Decision:** Adopt a single cockpit lifecycle handler in SkyTeam.TelegramBot\Program.cs (\RefreshGroupCockpitAsync\) that always attempts edit-first against the stored cockpit message id, recreates and re-persists the message id when edit fails, and performs best-effort pin on create/recreate.
+
+**Why:**
+- Enforces one edited cockpit message per group flow instead of emitting new state messages.
+- Keeps \/sky\ command fallback and callback refresh paths aligned by sharing the same lifecycle operation.
+- Prevents permission-related pin failures from breaking gameplay state updates.
+
+**Follow-up:** Unskip and implement end-to-end Telegram lifecycle tests in \SkyTeam.Application.Tests\Telegram\Issue51CockpitLifecycleTests.cs\ once Telegram client seams are introduced for deterministic message/pin failure simulation.
+
+---
+
+## 2026-02-22T02:00:05Z: Issue #51 — test contract scaffolding decision (Aloha)
+
+**By:** Aloha (Tester)
+
+**Decision:** Scaffold issue #51 cockpit lifecycle behaviors as skipped contract tests in \SkyTeam.Application.Tests\Telegram\Issue51CockpitLifecycleTests.cs\, because the cockpit \message_id\ lifecycle and best-effort auto-pin flows are not yet implemented in \SkyTeam.TelegramBot\Program.cs\.
+
+**Why:**
+- Preserves issue #51 acceptance criteria as executable contracts before implementation lands.
+- Makes expected lifecycle behavior explicit: single per-group cockpit message id persistence, edit-in-place updates, recreate-on-missing/uneditable fallback, best-effort auto-pin non-blocking behavior, and \/sky state\ fallback refresh.
+
+**Follow-up:** When issue #51 implementation is merged, unskip these tests and wire them to the concrete cockpit lifecycle and Telegram client abstraction.
+
+---
+
+## Skiles — PR Publish Decision for Issues #50 and #51
+
+**Context:**
+Both callback plumbing (#50) and cockpit lifecycle (#51) are complete. Ready for publication.
+
+**Decision:**
+Publish both issues together in one draft PR because they converge in SkyTeam.TelegramBot\Program.cs through the shared group cockpit refresh flow.
+
+**Why:**
+- Callback 1:grp:refresh behavior depends on the same edit/recreate cockpit lifecycle introduced for #51.
+- A single PR gives reviewers one coherent end-to-end path for group state rendering, callback answering, and cockpit message persistence.
+
+**Test Evidence:**
+- \dotnet test SkyTeam.Application.Tests\SkyTeam.Application.Tests.csproj\ — passing
+
+**Follow-up:**
+- Replace skipped Telegram contract tests in SkyTeam.Application.Tests\Telegram\Issue50CallbackQueryFlowTests.cs and SkyTeam.Application.Tests\Telegram\Issue51CockpitLifecycleTests.cs with executable integration tests after introducing Telegram client seams.
+

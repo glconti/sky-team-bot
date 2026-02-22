@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SkyTeam.Application\SkyTeam.Application.csproj"/>
+    <ProjectReference Include="..\SkyTeam.TelegramBot\SkyTeam.TelegramBot.csproj"/>
   </ItemGroup>
 
 </Project>

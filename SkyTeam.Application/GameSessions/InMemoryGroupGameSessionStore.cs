@@ -151,6 +151,7 @@ public sealed class InMemoryGroupGameSessionStore
     private readonly object _sync = new();
     private readonly Dictionary<long, GameSession> _sessions = new();
     private readonly Dictionary<long, long> _groupChatIdByUserId = new();
+    private readonly Dictionary<long, int> _cockpitMessageIdByGroupChatId = new();
 
     public GameSessionStartResult Start(long groupChatId, LobbySnapshot? lobbySnapshot, long requestingUserId)
     {
@@ -192,6 +193,18 @@ public sealed class InMemoryGroupGameSessionStore
     {
         lock (_sync)
             return _groupChatIdByUserId.TryGetValue(userId, out groupChatId);
+    }
+
+    public bool TryGetCockpitMessageId(long groupChatId, out int cockpitMessageId)
+    {
+        lock (_sync)
+            return _cockpitMessageIdByGroupChatId.TryGetValue(groupChatId, out cockpitMessageId);
+    }
+
+    public void SetCockpitMessageId(long groupChatId, int cockpitMessageId)
+    {
+        lock (_sync)
+            _cockpitMessageIdByGroupChatId[groupChatId] = cockpitMessageId;
     }
 
     public GameSessionPublicState? GetPublicState(long groupChatId)

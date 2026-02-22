@@ -153,3 +153,19 @@
   - Should reject undo after opponent has played.
   - Should reject undo when round is `ReadyToResolve`.
 - Ensure `GetHand`/available command exposure stays consistent after undo.
+
+### Session 6: Issue #50 CallbackQuery test scaffolding (2026-02-22)
+**Outcome:** Added xUnit + FluentAssertions callback-flow test scaffolding for issue #50 in `SkyTeam.Application.Tests\Telegram\Issue50CallbackQueryFlowTests.cs`.
+
+**Learnings:**
+- Current `SkyTeam.TelegramBot\Program.cs` routes only `Update.Message`; `CallbackQuery` routing is not implemented yet.
+- Callback-specific acceptance criteria (#50) are now captured as explicit pending tests (skip-scaffold) for: callback route, spinner stop via `AnswerCallbackQuery` on success/error, refresh re-render path, graceful unknown/expired callbacks, and `/sky state` fallback validity.
+- Minimal assumption used: once callback plumbing is implemented, tests can be unskipped and wired to the callback handler without reworking expected behaviors.
+
+### Session 7: Issue #51 Cockpit lifecycle + auto-pin test scaffolding (2026-02-22)
+**Outcome:** Added xUnit + FluentAssertions pending contract tests for issue #51 in `SkyTeam.Application.Tests\Telegram\Issue51CockpitLifecycleTests.cs`.
+
+**Learnings:**
+- Current `SkyTeam.TelegramBot\Program.cs` has refresh callback support but does not yet persist a per-group cockpit `message_id` lifecycle or auto-pin behavior.
+- Issue #51 acceptance criteria are now captured as explicit skip-scaffold tests for: single cockpit message id persistence, edit-in-place updates, recreate-on-missing/uneditable flow, best-effort pin failure tolerance, and `/sky state` fallback refresh.
+- Minimal assumption used: once cockpit lifecycle/auto-pin implementation lands, tests can be unskipped and wired without changing behavioral expectations.
