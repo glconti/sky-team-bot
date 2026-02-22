@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Sky Team</title>
+  <script src="https://telegram.org/js/telegram-web-app.js?59"></script>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; }
+    #meta { opacity: 0.8; font-size: 12px; margin-bottom: 12px; }
+    pre { white-space: pre-wrap; word-break: break-word; padding: 12px; border: 1px solid rgba(127,127,127,.35); border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <div id="meta"></div>
+  <pre id="app">Loading…</pre>
+
+  <script>
+    (function () {
+      const metaEl = document.getElementById('meta');
+      const appEl = document.getElementById('app');
+
+      function setText(text) {
+        appEl.textContent = text;
+      }
+
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (!tg) {
+        setText('Not running inside Telegram. Open this page via the bot WebApp button.');
+        return;
+      }
+
+      tg.ready();
+
+      const initData = tg.initData || '';
+      const startParam = (tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
+
+      metaEl.textContent = `start_param: ${startParam || '(empty)'} • initData length: ${initData.length}`;
+
+      if (!startParam) {
+        setText('Missing start_param. Open the Mini App from the group cockpit button so Telegram provides the gameId.\n\nCalling backend anyway for diagnostics…');
+      } else {
+        setText('Calling backend…');
+      }
+
+      const url = `/api/webapp/game-state?gameId=${encodeURIComponent(startParam)}`;
+
+      fetch(url, {
+        method: 'GET',
+        headers: { 'X-Telegram-Init-Data': initData },
+        cache: 'no-store'
+      })
+        .then(async (r) => {
+          const bodyText = await r.text();
+
+          if (!r.ok) {
+            throw new Error(`${r.status} ${r.statusText}${bodyText ? `\n\n${bodyText}` : ''}`);
+          }
+
+          return bodyText ? JSON.parse(bodyText) : null;
+        })
+        .then((state) => {
+          setText(JSON.stringify(state, null, 2));
+        })
+        .catch((err) => {
+          setText('Error calling backend:\n\n' + (err && err.message ? err.message : String(err)));
+        });
+    })();
+  </script>
+</body>
+</html>
