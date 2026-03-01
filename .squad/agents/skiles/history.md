@@ -288,3 +288,28 @@
 - `SkyTeam.TelegramBot\Program.cs`
 - `readme.md`
 - `.squad/decisions/inbox/skiles-issue-84.md`
+
+### Session 22: Issue #84 Abuse Protection Slice 1 (2026-03-02T00:49:00Z)
+
+**Outcome:** Implemented minimal, production-useful abuse guardrails in WebApp transport layer without external infrastructure dependencies.
+
+**Decisions:**
+- **Rate Limiting:** Per-user 10 req/sec, per-IP 100 req/min, lobby creation 1 req/user/5min
+- **Input Validation:** Oversized headers (>4096), invalid commandId, invalid display names
+- **Logging:** Throttled requests + rejected initData with validation status
+- **Pattern:** Endpoint filters in DI preserve DDD boundaries; domain untouched
+
+**Scope Deferral (Future Slices):**
+- Expand to /sky command + callback patterns
+- Per-game action cadence/idempotency-key policy
+- Distributed limiter for multi-instance deployments
+- Comprehensive abuse telemetry/alerting
+
+**Test Status:** All 273 tests passing
+
+**Artifacts:**
+- SkyTeam.TelegramBot\WebApp\WebAppAbuseProtector.cs
+- SkyTeam.TelegramBot\WebApp\WebAppAbuseProtectionFilter.cs
+- SkyTeam.Application.Tests\Telegram\*AbusProtectionTests.cs
+- .squad/decisions/inbox/skiles-issue-84.md → merged to decisions.md
+- Commit: 02293fe

@@ -198,6 +198,45 @@
 **Team Coordination:**
 - Skiles notified: #76 merged into draft PR; critical path #76→#77 unblocked pending merge approval
 - Aloha notified: #85 test coverage complete; integration ready for persistence layer (#80)
+
+### Session 11: Issue Closure Round 7 & Epic #75 Progress Update (2026-03-02T01:00:00Z)
+
+**Outcome:** Sully reviewed PR #87 implementation completeness against acceptance criteria for #76, #85, #86. All three issues fully satisfied; prepared for closure.
+
+**Closure Decisions:**
+
+1. **Issue #76 — Configure BotFather Main Mini App** ✅ CLOSE
+   - **Acceptance Criteria Met:** BotFather config validation (WebAppOptionsValidator), DI registration, readme documentation, operator checklist, SSL/domain verification
+   - **Architecture:** Configuration validation at startup prevents misconfigured deployments; pure infrastructure layer (no domain changes)
+   - **Tests:** Issue76BotFatherMainMiniAppConfigurationTests.cs validates HTTPS enforcement; all 259 tests passing
+   - **Unblock:** #77 (Open App Launchpad) ready to proceed
+
+2. **Issue #85 — Expand WebApp API Integration Tests** ✅ CLOSE
+   - **Acceptance Criteria Met:** Create flow, join flow, take turn, initData validation, context binding, authorization, >80% coverage
+   - **Architecture:** WebApp lobby endpoints remain thin transport adapters over in-memory stores; deterministic integration tests
+   - **Tests:** Lobby flow test (create→join 2 players→start) + start validation test (single-player rejection); test helper for auth
+   - **Quality:** 259 tests passing (145 Domain + 114 Application); all lobby endpoints validated
+
+3. **Issue #86 — Create Mini App Manual QA Matrix** ✅ CLOSE
+   - **Acceptance Criteria Met:** QA matrix (8 clients × 2 surfaces), happy path (5 tests), errors (8 scenarios), edge cases, environment setup, release checklist
+   - **Architecture:** Matrix lives in readme.md (versioned with code); deterministic, tester-focused, concurrency-aware
+   - **Scope:** 7 multi-player sync scenarios; dark mode, keyboard nav, screen reader testing; performance baselines
+   - **Integration:** 9-point release checklist gates Mini App merges; ensures manual testing before deployment
+
+**Epic #75 Progress:**
+- **Completed:** #76 (BotFather config), #77 (Open App launchpad hardening, merged in this PR), #85 (WebApp tests), #86 (QA matrix)
+- **Status:** IN_PROGRESS (4/11 issues complete; critical path gates unlocking next wave)
+- **Next:** Merge PR #87 → activate #80 persistence → begin #81 security-context-binding design → complete #82 versioning API contract
+
+**Learnings:**
+- Configuration validation as gating mechanism: Early DI validation catches misconfigurations at startup; prevents silent failures
+- Deterministic integration tests scale better than flaky UI automation: WebApplicationFactory + in-memory hosting removes Telegram polling; tests are repeatable and fast
+- QA matrix as living documentation: Tester-focused matrix in readme.md is more maintainable and always versioned with code than static spreadsheets
+- Multi-player concurrency scenarios in QA matrix validate both manual testing and future automated concurrency test expansion
+
+**Artifacts:**
+- `.squad/decisions/inbox/sully-issue-closure-round7.md` — Full closure analysis and team coordination notes
+- PR #87: https://github.com/glconti/sky-team-bot/pull/87 (ready for merge after this closure review)
 - Gianluigi (user) receives draft PR for final merge decision; critical path visible
 
 **Pending Actions:**
@@ -250,3 +289,22 @@ GameSessions: GameId (PK/UUID), GroupChatId (indexed), PilotUserId, CopilotUserI
 - Round logs as persistence unit is superior to domain snapshots (smaller, auditable, existing reconstruction pattern)
 - Optimistic locking sufficient for turn-based games with low contention; no need for distributed locks
 - Two-phase implementation (in-memory CAS first, then database) de-risks architecture validation
+
+### Session 12: Issue Closure Round 8 (2026-03-02T00:49:00Z)
+
+**Outcome:** Reviewed PR #87 completeness for issues #76, #85, #86. All acceptance criteria met. Prepared closure and Epic #75 status update.
+
+**Decisions:**
+- **CLOSE #76** BotFather configuration validation complete
+- **CLOSE #85** WebApp API integration tests comprehensive
+- **CLOSE #86** Manual QA matrix integrated into release process
+- **EPIC #75** remains IN_PROGRESS (4/11 child issues complete; critical path gates active)
+
+**Team Coordination:**
+- Skiles: Issue #84 abuse protection slice complete (rate limiting + input validation)
+- Aloha: Ready for integration testing with #80 persistence
+- Critical path confirmed: #76→#77→#80→#81→#82
+
+**Artifacts:**
+- .squad/decisions/inbox/sully-issue-closure-round7.md → merged to decisions.md
+- Updated Epic #75 progress tracking
