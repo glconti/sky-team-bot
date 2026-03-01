@@ -5,6 +5,14 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
+## Cross-Team Status (2026-03-02T00:35:00Z)
+- **Sully:** Issue #80/#82 architecture contract designed. Persistence contract stabilized; versioning scope deferred to #82. Next: #81 design + #82 API review.
+- **Skiles:** Issue #80 vertical slice COMPLETED. Persistence + version tracking + tests passing. #82 versioning APIs pending design review.
+- **Aloha (You):** Issue #86 QA COMPLETED. Manual QA matrix for Mini App (8 client × launch surface matrix, 5 happy path, 8 error cases, 7 multi-player sync, release checklist) merged to readme.md & decisions.md. Next: Run matrix on iOS/Android before PR #87 merge.
+- **Coordinator Update:** Focus area now explicit — Telegram Mini App rollout (persistence, launch flow, QA hardening). Active issues: [76, 80, 85, 86, 87].
+- **Critical Path:** #80→#81 (security-context-binding) → #82 (versioning/concurrency) before UI integration; #86 QA matrix now gates Mini App releases.
+- **Next:** Activate skipped version-conflict test; expand concurrency suite using QA matrix multi-player scenarios; run full matrix on real devices before PR #87 merge.
+
 ## Cross-Team Status (2026-03-02T00:25:39Z)
 - **Sully:** Issue #80/#82 architecture contract designed. Persistence contract stabilized; versioning scope deferred to #82. Next: #81 design + #82 API review.
 - **Skiles:** Issue #80 vertical slice COMPLETED. Persistence + version tracking + tests passing. #82 versioning APIs pending design review.
@@ -272,3 +280,35 @@
 - Persistence round-trip QA became testable after the `IGameSessionPersistence` seam; rehydration behavior is now covered with an in-memory persistence double.
 - Version-conflict QA is blocked until write APIs accept an expected version token and return a dedicated stale-write conflict status.
 - When hooks are missing, keep momentum with skipped contract tests plus a concrete blocker handoff in `.squad/decisions/inbox/aloha-issue-80.md`.
+
+### Session 11: Issue #86 — Manual QA Matrix for Mini App (2026-03-02)
+**Outcome:** Completed issue #86 by adding practical manual QA matrix to readme.md covering all Telegram client variants and launch surfaces.
+
+**Deliverables:**
+- **QA Matrix Table:** 8 rows (iOS/Android/Desktop/Web × cockpit button/deep link) with pass/fail columns for lobby load, create, join, play, error recovery
+- **Happy Path Tests:** 5 test cases covering create/join flow, game play (roll/place/undo/refresh), token spending
+- **Error Cases:** 8 test scenarios—tampered signature, expired auth, network loss, concurrent placement, stale game ref, empty/long names, special chars, rapid clicks
+- **Concurrency & Resilience:** 7 multi-player sync tests—simultaneous rolls/placements, turn blocking, message polling, reconnection
+- **Device & UI Checks:** Responsive design (320px–1920px), dark mode toggle, accessibility (keyboard nav, screen readers), touch targets ≥ 48px
+- **Performance Baselines:** Lobby load < 2s, game fetch < 1s, die roll response < 500ms, cockpit updates < 1s
+- **Release Checklist:** 9-point pre-merge verification including multi-client testing, error scenarios, dark mode, accessibility, performance
+
+**Artifacts:**
+- **File:** `readme.md` (added "Manual QA Matrix" section with 5 subsections)
+- **Commit:** b5e67d6 — "docs: Add comprehensive manual QA matrix for Mini App testing"
+- **Issue Comment:** Posted progress update linking PR #87, all acceptance criteria marked complete
+
+**Process Decision:**
+- QA matrix lives in readme.md (developer-facing, always versioned with code)
+- Matrix format: **client × surface × feature** with explicit pass/fail/warning/NA status
+- Test environment setup included (bot token, Mini App URL, test group)
+- Release checklist ensures manual testing occurs before each Mini App update
+- Practical focus: happy path, 2–3 error scenarios per client, boundary cases, multi-player sync
+
+**Key Insight:**
+Manual QA matrix is most effective when:
+1. **Scoped tightly:** Telegram clients + Mini App surfaces (not entire bot)
+2. **Deterministic:** Reproducible test cases (not vague "check things")
+3. **Integrated with release:** Release checklist ties matrix to merge gates
+4. **Developer-friendly:** Lives in readme alongside setup instructions
+5. **Incrementally testable:** Tester can validate one row (e.g., iOS) before full suite

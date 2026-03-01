@@ -1,9 +1,9 @@
 ---
-updated_at: 2026-02-20T22:01:00Z
-focus_area: Domain model — Sky Team board game
-active_issues: []
+updated_at: 2026-03-02T00:35:00Z
+focus_area: Telegram Mini App rollout — persistence, launch flow, and QA hardening
+active_issues: [76, 80, 85, 86, 87]
 ---
 
 # What We're Focused On
 
-Building the domain model for the Sky Team cooperative board game. Core modules (Axis, Engines, Brakes, Flaps, Landing Gear, Radio, Concentration), turn flow, win/loss conditions. Telegram bot integration comes later.
+Executing the Telegram Mini App-first backlog for async play: BotFather launch configuration, durable game persistence, concurrency/versioning guards, and integration/manual QA coverage. PR #87 is the active delivery stream while remaining assigned issues are being processed in Ralph rounds.

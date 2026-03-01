@@ -2,6 +2,67 @@
 
 > Append-only ledger of team decisions. Never retroactively edit entries.
 
+## 2026-03-02T00:34:00Z: QA Decision — Manual QA Matrix for Telegram Mini App (#86)
+
+**Author:** Aloha (Tester/QA Lead)  
+**Date:** 2026-03-02  
+**Status:** ✅ Completed and Merged  
+**Issue:** #86
+
+### Decision: QA Matrix Location & Format
+
+#### Problem
+Issue #86 required a comprehensive manual QA checklist for Telegram Mini App testing across clients (iOS, Android, Desktop Web, Mobile Web) and launch surfaces (cockpit button, deep link). Needed to determine: location, detail level, and release integration.
+
+#### Decision
+**Location:** `readme.md` (integrated, always versioned with code)
+- Developer-facing documentation, not hidden in wiki
+- Auto-version-controlled; every release has matching QA matrix
+- Discoverable by team (single source of truth)
+- Living document pattern: updated alongside feature changes
+
+**Format:** Structured table + subsections
+- **Main Matrix:** Telegram clients × launch surfaces × feature columns
+- **Happy Path Tests:** 5 numbered, reproducible test scenarios
+- **Error Cases:** 8 realistic failure modes + 7 multi-player sync race conditions
+- **Device/UI Checks:** Dark mode, keyboard nav, screen readers, responsive
+- **Performance Baselines:** Concrete metrics (< 2s load, < 500ms roll response)
+- **Release Checklist:** 9-point pre-merge gate
+
+#### Scope (Intentionally Narrow)
+- **In Scope:** Telegram Mini App client variants + launch surfaces
+- **Out of Scope:** Full bot testing, CLI fallback, admin diagnostics
+- **Rationale:** Keep focused and human-testable (~30–60 min per cycle)
+
+#### Key Insights
+1. **Practical > Perfect:** Only test cases a human tester can execute in 30–60 min; skip automated tests
+2. **Deterministic > Vague:** Every test case has clear inputs & expected outputs
+3. **Incremental:** Tester can validate one client row at a time
+4. **Concurrency-aware:** Multi-player sync scenarios as release requirement (critical for #80/#82)
+5. **Accessibility first-class:** Dark mode, keyboard nav, screen readers as release gate (not afterthought)
+
+#### Acceptance Criteria — All Met ✅
+- [x] QA matrix documented (8 client rows, launch surfaces)
+- [x] Happy path test cases (5 scenarios: create, join, take turn, concurrent, endgame)
+- [x] Error test cases (8 failure modes + 7 multi-player sync tests)
+- [x] Edge cases (expiration, signature, malformed data)
+- [x] Test environment instructions (bot token, test group, Mini App URL)
+- [x] Release checklist integrated (9-point pre-merge gate)
+
+#### Artifacts
+- **File:** `readme.md` (Manual QA Matrix section, ~135 lines)
+- **Commit:** b5e67d6 — "docs: Add comprehensive manual QA matrix for Mini App testing"
+- **Issue Comment:** Posted on #86 with progress update
+- **Orchestration Log:** `2026-03-02T00Z34Z00-aloha.md`
+
+#### Team Notes
+- **Testers:** Use this matrix before Mini App releases; log failures as bugs, don't hold releases
+- **Developers:** Update matrix when adding features (same PR as code)
+- **Lead (Sully):** Consider adding "QA sign-off" as merge requirement once matrix stabilizes
+- **Next:** Run full matrix on iOS/Android before PR #87 merge; iterate on test cases based on real tester experience
+
+---
+
 ## 2026-03-01T23:13:46Z: Architecture Decision — Durable Persistence + Concurrency (#80 + #82)
 
 Author: Sully (Lead/Architect)  
