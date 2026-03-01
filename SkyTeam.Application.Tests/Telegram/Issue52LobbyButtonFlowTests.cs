@@ -14,7 +14,7 @@ public sealed class Issue52LobbyButtonFlowTests
         var buildKeyboard = GetPrivateMethod("BuildGroupStateKeyboard");
 
         // Act
-        var keyboard = (InlineKeyboardMarkup)buildKeyboard.Invoke(null, [123L, "sky_team_bot"])!;
+        var keyboard = (InlineKeyboardMarkup)buildKeyboard.Invoke(null, [123L, "sky_team_bot", null])!;
         var buttons = keyboard.InlineKeyboard.SelectMany(row => row).ToList();
 
         // Assert
@@ -67,7 +67,15 @@ public sealed class Issue52LobbyButtonFlowTests
 
     private static MethodInfo GetPrivateMethod(string name)
     {
-        var method = TelegramBotServiceType.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static);
+        var method = TelegramBotServiceType.GetMethod(
+            name,
+            BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            types: [typeof(long), typeof(string), typeof(string)],
+            modifiers: null);
+
+        method ??= TelegramBotServiceType.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static);
+
         method.Should().NotBeNull();
         return method!;
     }

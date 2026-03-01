@@ -30,7 +30,9 @@ The bot uses long polling and keeps in-memory state while the process is running
    - `/sky roll`
 
 ### Mini App flow (for seated players)
-Set `SKYTEAM_MINI_APP_URL` and use the Mini App for secret actions (hand/dice/place/undo).
+Set a public HTTPS URL for the Mini App shell (served by this host):
+- `SKYTEAM_MINI_APP_URL` (or `WebApp:MiniAppUrl`)
+
 Bot commands remain as fallback and will redirect you to the Mini App when secret info is required.
 
 ### Useful command

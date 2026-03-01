@@ -8,7 +8,7 @@ namespace SkyTeam.Application.Tests.Telegram;
 public sealed class Issue60LaunchMiniAppButtonTests
 {
     [Fact]
-    public void BuildGroupStateKeyboard_ShouldIncludeOpenAppDeepLink_WhenBotUsernameIsKnown()
+    public void BuildGroupStateKeyboard_ShouldIncludeOpenAppWebAppButton_WhenBotUsernameIsKnown()
     {
         // Arrange
         var type = ResolveBotServiceTypeOrSkip();
@@ -20,15 +20,40 @@ public sealed class Issue60LaunchMiniAppButtonTests
 
         var groupChatId = 123L;
         var botUsername = "sky_team_bot";
+        var miniAppUrl = "https://example.test/";
 
         // Act
-        var keyboard = (InlineKeyboardMarkup?)buildKeyboard!.Invoke(null, [groupChatId, botUsername]);
+        var keyboard = (InlineKeyboardMarkup?)buildKeyboard!.Invoke(null, [groupChatId, botUsername, miniAppUrl]);
 
         // Assert
         keyboard.Should().NotBeNull();
 
         var buttons = keyboard!.InlineKeyboard.SelectMany(row => row).ToArray();
-        buttons.Should().Contain(b => b.Url == "https://t.me/sky_team_bot?startapp=123");
+        buttons.Should().Contain(b => b.WebApp != null && b.WebApp.Url == miniAppUrl);
+    }
+
+    [Fact]
+    public void BuildGroupStateKeyboard_ShouldTrimAtPrefixAndSupportNegativeChatIds_WhenGeneratingDeepLinks()
+    {
+        // Arrange
+        var type = ResolveBotServiceTypeOrSkip();
+        var buildKeyboard = type.GetMethod(
+            "BuildGroupStateKeyboard",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        buildKeyboard.Should().NotBeNull();
+
+        var groupChatId = -123L;
+        var botUsername = "@sky_team_bot";
+
+        // Act
+        var keyboard = (InlineKeyboardMarkup?)buildKeyboard!.Invoke(null, [groupChatId, botUsername, null]);
+
+        // Assert
+        keyboard.Should().NotBeNull();
+
+        var buttons = keyboard!.InlineKeyboard.SelectMany(row => row).ToArray();
+        buttons.Should().Contain(b => b.Url == "https://t.me/sky_team_bot?startapp=-123");
     }
 
     private static Type ResolveBotServiceTypeOrSkip()

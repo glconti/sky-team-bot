@@ -15,7 +15,11 @@ builder.Services.Configure<TelegramBotOptions>(options =>
         ?? builder.Configuration["Telegram:BotToken"];
 });
 
-builder.Services.Configure<WebAppOptions>(builder.Configuration.GetSection("WebApp"));
+builder.Services.Configure<WebAppOptions>(options =>
+{
+    builder.Configuration.GetSection("WebApp").Bind(options);
+    options.MiniAppUrl ??= builder.Configuration["SKYTEAM_MINI_APP_URL"];
+});
 
 builder.Services.AddSingleton<TelegramInitDataValidator>();
 builder.Services.AddSingleton<TelegramBotService>();
