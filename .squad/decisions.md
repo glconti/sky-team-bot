@@ -3473,3 +3473,76 @@ ew → join → join → start
 - All new integration tests pass; no blockers for final integration phase (#86).
 
 
+
+---
+
+## 2026-03-02T00:25:39Z: Issue #80 first persistence slice + #82 versioning handoff (Skiles)
+
+**By:** Skiles (Domain Dev)  
+**Scope:** #80 durable game persistence (vertical slice), with #82 compatibility notes.
+
+### Decision
+Implemented durable persistence as a repository-backed snapshot flow for InMemoryGroupGameSessionStore:
+- Added explicit application contract IGameSessionPersistence with versioned snapshot schema (PersistedGameSessionStoreState).
+- Persisted game sessions include Version, round logs (rolled dice + placements), round metadata, and cockpit message ids.
+- Added host-side JsonGameSessionPersistence using atomic temp-file replace writes.
+- Store rehydrates on startup from persisted snapshots and rebuilds domain state via round-log replay.
+
+### #82 Clarification (Versioning Contract)
+- Version is now persisted and incremented on state mutations (RegisterRoll, successful PlaceDie, successful UndoLastPlacement).
+- This slice does **not** yet expose compare-and-swap APIs (xpectedVersion) or conflict responses.
+- #82 should extend current mutation surfaces to accept xpectedVersion and return ConcurrencyConflict when versions mismatch.
+
+### Rationale
+- Minimal vertical slice for restart safety without leaking persistence concerns into the domain model.
+- Explicit persistence contract keeps infrastructure (JSON/file storage) outside SkyTeam.Domain and swappable for DB-backed repository later.
+- Persisted Version unblocks optimistic locking in #82 without reworking persistence schema again.
+
+---
+
+## 2026-03-02T00:25:39Z: Aloha — Issue #80 QA Blocker Handoff
+
+**Issue:** #80 Add durable game persistence  
+**Owner:** Aloha (QA)  
+**Status:** Partially blocked (version conflict hook)
+
+### What QA Covered
+- ✅ Persistence round-trip restored state across store rehydration (PersistenceRoundTrip_ShouldRestoreSessionState_WhenStoreIsRehydrated).
+- ✅ Deterministic concurrency guard validated that only one simultaneous placement wins (PlaceDie_ShouldAcceptSinglePlacement_WhenConcurrentSubmissionsTargetSameDie).
+- ⏸️ Version-conflict expectation remains contract-only (Update_ShouldReturnVersionConflict_WhenExpectedVersionIsOutdated, skipped).
+
+### Missing Hook
+- Mutation APIs still do not accept an **expected version** token or return an explicit **version conflict** result.
+
+### Needed To Unblock Final QA
+1. Add expected-version input on write operations.
+2. Return a dedicated conflict status when persisted/current version differs.
+3. Keep behavior deterministic so stale-write tests can assert conflict without timing races.
+
+---
+
+## 2026-03-02T00:25:39Z: Sully — Issue #80 Architecture Contract & #82 Versioning Scope
+
+**By:** Sully (Lead/Architect)  
+**Scope:** #80/#82 persistence and versioning contract alignment.
+
+### Decision
+Documented explicit persistence contract and clarified versioning scope:
+- **#80 vertical slice:** IGameSessionPersistence interface with PersistedGameSessionStoreState schema (versioned snapshots, round logs, cockpit message IDs).
+- **Version field:** Persisted, incremented on successful mutations. Positioned for optimistic locking in #82 without reworking schema.
+- **#82 scope:** Extend mutation surfaces to accept xpectedVersion input and return ConcurrencyConflict response when versions mismatch.
+
+### Architecture Boundaries
+- **Domain layer:** Clean; no persistence concerns, no file I/O.
+- **Application layer:** PersistedGameSessionStore handles rehydration and mutation dispatch.
+- **Infrastructure layer:** JsonGameSessionPersistence swappable (DB-backed repository later).
+
+### Rationale
+- Minimal slice unblocks persistence restart safety.
+- Explicit contract enables future versioning APIs without reworking schema.
+- Deterministic rehydration (round-log replay) maintains consistency guarantees.
+
+### Blockers Resolved
+- ✅ Persistence contract unblocked both #80 and #82.
+- ✅ Version field positioned for #82 optimistic-locking implementation.
+- ⏸️ #82 versioning APIs deferred (expectedVersion input, ConcurrencyConflict response) pending review.

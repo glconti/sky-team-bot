@@ -5,11 +5,12 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Cross-Team Status (2026-03-01T23:01:49Z)
-- **Skiles:** Issue #76 config validation + operator runbook (COMPLETED) → Next: Issue #77 (Open App Launchpad, depends on #76)
-- **Sully:** Epic #75 triaged (11 issues, P0/P1/P2); architecture gates established; no code changes in this cycle
-- **Aloha (You):** Issue #85 integration tests completed (lobby API flows + error paths; all 123 tests passing) → Next: Issue #86 (final integration/QA matrix)
-- **Critical Path:** #76→#77 (launch blockers) → #80 (persistence) parallel with UI → #81–#82 (security/concurrency before production)
+## Cross-Team Status (2026-03-02T00:25:39Z)
+- **Sully:** Issue #80/#82 architecture contract designed. Persistence contract stabilized; versioning scope deferred to #82. Next: #81 design + #82 API review.
+- **Skiles:** Issue #80 vertical slice COMPLETED. Persistence + version tracking + tests passing. #82 versioning APIs pending design review.
+- **Aloha (You):** Issue #80 QA coverage COMPLETED. Round-trip + deterministic concurrency validated. Version-conflict test skipped (blocked on #82 API).
+- **Critical Path:** #80→#81 (security-context-binding) → #82 (versioning/concurrency) before UI integration.
+- **Next:** Await #82 versioning API implementation; activate skipped version-conflict test; expand concurrency test suite.
 
 ## Learnings
 
@@ -262,3 +263,12 @@
 - **Pattern:** Deterministic integration tests use `WebApplicationFactory<Program>` + in-memory bot token config and hosted-service removal to keep Telegram polling disabled.
 - **User preference:** Keep diffs surgical and validate via direct `dotnet test` runs in `SkyTeam.Application.Tests`.
 - **Key file paths:** `SkyTeam.Application.Tests\Telegram\Issue61WebAppLobbyEndpointsTests.cs`, `SkyTeam.TelegramBot\WebApp\WebAppEndpoints.cs`.
+
+### Session 10: Issue #80 — Persistence contracts + concurrency guard (2026-03-02)
+**Outcome:** Added deterministic concurrency guard coverage in `InMemoryGroupGameSessionStoreTests` and captured durable persistence/version expectations as explicit issue #80 contract tests.
+
+**Learnings:**
+- Deterministic concurrency coverage can be achieved by releasing two same-die placement requests behind a shared gate and asserting one `Placed` + one `NotPlayersTurn`.
+- Persistence round-trip QA became testable after the `IGameSessionPersistence` seam; rehydration behavior is now covered with an in-memory persistence double.
+- Version-conflict QA is blocked until write APIs accept an expected version token and return a dedicated stale-write conflict status.
+- When hooks are missing, keep momentum with skipped contract tests plus a concrete blocker handoff in `.squad/decisions/inbox/aloha-issue-80.md`.

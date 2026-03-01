@@ -5,11 +5,12 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Cross-Team Status (2026-03-01T23:01:49Z)
-- **Skiles:** Issue #76 config validation + operator runbook (COMPLETED) → Next: Issue #77 (Open App Launchpad, depends on #76)
-- **Aloha:** Issue #85 integration tests completed (lobby API flows + error paths; all 123 tests passing)
-- **Sully (You):** Epic #75 triaged (11 issues, P0/P1/P2); critical path #76→#77→#80→UI; architecture gates established for #80–#82
-- **Next:** Architecture review for #77 (Cockpit + button callback design), #80 (Game aggregate + version field), #81–#82 (security/concurrency)
+## Cross-Team Status (2026-03-02T00:25:39Z)
+- **Sully (You):** Issue #80/#82 architecture contract designed + decision records posted. Persistence contract stabilized; versioning scope deferred to #82.
+- **Skiles:** Issue #80 vertical slice COMPLETED (persistence + version tracking + tests passing). #82 versioning APIs pending design review.
+- **Aloha:** Issue #80 QA coverage COMPLETED (round-trip + deterministic concurrency). Version-conflict test skipped (blocked on #82 API implementation).
+- **Critical Path:** #80→#81 (security-context-binding) → #82 (versioning/concurrency) before UI integration.
+- **Next:** Begin #81 security-context-binding design; review #82 versioning API contract (expectedVersion input + ConcurrencyConflict response).
 
 ## Core Context
 

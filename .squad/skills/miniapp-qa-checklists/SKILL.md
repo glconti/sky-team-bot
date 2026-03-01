@@ -569,3 +569,16 @@ Use this template for new Mini App features:
 - **Mini App Skill:** `.squad/skills/telegram-mini-apps/SKILL.md`
 - **Test Examples:** `SkyTeam.Domain.Tests/*.cs`, `SkyTeam.Application.Tests/*.cs`
 - **Aloha Charter:** `.squad/agents/aloha/charter.md`
+
+---
+
+## Reusable Pattern: Persistence QA When Hooks Are Missing
+
+When durable persistence is planned but implementation seams are not yet exposed:
+
+1. Add one **active deterministic concurrency guard** test against current behavior.
+2. Add **skipped contract tests** for:
+   - persistence round-trip across restart/rehydration
+   - stale write/version conflict handling
+3. Include clear skip reasons that name the missing hook(s).
+4. Write a blocker handoff in `.squad/decisions/inbox/` with required API seams (rehydration + expected version token).

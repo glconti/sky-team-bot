@@ -5,10 +5,12 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Cross-Team Status (2026-03-01T23:01:49Z)
-- **Sully:** Epic #75 triaged (11 issues, P0/P1/P2, critical path #76→#77→#80→UI)
-- **Aloha:** Issue #85 integration tests completed (lobby API flows + error paths; all 123 tests passing)
-- **Skiles (You):** Issue #76 config validation + operator runbook (COMPLETED) → Next: Issue #77 (Open App Launchpad)
+## Cross-Team Status (2026-03-02T00:25:39Z)
+- **Sully:** Issue #80/#82 architecture contract designed. Persistence contract stabilized; versioning scope deferred to #82. Next: #81 design + #82 API review.
+- **Skiles (You):** Issue #80 vertical slice COMPLETED. Persistence + version tracking + tests passing. #82 versioning APIs pending design review.
+- **Aloha:** Issue #80 QA coverage COMPLETED. Round-trip + deterministic concurrency validated. Version-conflict test skipped (blocked on #82 API).
+- **Critical Path:** #80→#81 (security-context-binding) → #82 (versioning/concurrency) before UI integration.
+- **Blockers Resolved:** Persistence contract unblocked downstream; #82 versioning scope clarified.
 
 ## Learnings
 
@@ -189,3 +191,19 @@
 - `SkyTeam.Application.Tests\Telegram\Issue76BotFatherMainMiniAppConfigurationTests.cs`
 - `readme.md`
 - `.squad/decisions/inbox/skiles-issue-76.md`
+
+### Session 16: Issue #80 durable game persistence slice (2026-03-02)
+
+**Outcome:** Added the first durable persistence vertical slice for active game sessions with safe reload after restart.
+
+**Key Learnings:**
+- Replaying per-round dice + placement logs is enough to reconstruct domain game state deterministically without introducing domain-level serialization concerns.
+- Persisting cockpit message ids with game sessions preserves edit-in-place cockpit lifecycle after process restart.
+- Introducing a persistence port in `SkyTeam.Application` and implementing JSON persistence in `SkyTeam.TelegramBot` keeps DDD boundaries clear while enabling future DB-backed repositories.
+
+**Delivered Artifacts:**
+- `SkyTeam.Application\GameSessions\GameSessionPersistence.cs`
+- `SkyTeam.Application\GameSessions\InMemoryGroupGameSessionStore.cs` (rehydration + versioned snapshot export/import)
+- `SkyTeam.TelegramBot\Persistence\JsonGameSessionPersistence.cs`
+- `SkyTeam.Application.Tests\GameSessions\InMemoryGroupGameSessionStoreTests.cs` (persistence round-trip)
+- `.squad/decisions/inbox/skiles-issue-80.md`
