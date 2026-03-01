@@ -260,6 +260,11 @@ All work consolidated on `feat/issue-76-85-botfather-config-webapp-tests` branch
 - **Epic #75 Status:** #80 → CLOSED (critical path unblocked); #81–#82 priority critical; #83–#86 queue pending concurrency gate.
 - **Next:** Close issue #80 on GitHub. Merge PR #87. Begin #81 security-context-binding design.
 
+## Cross-Team Status (2026-03-01T23:01:49Z)
+- **Sully:** Epic #75 triaged (11 issues, P0/P1/P2, critical path #76→#77→#80→UI)
+- **Aloha:** Issue #85 integration tests completed (lobby API flows + error paths; all 123 tests passing)
+- **Skiles (You):** Issue #76 config validation + operator runbook (COMPLETED) → Next: Issue #77 (Open App Launchpad)
+
 ## Learnings
 - For strict acceptance criteria, an idempotent startup schema migration can close a database-schema gate without forcing a risky rewrite of an already stable JSON persistence runtime.
 - Keeping SQL migration scripts as repository artifacts and embedding them at build time provides both auditability and production-safe runtime loading.
@@ -331,3 +336,221 @@ All work consolidated on `feat/issue-76-85-botfather-config-webapp-tests` branch
 - Total test suite: 309 passing, 4 failing (unrelated Issue60 tests), 16 skipped
 
 **No changes required** — the issue acceptance criteria were already met by previous implementation.
+**Outcome:** Implemented application-layer round/turn state primitives to support strict alternation and secret dice hands (no Telegram SDK types).
+
+**Key Learnings:**
+- Keeping round/turn orchestration in application avoids leaking domain-internal dice/player types into Telegram UX.
+- Modeling the round as a small state machine (`InProgress` → `ReadyToResolve` after 8 placements) keeps downstream use-cases simple.
+- Undo gating is easiest to express as: "only the player who placed last can undo, and only before the other player plays".
+
+**Delivered Artifacts:**
+- `SkyTeam.Application.Round`: `PlayerSeat`, `DieValue`, `SecretDiceHand`, `RoundTurnState`.
+- Design note: `.squad/decisions/inbox/skiles-issue28-design.md`.
+
+---
+
+### Session 7: Telegram /sky undo (2026-02-21)
+
+**Outcome:** Implemented `/sky undo` in `SkyTeam.TelegramBot\Program.cs` (private chat only) to undo the last die placement and refresh the player's secret hand.
+
+**Key Paths & Behavior:**
+- Telegram surface: `SkyTeam.TelegramBot\Program.cs` → `HandleSkyUndoAsync()`.
+- Application use-case: `SkyTeam.Application\GameSessions\InMemoryGroupGameSessionStore.UndoLastPlacement(userId)` returning `GameUndoResult` (`NoActiveSession`, `NotSeated`, `RoundNotRolled`, `UndoNotAllowed`, `DomainError`).
+- On success: bot posts a public message to `PublicInfo.GroupChatId` and DMs the requesting user with the updated hand and available commands (same rendering style as `/sky place`).
+- Group chat guard: `/sky undo` in a group replies "Use /sky undo in a private chat with me."
+
+### Session 8: Telegram Button-First UX — Callback Architecture Breakdown (2026-02-21T23:05:13Z)
+
+**Outcome:** Produced comprehensive technical breakdown of callback_query handling, single edited cockpit message pattern, DM menu design, 64-byte callback_data mitigation strategy, menu state store architecture, deep-link onboarding flow, and constraint-handling strategies.
+
+**Key Decisions:**
+
+**1. Callback Query Handler Pattern**
+- Validate payload: `(userId, groupChatId, menuVersion, actionId)`
+- Server-side lookup: `MenuState[(userId, groupChatId, menuVersion)][actionId]` → command/target
+- Execute corresponding domain command
+- `AnswerCallbackQuery` response (spinner stop, error toast)
+- Idempotency: track `(userId, groupChatId, menuVersion, actionId)` to dedupe retries
+
+**2. Single Edited Cockpit Message Lifecycle**
+- On first interaction (`/sky new`): send cockpit, persist `message_id`
+- On state change (after round resolution): `EditMessageText` only (no new messages)
+- Cockpit deleted on game end or session timeout
+
+**3. Menu State Store (In-Memory, Per-Group)**
+- Storage: `Dictionary<(userId, groupChatId, menuVersion), MenuState>`
+- MenuState: `{ actionId → commandId, targetId → moduleSlot, timestamp }`
+- Thread-safe with `ReaderWriterLockSlim` per group
+- GC: expire after 1 hour or session end
+- Supports versioning (`v1:`, `v2:` for schema evolution)
+
+**4. callback_data 64-Byte Constraint Solution**
+- Problem: full command IDs + dynamic options exceed 64 bytes
+- Solution: short versioned action tokens (`v1:place:d2`) + server-side state
+- No long IDs in callback; all mapping is server-side
+- Format: `v1:action:index`
+
+**5. DM Menu Design**
+- Display secret hand + available placements
+- Persist DM `message_id` per user; edit on state change
+- Button layout: die-selector (0–3) + target buttons (module slots) + undo/cancel
+
+**6. Deep-Link Onboarding (/start?game=<groupId>)**
+- Entry: group "Join Game" button or manual `/start?game=123`
+- Handler: register user, join session, show DM hand menu
+- Fallback: plain `/start` lists active games
+
+**Constraints & Mitigations:**
+- **Retry dedup:** idempotency key prevents duplicate actions
+
+### Session 4: Slice #59 — WebApp Foundation Implementation (2026-02-22)
+
+**Outcome:** Converted TelegramBot to ASP.NET Core Web SDK; implemented TelegramInitDataValidator, TelegramInitDataFilter, and GET /api/webapp/game-state endpoint.
+
+**Deliverables:**
+1. **Project SDK conversion:** `SkyTeam.TelegramBot.csproj` → `Microsoft.NET.Sdk.Web`
+2. **Program.cs refactor:**
+   - WebApplication.CreateBuilder() pattern (vs. Host.CreateDefaultBuilder)
+   - InMemoryGroupLobbyStore, InMemoryGroupGameSessionStore registered as singletons
+   - TelegramBotService (IHostedService) wraps existing polling loop
+   - UseStaticFiles() for wwwroot/ serving
+   - MapWebAppEndpoints() for /api/webapp/* routing
+3. **TelegramInitDataValidator service:**
+   - Pure, testable validation logic
+   - HMAC-SHA256 per Telegram spec
+   - FixedTimeEquals constant-time comparison
+   - auth_date freshness check (default 5 min, configurable)
+   - Returns InitDataValidationResult (success or specific failure reason)
+4. **TelegramInitDataFilter (IEndpointFilter):**
+   - Reads X-Telegram-Init-Data header
+   - Delegates to validator
+   - On success: injects TelegramWebAppUser into HttpContext.Items
+   - On failure: returns 401 Unauthorized
+5. **GET /api/webapp/game-state endpoint:**
+   - Query param: gameId (from start_param)
+   - Cross-check signed start_param against query gameId (reject 400 if mismatch)
+   - Query in-memory stores; return public game state (200)
+   - Return 404 if no lobby/session, 400 if invalid gameId, 401 if auth fails
+6. **TelegramBotOptions configuration class:**
+   - BotToken (from env TELEGRAM_BOT_TOKEN)
+   - WebApp section (InitDataMaxAgeSeconds, etc.)
+7. **appsettings.json:** Added WebApp:InitDataMaxAgeSeconds (default 300)
+
+**Architecture Decisions:**
+- **Single host process:** No IPC needed; in-memory stores are DI singletons
+- **Hosted service for polling:** ASP.NET Core lifecycle management + graceful shutdown
+- **Filter-based auth:** Clean separation; reusable across endpoints
+- **Read-only in Slice #59:** Public state only; no secrets. Write endpoints deferred to Slice #64
+
+**Testing:**
+- Issue #59 validator tests: Valid initData, tampered hash, expired auth_date, missing hash, empty initData, constant-time comparison ✅
+- Issue #59 endpoint integration tests: Valid (200), no game (404), missing header (401), invalid initData (401), mismatched gameId (400) ✅
+- Issue #53 callback tests: Roll/Place(DM)/Refresh callbacks, privacy contract, fallback continuity ✅
+- Result: 206 total, 193 passed, 13 skipped, 0 failed
+
+**Integrations:**
+- Backward compatible with existing Telegram callback routing (Issues #50–#53)
+- Lock guards in stores ensure no race conditions under ASP.NET Core's multi-threaded requests
+- Static files served alongside Telegram polling in single process
+
+**Next Steps:**
+- Slice #60: Launch surface ("Open app" button + start_param wiring in group cockpit)
+- Slice #61: Mini app lobby UI (New/Join/Start buttons)
+- Slice #62: Mini app in-game UI (cockpit + private hand, no DMs)
+
+- **Restart recovery:** stale buttons → "menu expired" toast; retry from `/sky hand`
+- **Concurrency:** per-group serialization + async/await on all Telegram API calls
+
+**GitHub Artifacts Created:**
+- Epic #49: https://github.com/glconti/sky-team-bot/issues/49 (Telegram button-first UX)
+- Child issues #50–#57: callback handler, cockpit renderer, DM menu, callback_data design, state store, onboarding, button lifecycle, E2E tests
+
+**Implementation Sequencing:**
+- Issue #54 (menu state store) unblocks #50–#52 (callbacks, renderer, menu)
+- Phases: #50–#52 (Phase 1), #53–#55 (Phase 2), #56–#57 (Phase 3 polish/tests)
+
+**Cross-Team:**
+- Sully created Epic #49 + child issues, routed to Skiles
+- Tenerife validates button rendering against UX spec
+- Aloha designs E2E callback test harness (mock Telegram SDK)
+- Scribe logs all work + merges decision inbox (3 files)
+
+### Session 9: Issue #50 CallbackQuery plumbing + safe Refresh (2026-02-22)
+
+**Outcome:** Implemented end-to-end callback plumbing in `SkyTeam.TelegramBot\Program.cs` for both `Message` and `CallbackQuery` updates, added a minimal callback router with `v1:grp:refresh`, and wired Refresh to edit the originating group state message.
+
+**Key Learnings:**
+- Reusing the existing per-group lock model for callback queries is straightforward by deriving lock keys from callback message chat (or mapped user→group fallback), preserving message/callback serialization consistency.
+- A shared `RenderGroupState(groupChatId)` path keeps `/sky state` fallback and callback refresh behavior aligned, avoiding duplicate state rendering logic.
+- Always answering callback queries (success and error/expired) is easiest when callback handlers are treated as no-throw UX operations with a clear recovery toast: `Menu expired — press /sky state`.
+
+### Session 10: Issue #51 Cockpit lifecycle + auto-pin (2026-02-22)
+
+**Outcome:** Added cockpit lifecycle management in `SkyTeam.TelegramBot\Program.cs` with edit-first refresh, recreate-on-edit-failure fallback, and best-effort pinning; persisted one cockpit message id per group in `InMemoryGroupGameSessionStore`.
+
+**Key Learnings:**
+- A single `RefreshGroupCockpitAsync()` entry point keeps `/sky` command flows and callback refresh behavior consistent and reduces drift in lifecycle handling.
+- Treating `EditMessageText` failures as non-fatal and recreating cockpit immediately is a robust strategy for deleted/uneditable message recovery.
+- Pinning should remain side-effect-only (`try/catch` ignore), so state refresh is never blocked by missing Telegram pin permissions.
+
+### Session 11: Publish prep for issues #50 and #51 (2026-02-22)
+
+**Outcome:** Prepared draft PR publication flow by consolidating #50 callback plumbing and #51 cockpit lifecycle changes on a dedicated branch, with focused test execution evidence.
+
+**Key Learnings:**
+- Keeping callback refresh and `/sky state` on the same cockpit refresh pipeline reduces divergence during publish/review.
+- Persisting cockpit message id in application state is sufficient to support edit-first lifecycle without introducing infrastructure coupling.
+
+### Session 12: Issue #52 Slice 3/7 — Lobby cockpit buttons (2026-02-22)
+
+**Outcome:** Implemented group cockpit lobby buttons end-to-end in `SkyTeam.TelegramBot\Program.cs`: `New`, `Join`, `Start`, `Refresh` callbacks now route through server-side validation, invalid presses no-op with callback toast, and successful presses refresh by editing the cockpit.
+
+**Key Learnings:**
+- Keeping lobby buttons always visible is compatible with role/seat safety as long as callback handlers enforce legality via existing lobby/session stores.
+- Callback UX should fail softly (`AnswerCallbackQuery` toast) while text command fallbacks (`/sky new|join|start`) remain unchanged and cockpit-refreshing.
+
+### Session 13: PR #58 publish for issue #52 (2026-02-22)
+
+**Outcome:** Published issue #52 implementation on draft PR #58 by committing/pushing lobby callback + tests changes, updating PR scope/checklist with test evidence, and posting issue status with PR linkage.
+
+**Key Learnings:**
+- Publishing in-place on the existing draft branch keeps review continuity for #50/#51/#52 cockpit work.
+- Test evidence is strongest when combining executable checks and explicit skipped-contract rationale for remaining callback test seams.
+
+### Session 14: Slice #59 WebApp foundation (2026-02-22)
+
+**Outcome:** Converted `SkyTeam.TelegramBot` into an ASP.NET Core host serving `wwwroot/` + `/api/webapp/*` while continuing Telegram update processing via a `BackgroundService`; added Telegram Mini App `initData` validation and a read-only `GET /api/webapp/game-state` endpoint per Sully contract.
+
+**Key Learnings:**
+- Convert host in-place (Web SDK) to keep in-memory stores shared via DI; move polling logic into hosted service to avoid static singletons.
+- Telegram `initData` validation is sensitive to HMAC key/data order (`secret_key = HMAC("WebAppData", bot_token)`); use constant-time compare and `auth_date` max age.
+- Tests that reflect on `Program` break with top-level statements; point brittle source-string assertions at a stable class (`TelegramBotService`) instead.
+
+### Session 3: Mini App Button Implementation (2026-03-01)
+
+**Outcome:** Proposed web_app button approach with signed chat context for Mini App launch.
+
+**Key Decision:**
+- Use InlineKeyboardButton.web_app for group cockpit Open app button
+- Derive game/group from signed chat.id; fallback to start_param for private launches
+- Artifacts: Orchestration log \& decision merged into decisions.md
+
+### Session 15: Issue #76 BotFather Main Mini App guardrails (2026-03-01)
+
+**Outcome:** Delivered first actionable in-repo slice for BotFather Main Mini App setup: runtime URL validation, focused tests, and operator runbook docs.
+
+**Architecture / Patterns:**
+- Added `IValidateOptions<WebAppOptions>` + `ValidateOnStart()` to fail fast when Mini App URL config is malformed.
+- Validation rule chosen for operator safety: Mini App URL must be absolute HTTPS and must not include query/fragment.
+- Kept external BotFather actions out of runtime code; captured as explicit manual checklist in docs and decision inbox.
+
+**User / Product Preferences Captured:**
+- Mini App-first launch experience is preferred over DM-first secret flows.
+- `startapp` deep-link syntax and BotFather Main Mini App setup must be explicitly documented for operators.
+
+**Key Paths:**
+- `SkyTeam.TelegramBot\WebApp\WebAppOptionsValidator.cs`
+- `SkyTeam.TelegramBot\Program.cs`
+- `SkyTeam.Application.Tests\Telegram\Issue76BotFatherMainMiniAppConfigurationTests.cs`
+- `readme.md`
+- `.squad/decisions/inbox/skiles-issue-76.md`

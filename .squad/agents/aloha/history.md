@@ -25,6 +25,11 @@
 - **Aloha (You):** Issue #80 QA coverage COMPLETED. Round-trip + deterministic concurrency validated. Version-conflict test skipped (blocked on #82 API).
 - **Critical Path:** #80→#81 (security-context-binding) → #82 (versioning/concurrency) before UI integration.
 - **Next:** Await #82 versioning API implementation; activate skipped version-conflict test; expand concurrency test suite.
+## Cross-Team Status (2026-03-01T23:01:49Z)
+- **Skiles:** Issue #76 config validation + operator runbook (COMPLETED) → Next: Issue #77 (Open App Launchpad, depends on #76)
+- **Sully:** Epic #75 triaged (11 issues, P0/P1/P2); architecture gates established; no code changes in this cycle
+- **Aloha (You):** Issue #85 integration tests completed (lobby API flows + error paths; all 123 tests passing) → Next: Issue #86 (final integration/QA matrix)
+- **Critical Path:** #76→#77 (launch blockers) → #80 (persistence) parallel with UI → #81–#82 (security/concurrency before production)
 
 ## Learnings
 

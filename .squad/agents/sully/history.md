@@ -6,6 +6,13 @@
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
 > **Note (2026-03-02 Round 16):** Session 28 summary below. Full session logs archived in `.squad/log/` and decision records in `.squad/decisions.md`. Detailed history from Sessions 1–25 summarized into Core Context.
+## Cross-Team Status (2026-03-01T23:01:49Z)
+- **Skiles:** Issue #76 config validation + operator runbook (COMPLETED) → Next: Issue #77 (Open App Launchpad, depends on #76)
+- **Aloha:** Issue #85 integration tests completed (lobby API flows + error paths; all 123 tests passing)
+- **Sully (You):** Epic #75 triaged (11 issues, P0/P1/P2); critical path #76→#77→#80→UI; architecture gates established for #80–#82
+- **Next:** Architecture review for #77 (Cockpit + button callback design), #80 (Game aggregate + version field), #81–#82 (security/concurrency)
+
+## Learnings
 
 ## Session 28–29 Summary (2026-03-02)
 
@@ -183,3 +190,42 @@ Architected Telegram Mini App as primary UI (from cockpit-centric design). Desig
 ---
 
 *History summarized to core context on 2026-03-02. Full session logs archived in `.squad/log/` and decision records in `.squad/decisions.md`.*
+**Key Decision:**
+- Mini App launch mechanism: startapp deep links with BotFather Main Mini App config
+- Artifacts: Orchestration log \& Session log created
+
+### Session 9: Epic #75 Triage & Execution Sequencing (2026-03-01T22:30:00Z)
+
+**Outcome:** Sully triaged Epic #75 (Mini App-first Async Play) and produced concrete execution sequence. Identified top 3 P1 priorities and architecture review gates.
+
+**Key Decisions:**
+- **Critical Path Locked:** #76 (BotFather config) → #77 (Open app launchpad) → #80 (persistence) → #78–#79 (UI) → #81–#82 (security/concurrency).
+- **Persistence + Concurrency Co-Design:** #80 (Game aggregate + Version field) must include optimistic locking shape upfront to feed #82. No sequential iteration; design together.
+- **Game Aggregate Schema:** `GameSessions` table with `Version (int)` field for compare-and-swap; atomic serialization on turn transitions.
+- **Cockpit Button Contract:** Inline keyboard with `startapp` deep link; callback data ≤ 64 bytes (use token codec from Session 2).
+- **Squad Ownership Reaffirmed:** Skiles (implementation #76–#84), Sully (architecture review, no code), Aloha (testing #85–#86), Tenerife (rule validation consulted).
+
+**Top 3 Execution Priorities (This Cycle):**
+1. **#76 — BotFather Mini App Config (Skiles):** Launch blocker; no domain changes.
+2. **#80 — Game Persistence (Skiles + Sully review):** Enables async reliability; Version field is critical.
+3. **#77 — Open App Launchpad (Skiles):** UX foundation for #78; cockpit button with startapp link.
+
+**Architecture Review Gates Established:**
+- Sully approves: aggregate shape (#80), version field design (#82), cockpit button contract (#77).
+- All three P1s must complete before #78–#79 UI development.
+
+**Deliverables:**
+- `.squad/decisions/inbox/sully-epic-75-triage.md` — Full triage document with dependency chain, roadblock mitigation, team ownership.
+- GitHub issue #75 comment — Concise triage summary with 3 priorities and critical path detail.
+
+**Team Coordination:**
+- Skiles begins with #76 (BotFather config validation).
+- Sully stands by for #80 aggregate design review (Version field, persistence schema).
+- Aloha prepares integration test harness for #85 (WebApp API coverage).
+- Tenerife consulted if #79 in-game UI touches rule exposure (read-only game state API).
+
+**Learnings:**
+- Epic chaining (launch → persistence → UI → hardening) requires upfront design of foundational layers (#76, #80) to prevent rework.
+- Persistence + concurrency are inseparable; pair #80 + #82 co-design from day one.
+- Telegram API constraints (64-byte callback data) must be factored into Cockpit design (#77) early.
+- Team ownership clarity prevents rework: Skiles (implementation), Sully (review gates), Aloha (testing), Tenerife (rules validation).
