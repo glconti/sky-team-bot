@@ -11,171 +11,46 @@
 - **Sully (You):** Epic #75 triaged (11 issues, P0/P1/P2); critical path #76→#77→#80→UI; architecture gates established for #80–#82
 - **Next:** Architecture review for #77 (Cockpit + button callback design), #80 (Game aggregate + version field), #81–#82 (security/concurrency)
 
+## Core Context
+
+### Foundational Work (Sessions 1–3: 2026-02-20 through 2026-02-21)
+**Baseline:** Established GitHub label taxonomy (25 labels), backlog structure (14 vertical-slice issues), and M1 foundation roadmap. Assessed Telegram placement + token architecture; produced extended command model and multi-token spec. Team coordinated on rules, command shapes, and module implementations.
+
+**Key Achievements:**
+- ✅ GitHub labels: Type, Priority, Status, Area, Routing categories; squad routing embedded
+- ✅ Module resolution order: Axis → Engines → Brakes → Flaps → Gear → Radio → Concentration (locked)
+- ✅ Multi-token spec: cost `k = |adjusted - rolled|`, single `PlaceDieCommand` with `AdjustedValue` parameter
+- ✅ Domain-first architecture: Secret placement in DM, token pool per aggregate, no infrastructure leakage
+- ✅ Skiles' Phase 1 foundation: GameState refactor + ExecuteCommand dispatcher (unblocked Phase 2)
+- ✅ Aloha's test harness: Boundary conditions, landing outcomes, token mechanics (all green)
+
+**Team Coordination:**
+- Tenerife finalized rules spec + loss semantics (15 explicit losses, 8 invalid-move categories)
+- Skiles delivered draft PR #37 (7 modules + landing validation + multi-token spend)
+- Aloha created draft PR #38 (boundary tests + landing matrix + token pool tests)
+- Scribe consolidated decisions + updated histories + committed .squad/
+
 ## Learnings
 
-### Session 1: Backlog Setup & GitHub Label Taxonomy (2026-02-20)
-- Created 25 GitHub labels across 5 categories: Type, Priority, Status, Area, and Routing
-- Established 14 vertical-slice issues for M1 foundation work
-- Key design decision: All issues represent end-to-end playable increments, not infrastructure-only work
-- Dependency graph: Rules clarification (#14) is the critical path blocker for module work
-- Squad routing embedded in labels for easy filtering and handoff
-- Status model: `ready` for foundation, `blocked` for work waiting on clarification, `review` for PR gates
-- Milestones structured for incremental delivery: MVP → Bot → Polish → Advanced
+### Session 4-6: Telegram Architecture + Domain Completion (2026-02-21)
 
-### Cross-Team Context
-- **Tenerife** completed M1 rules specification (all 7 modules, landing criteria, clarifications)
-- **Skiles** identified Phase 1 blocker: GameState aggregate + ExecuteCommand dispatcher must be built first
-- **Aloha** standing by with test harness for module implementations
+**Outcome:** Drafted 5-layer Telegram bot architecture (Domain → Application → Presentation → Adapter → Host). Created `SkyTeam.TelegramBot` project. Fixed token pool wiring in PR #37. Finalized loss semantics checklist (15 explicit losses). All 7 modules + landing validation + multi-token mechanics operational in draft PRs #37–#38.
 
-### Session 2: Telegram Placement + Concentration Token Architecture (2026-02-21)
-**Outcome:** Assessed secret placement and coffee token UX fit against DDD aggregate pattern; produced extended interaction contract and command model for Skiles.
+**Sully's Contributions:**
+- 5-layer architecture with clear separation of concerns
+- 7-Epic MVP backlog (A–G) with vertical slices
+- 8 user interview questions (UX clarifications)
+- PR #37 token pool fix: delegation from Game → ConcentrationModule
+- Landing checks: 6 independent criteria (Engines ≥9, Brakes ≥6, Flaps ≥4, Gear ≥3, Axis ∈[-2,2], Approach cleared)
 
-**Key Decisions:**
-- **Secret placement:** Architecturally Excellent — aligns with DDD game aggregate. No public infrastructure changes needed.
-- **Token command model:** Option A (Recommended) — Token spend as multi-token parameter on PlaceDieCommand (`SpendTokens: int?` or `AdjustedValue: int?` with derived cost). Prevents ordering ambiguity and state-machine complexity.
-- **Extended command shape:** Single `PlaceDieCommand` with optional adjustment parameters: `UseTokenForAdjustment: bool`, `AdjustedValue: int?`, `TokensToSpend: int` (derived). Validation method checks pool availability and value validity.
-- **Telegram contract:** Ephemeral UI (private keyboards, color-coded options), readiness handling, reveal broadcasting. Domain stays UI-agnostic.
-- **Module resolution order locked:** Land on Concentration → Gain token → Advance (prevents race conditions)
+**Team Coordination:**
+- Skiles created project + initialized Program.cs + began Issue #28 (application round/turn state)
+- Tenerife produced UX spec (570+ lines, 7 transcripts) + loss semantics checklist
+- Aloha added ExecuteCommand smoke tests + validated token-adjusted command surface
 
-**Delivered Artifacts:**
-- Telegram placement + token architecture assessment (`.squad/decisions.md`)
-- Extended interaction contract: Bot ↔ Domain interface with multi-token support
-- Command shape guidance for Skiles: `PlaceDieOnConcentrationCommand` with spend validation
-- One orchestration log entry: Sully (architecture assessment)
-
-**Cross-Coordination:**
-- **Tenerife** finalized official rules spec with multi-token spend locked (cost `k = |adjusted - rolled|`)
-- **Skiles** extended domain model to support multi-token spend per this architecture guidance
-- **Aloha** can incorporate secret storage + multi-token testing per Skiles' extended proposal
-
-### Session 3: Decision Consolidation & Team Handoff (2026-02-21)
-**Outcome:** Scribe merged decision inbox, updated agent histories, committed `.squad/` state; team unblocked for Phase 1 implementation with multi-token spec fully validated.
-
-**Key Actions:**
-- Merged multi-token spec into decisions.md (Tenerife canonical reference + Skiles extended command model)
-- Deleted deduplicated inbox files
-- Updated Sully history with multi-token command shape guidance
-- Committed `.squad/` changes (orchestration logs, session log, updated histories)
-
-**Team Readiness:**
-- ✅ Multi-token spec complete: cost `k = |adjusted - rolled|`, no wraparound, full die value range supported
-- ✅ Command shape extended: `AdjustedValue` optional parameter with derived spend cost
-- ✅ Architecture validated: Single command, no separate token spend command, domain ↔ UI boundary clear
-- ✅ Skiles can implement Phase 1 with confidence in token model and command shape
-- ✅ Aloha can test multi-token flows (1-token, 2-token, 3-token, insufficient tokens edge cases)
-
-### Session 4: Telegram Architecture + MVP Backlog Sprint (2026-02-21)
-**Outcome:** Four agents drafted comprehensive Telegram bot architecture, UX specification, implementation plan, and test strategy; produced 4 orchestration logs + session log + merged decisions.
-
-**Key Decisions:**
-- **Sully:** 5-layer architecture (Domain → Application → Presentation → Telegram Adapter → Bot Host); 7 Epic MVP backlog (A–G) with vertical slices; 8 user interview questions
-- **Skiles:** Created `SkyTeam.TelegramBot` console project + integrated into solution (`.slnx`)
-- **Tenerife:** Comprehensive Telegram UX specification (570+ lines, 7 example transcripts, secret placement + button-driven token mechanics)
-- **Aloha:** Test-backlog recommendations (verbal; integrated into decisions if formal artifact needed)
-
-**Delivered Artifacts:**
-- `.squad/orchestration-log/2026-02-21T08-22-30Z-sully.md` — Architecture + MVP backlog orchestration log
-- `.squad/orchestration-log/2026-02-21T08-22-31Z-skiles.md` — Project initialization orchestration log
-- `.squad/orchestration-log/2026-02-21T08-22-32Z-tenerife.md` — UX specification orchestration log
-- `.squad/orchestration-log/2026-02-21T08-22-33Z-aloha.md` — QA recommendations orchestration log
-- `.squad/log/2026-02-21T08-22-00Z-telegram-bot-backlog.md` — Session log
-- `.squad/decisions.md` — Merged 4 new decision entries (user directive, Sully architecture, Skiles project, Tenerife UX)
-
-**Team Synchronization:**
-- **Sully → Skiles:** Epic roadmap defines implementation phases (A–G); 8 interview questions clarify UX tradeoffs
-- **Tenerife → Skiles:** UX spec provides binding contract for Telegram adapter (button rendering, state display, message formats)
-- **Sully ↔ Tenerife:** Architecture/UX alignment on secret placement (DM-based), public reveal (group broadcast), token UX (buttons, not commands)
-- **Aloha → Team:** Test recommendations ready for Epic-by-Epic implementation (unit → integration → E2E)
-
-**Pending Actions:**
-- User answers Sully's 8 interview questions (UX clarifications: DM onboarding, turn discipline, persistence, undo/cancel policy, etc.)
-- Skiles begins Phase 1: GameState aggregate + ExecuteCommand dispatcher (critical path for all Epics B–G)
-- Tenerife validates module implementations against UX spec (readiness gate per Epic D–F)
-- Aloha integrates test harness with Skiles' implementation phases
-
-### Session 5: Issue #31 Completion Round (2026-02-21T10:21:03Z)
-**Outcome:** Tenerife finalized comprehensive 500+ line spec documenting all 7 modules, landing win/loss criteria, resolution order, and edge cases. Skiles delivered draft PR #37 with all 7 module implementations and coffee-token multi-spend. Aloha created draft PR #38 with test coverage for boundaries, landing outcomes, and token mechanics.
-
-**Tenerife's Deliverables:**
-- **Spec document:** Issue #31 specification (tenerife-issue31-spec.md) covering modules 1–7 with detailed state, placement rules, resolution timing, landing criteria per module, edge cases, and 10-section verification checklist
-- **Module Order:** Axis → Engines → Brakes → Flaps → Landing Gear → Radio → Concentration (fixed, documented)
-- **Landing Criteria:** 6 conditions (all must pass for win: axis [-2,+2], engines ≥9, brakes ==3 and >speed, flaps ==4, gear ==3, approach clear)
-- **Loss Conditions:** Axis imbalance (immediate), altitude exhausted (final round), landing failure (any criterion fails)
-- **Clarifications:** Brakes criterion, Engines final round suppression, Landing Gear idempotence, multi-token spend bounds, token pool scoping, net token change (spend + concentration), reroll out-of-scope
-
-**Aloha's Findings:**
-- **Spec Mismatch #1:** Brakes landing criterion inconsistent — spec says `BrakesValue == 3 AND BrakesValue > LastSpeed` but BrakesValue is switch count (0–3); if LastSpeed ≥ 9, condition is impossible
-- **Spec Mismatch #2:** Current code treats BrakesValue as last activated value (2/4/6) and checks `BrakesValue >= 6` without speed comparison
-- **Recommendation:** Clarify intended landing check before finalizing tests
-- **Token-Adjusted Commands:** Validated design surface (e.g., `Axis.AssignBlue:1>3`); tests confirm command surfacing, spend behavior, pool/die bounds
-
-**Skiles' Implementations:**
-- All 7 modules working in draft PR #37
-- Landing validation logic complete
-- Command ID surface for token-adjusted placements operational
-- GameState refactor complete; ExecuteCommand dispatcher wired
-
-**Cross-Agent Dependencies:**
-- Awaiting Sully code review (module design, command dispatcher, aggregate cohesion)
-- Awaiting user clarification on Brakes landing criterion semantics
-- Concentration token design complete; ready for Telegram adapter once Epic B baseline established
-
-**Delivered Artifacts (Session 5):**
-- `.squad/orchestration-log/2026-02-21T10-21-03Z-skiles.md` — Skiles orchestration log
-- `.squad/orchestration-log/2026-02-21T10-21-03Z-tenerife.md` — Tenerife orchestration log
-- `.squad/orchestration-log/2026-02-21T10-21-03Z-aloha.md` — Aloha orchestration log
-- `.squad/log/2026-02-21T10-21-03Z-ralph-round.md` — Session log
-- `.squad/decisions.md` — Merged Tenerife spec + Aloha findings + user directive (placement undo)
-- Updated agent histories (Tenerife, Skiles, Aloha)
-
-**Pending Escalations:**
-1. **Brakes Landing Criterion:** Reconcile spec vs. code semantics before finalizing tests
-2. **Token-Adjusted Command IDs:** Await Telegram button rendering spec (Sully + Tenerife)
-
-### Session 6: PR #37 Unblock & Loss Semantics Finalization (2026-02-21T18:06:26Z)
-**Outcome:** Sully fixed token pool wiring in PR #37. Tenerife produced comprehensive loss condition checklist (15 explicit losses, 8 invalid-move categories, 3 TODOs). Aloha added ExecuteCommand smoke tests. Scribe logged all work and merged decisions.
-
-**Sully's PR #37 Fix:**
-- **Token Pool Ownership:** Coffee token pool owned by `ConcentrationModule` (authoritative source)
-- **Spend Delegation:** `Game.SpendCoffeeTokens(k)` → `ConcentrationModule.SpendCoffeeTokens(k)`
-- **Landing Checks:** 6 independent criteria (Engines ≥9, Brakes ≥6, Flaps ≥4, Gear ≥3, Axis ∈[-2,2], Approach cleared); no mandatory placement loss gate
-- **Tests:** Green; wiring minimal and consistent
-
-**Tenerife's Loss Semantics Checklist:**
-- **Explicit Losses (throw `GameRuleLossException`):**
-  1. Axis Out of Balance at Landing: `AxisPosition < -2 OR > 2`
-  2. Speed Too High at Landing: `BrakesValue < EnginesValue`
-  3. Approach Track Collision: ANY plane token remains
-  4. Altitude Exhausted: No segments left without landing
-  5. Mid-Round Axis Invariant: Position ≥ ±3 after both dice placed
-- **Invalid Moves (prevent via command validation):**
-  1. Brakes/Flaps sequence violations
-  2. Duplicate placements (Landing Gear, Axis, Engines)
-  3. Concentration/Radio exhaustion
-  4. Token overspend
-  5. Die not available (bot bug, not user error)
-- **Bugs Noted:**
-  - Axis landing check currently == 0, should check ∈[-2,2]
-  - Speed comparison uses >, verify if intended
-  - Altitude exhaustion not explicit; needs implementation
-  - Reroll mechanics not visible
-- **Rationale:** Separating losses from validation errors enables proper exception handling and deterministic game-state management
-
-**Aloha's ExecuteCommand Smoke Tests:**
-- Added base-scenario coverage: valid command execution, token spend, invalid rejection
-- AAA pattern, FluentAssertions, data-driven matrix
-- Tests green; ready for broader integration suite
-
-**Scribe's Logging & Consolidation:**
-- **Orchestration Logs (3):** Sully PR#37, Tenerife loss semantics, Aloha ExecuteCommand
-- **Session Log:** PR#37 unblock summary
-- **Decisions Merge:** Moved inbox files into decisions.md; deleted processed inbox files
-- **Agent Histories:** Updated Scribe, Sully, Tenerife, Aloha with session context
-- **Git Commit:** Staged and committed `.squad/` changes
-
-**Team Readiness:**
-- ✅ PR #37 token wiring fixed and validated
-- ✅ Loss semantics documented; ready for implementation validation
+**Known Blockers:**
+- Brakes landing criterion spec mismatch (BrakesValue switch 0–3 vs. speed ≥9 check unsatisfiable)
+- Telegram button rendering spec needed (callback data 64-byte constraint)
 
 ### Session 4: Slice #59 — WebApp Foundation Design Review (2026-02-22)
 
@@ -334,3 +209,43 @@
 - Issue comments with PR cross-links improve team context; no need for separate Slack/Discord coordination.
 - Feature branch naming convention (`feat/<issue>-<description>`) aids history traceability and multi-issue tracking.
 - Clean commit messages with issue references enable GitHub's automatic issue closure on PR merge.
+
+### Session 11: Persistence + Concurrency Architecture (#80 + #82) (2026-03-02)
+
+**Outcome:** Sully designed unified architecture for durable persistence (#80) and optimistic locking (#82) as a single co-designed unit. Posted architecture contracts to both GitHub issues. Created decision document with full implementation handoff.
+
+**Key Decisions:**
+- **Co-Design Mandate:** Persistence and concurrency are architecturally inseparable; cannot implement one without the other
+- **Version Field:** `int NOT NULL`, starts at 1, increments atomically on every mutation; foundation for CAS
+- **Optimistic Locking:** `UpdateAsync(session, expectedVersion)` with compare-and-swap semantics; no pessimistic locks
+- **Serialization Strategy:** Persist round logs (not domain snapshots); reuse existing `RebuildDomainGameFromLogs` pattern
+- **TTL Policy:** Active games no expiry; completed/abandoned games 30-day retention with daily cleanup job
+- **Repository Pattern:** `IGameSessionRepository` interface with `CreateAsync`, `UpdateAsync`, `GetByIdAsync`, `GetByGroupChatIdAsync`
+- **Conflict Response:** HTTP 409 with `ConcurrencyConflict` error + current version for client retry
+
+**Schema Design:**
+```
+GameSessions: GameId (PK/UUID), GroupChatId (indexed), PilotUserId, CopilotUserId,
+              State (JSON), Status, Version (CAS), CreatedAt, UpdatedAt, ExpiresAt
+```
+
+**Review Gates Established:**
+- Version field non-nullable and incremented on every mutation
+- All mutations use repository pattern with expected version check
+- Integration tests verify parallel placement rejection
+- Unique index on GroupChatId for active sessions
+
+**Deliverables:**
+- `.squad/decisions/inbox/sully-80-82-architecture.md` — Full architecture contract
+- GitHub issue #80 comment — Persistence architecture + review gates
+- GitHub issue #82 comment — Concurrency contract + test requirements
+
+**Team Handoff:**
+- **Skiles:** Implementation ready with full contract (repository interface, serialization shape, CAS semantics)
+- **Aloha:** Test checklist provided (6 required tests: concurrency, persistence, version, create conflict, update conflict, TTL)
+
+**Learnings:**
+- Persistence and versioning form an atomic design unit; never design separately
+- Round logs as persistence unit is superior to domain snapshots (smaller, auditable, existing reconstruction pattern)
+- Optimistic locking sufficient for turn-based games with low contention; no need for distributed locks
+- Two-phase implementation (in-memory CAS first, then database) de-risks architecture validation
