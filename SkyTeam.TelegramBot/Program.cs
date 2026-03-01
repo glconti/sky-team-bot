@@ -32,6 +32,7 @@ builder.Services.AddSingleton<IValidateOptions<WebAppOptions>, WebAppOptionsVali
 builder.Services.AddOptions<WebAppOptions>().ValidateOnStart();
 
 builder.Services.AddSingleton<TelegramInitDataValidator>();
+builder.Services.AddSingleton<WebAppAbuseProtector>();
 builder.Services.AddSingleton<TelegramBotService>();
 builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<TelegramBotService>());
 

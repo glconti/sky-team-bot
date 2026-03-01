@@ -59,6 +59,16 @@ Bot commands remain as fallback and will redirect you to the Mini App when secre
 - Notifications are deduplicated per transition key to avoid duplicate sends on retries.
 - If DM delivery fails, the bot posts a group-chat fallback ping with action-required text only (no secret hand/module details).
 
+### Abuse guardrails (Issue #84, slice 1)
+- WebApp endpoints apply in-memory throttling with `429 Too Many Requests` + `Retry-After`:
+  - per-user: max 10 requests/second
+  - per-IP: max 100 requests/minute
+  - lobby creation: max 1 request per user per 5 minutes (`POST /api/webapp/lobby/new`)
+- Input validation guardrails:
+  - `commandId` is required, max 128 chars, no whitespace (`POST /api/webapp/game/place`)
+  - viewer display name must be non-empty and at most 64 chars (`POST /api/webapp/lobby/join`)
+  - oversized `X-Telegram-Init-Data` headers are rejected with `400 Bad Request`
+
 ### Operator verification checklist
 - `SKYTEAM_MINI_APP_URL` resolves directly over HTTPS (no redirect loops, no TLS warnings).
 - Tapping **Open app** or a `startapp` link opens the Mini App on Telegram iOS, Android, and Desktop.

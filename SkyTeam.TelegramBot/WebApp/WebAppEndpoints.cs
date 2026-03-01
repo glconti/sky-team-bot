@@ -64,10 +64,14 @@ public sealed record WebAppGameStateResponse(
 
 public static class WebAppEndpoints
 {
+    private const int MaxDisplayNameLength = 64;
+    private const int MaxCommandIdLength = 128;
+
     public static void MapWebAppEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/webapp")
-            .AddEndpointFilter<TelegramInitDataFilter>();
+            .AddEndpointFilter<TelegramInitDataFilter>()
+            .AddEndpointFilter<WebAppAbuseProtectionFilter>();
 
         group.MapGet("/game-state", GetGameState);
         group.MapPost("/lobby/new", CreateLobby);
@@ -136,7 +140,11 @@ public static class WebAppEndpoints
         if (result.Error is not null)
             return result.Error;
 
-        var player = new LobbyPlayer(result.Context!.Viewer.UserId, result.Context.Viewer.DisplayName);
+        var displayName = result.Context!.Viewer.DisplayName.Trim();
+        if (string.IsNullOrWhiteSpace(displayName) || displayName.Length > MaxDisplayNameLength)
+            return Results.BadRequest(new { error = "Invalid display name." });
+
+        var player = new LobbyPlayer(result.Context.Viewer.UserId, displayName);
         var joinResult = lobbyStore.Join(result.GroupChatId!.Value, player);
 
         if (joinResult.Status is LobbyJoinStatus.JoinedAsPilot or LobbyJoinStatus.JoinedAsCopilot)
@@ -247,10 +255,14 @@ public static class WebAppEndpoints
         if (request.DieIndex is < 0 or >= SecretDiceHand.DicePerHand)
             return Results.BadRequest(new { error = "Invalid die index." });
 
-        if (string.IsNullOrWhiteSpace(request.CommandId))
+        var commandId = request.CommandId?.Trim();
+        if (string.IsNullOrWhiteSpace(commandId))
             return Results.BadRequest(new { error = "Missing commandId." });
 
-        var placement = gameSessionStore.PlaceDie(result.Context!.Viewer.UserId, request.DieIndex, request.CommandId);
+        if (commandId.Length > MaxCommandIdLength || commandId.Any(char.IsWhiteSpace))
+            return Results.BadRequest(new { error = "Invalid commandId." });
+
+        var placement = gameSessionStore.PlaceDie(result.Context!.Viewer.UserId, request.DieIndex, commandId);
         if (placement.Status != GamePlacementStatus.Placed)
             return Results.Conflict(new { error = MapPlacementError(placement) });
 

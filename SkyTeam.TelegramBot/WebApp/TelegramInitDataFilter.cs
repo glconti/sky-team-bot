@@ -12,13 +12,21 @@ public sealed record TelegramInitDataContext(
 public sealed class TelegramInitDataFilter(
     TelegramInitDataValidator validator,
     IOptions<TelegramBotOptions> botOptions,
-    IOptions<WebAppOptions> webAppOptions) : IEndpointFilter
+    IOptions<WebAppOptions> webAppOptions,
+    ILogger<TelegramInitDataFilter> logger) : IEndpointFilter
 {
     public const string ContextItemKey = "tg.webapp.context";
+    private const int MaxInitDataHeaderLength = 4096;
 
     public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var initData = context.HttpContext.Request.Headers["X-Telegram-Init-Data"].ToString();
+        if (initData.Length > MaxInitDataHeaderLength)
+        {
+            logger.LogWarning("Rejected initData header that exceeded max length. Path={Path}", context.HttpContext.Request.Path.Value);
+            return new(Results.BadRequest(new { error = "Invalid initData." }));
+        }
+
         var maxAgeSeconds = webAppOptions.Value.InitDataMaxAgeSeconds <= 0 ? 300 : webAppOptions.Value.InitDataMaxAgeSeconds;
 
         var result = validator.Validate(
@@ -28,7 +36,10 @@ public sealed class TelegramInitDataFilter(
             DateTimeOffset.UtcNow);
 
         if (!result.IsOk)
+        {
+            logger.LogWarning("Rejected initData request. Status={Status} Path={Path}", result.Status, context.HttpContext.Request.Path.Value);
             return new(Results.Unauthorized());
+        }
 
         var initContext = new TelegramInitDataContext(
             Viewer: result.Viewer!,

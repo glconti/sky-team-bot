@@ -109,3 +109,17 @@ When Mini App launch depends on operator-managed BotFather settings, add local r
   - no query/fragment (keep URL as stable app shell base)
 - Register `ValidateOnStart()` so misconfiguration fails fast at startup.
 - Cover with focused tests for valid HTTPS and invalid http/relative/query/fragment cases.
+
+## Abuse guardrail slice pattern (WebApp transport)
+For first-pass abuse protection without new infrastructure:
+- Add a singleton in-memory sliding-window guard service.
+- Enforce it in a dedicated `IEndpointFilter` after auth/initData validation.
+- Start with pragmatic defaults:
+  - per-user request rate
+  - per-IP request rate
+  - strict limit on create/start mutating endpoints
+- On rejection:
+  - return `429 Too Many Requests`
+  - include `Retry-After` header
+  - log scope/key/path for auditing
+- Keep validation in transport boundary (`400`) and avoid domain mutations on reject paths.

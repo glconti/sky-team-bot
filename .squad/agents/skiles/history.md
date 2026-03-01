@@ -270,3 +270,21 @@
 - Test coverage: All passing
 - Commit: d91925f
 - Issue comment posted; decision merged into decisions.md
+
+### Session 21: Issue #84 abuse protection + input validation slice 1 (2026-03-02)
+
+**Outcome:** Started issue #84 on PR #87 with minimal, production-useful guardrails in the WebApp transport layer.
+
+**Key Learnings:**
+- A singleton in-memory sliding-window guard (`IEndpointFilter`) is an effective first abuse-protection layer without introducing infrastructure dependencies.
+- Keeping abuse controls in transport filters preserves domain purity while still enforcing practical per-user/per-IP limits.
+- Input validation guardrails are safest when enforced at endpoint boundaries with explicit `400` errors and no domain-state side effects.
+
+**Delivered Artifacts:**
+- `SkyTeam.TelegramBot\WebApp\WebAppAbuseProtector.cs`
+- `SkyTeam.TelegramBot\WebApp\WebAppAbuseProtectionFilter.cs`
+- `SkyTeam.TelegramBot\WebApp\WebAppEndpoints.cs`
+- `SkyTeam.TelegramBot\WebApp\TelegramInitDataFilter.cs`
+- `SkyTeam.TelegramBot\Program.cs`
+- `readme.md`
+- `.squad/decisions/inbox/skiles-issue-84.md`
