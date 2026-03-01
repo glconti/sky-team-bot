@@ -5,6 +5,11 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
+## Cross-Team Status (2026-03-01T23:01:49Z)
+- **Sully:** Epic #75 triaged (11 issues, P0/P1/P2, critical path #76→#77→#80→UI)
+- **Aloha:** Issue #85 integration tests completed (lobby API flows + error paths; all 123 tests passing)
+- **Skiles (You):** Issue #76 config validation + operator runbook (COMPLETED) → Next: Issue #77 (Open App Launchpad)
+
 ## Learnings
 
 ### Session 1: Codebase Audit & Milestone 1 Planning (2026-02-21)
@@ -345,3 +350,23 @@
 - Use InlineKeyboardButton.web_app for group cockpit Open app button
 - Derive game/group from signed chat.id; fallback to start_param for private launches
 - Artifacts: Orchestration log \& decision merged into decisions.md
+
+### Session 15: Issue #76 BotFather Main Mini App guardrails (2026-03-01)
+
+**Outcome:** Delivered first actionable in-repo slice for BotFather Main Mini App setup: runtime URL validation, focused tests, and operator runbook docs.
+
+**Architecture / Patterns:**
+- Added `IValidateOptions<WebAppOptions>` + `ValidateOnStart()` to fail fast when Mini App URL config is malformed.
+- Validation rule chosen for operator safety: Mini App URL must be absolute HTTPS and must not include query/fragment.
+- Kept external BotFather actions out of runtime code; captured as explicit manual checklist in docs and decision inbox.
+
+**User / Product Preferences Captured:**
+- Mini App-first launch experience is preferred over DM-first secret flows.
+- `startapp` deep-link syntax and BotFather Main Mini App setup must be explicitly documented for operators.
+
+**Key Paths:**
+- `SkyTeam.TelegramBot\WebApp\WebAppOptionsValidator.cs`
+- `SkyTeam.TelegramBot\Program.cs`
+- `SkyTeam.Application.Tests\Telegram\Issue76BotFatherMainMiniAppConfigurationTests.cs`
+- `readme.md`
+- `.squad/decisions/inbox/skiles-issue-76.md`

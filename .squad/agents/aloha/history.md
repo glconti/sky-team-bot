@@ -5,6 +5,12 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
+## Cross-Team Status (2026-03-01T23:01:49Z)
+- **Skiles:** Issue #76 config validation + operator runbook (COMPLETED) → Next: Issue #77 (Open App Launchpad, depends on #76)
+- **Sully:** Epic #75 triaged (11 issues, P0/P1/P2); architecture gates established; no code changes in this cycle
+- **Aloha (You):** Issue #85 integration tests completed (lobby API flows + error paths; all 123 tests passing) → Next: Issue #86 (final integration/QA matrix)
+- **Critical Path:** #76→#77 (launch blockers) → #80 (persistence) parallel with UI → #81–#82 (security/concurrency before production)
+
 ## Learnings
 
 ### Session 1: Telegram Architecture + MVP Backlog Sprint (2026-02-21)
@@ -247,3 +253,12 @@
 **Artifacts:**
 - Orchestration log: 2026-03-01T21-55-06Z-aloha-miniapp-tests.md
 - Test cases for launch flow, callback state, static serving
+
+### Session 9: Issue #85 — WebApp API integration expansion (2026-03-01)
+**Outcome:** Extended WebApp lobby integration coverage with a full create/join/start API flow and a negative-path start validation aligned with current endpoint behavior.
+
+**Learnings:**
+- **Architecture decision:** WebApp lobby endpoints remain thin transport adapters over `InMemoryGroupLobbyStore` + `InMemoryGroupGameSessionStore`, with conflict status mapping for non-ready start attempts.
+- **Pattern:** Deterministic integration tests use `WebApplicationFactory<Program>` + in-memory bot token config and hosted-service removal to keep Telegram polling disabled.
+- **User preference:** Keep diffs surgical and validate via direct `dotnet test` runs in `SkyTeam.Application.Tests`.
+- **Key file paths:** `SkyTeam.Application.Tests\Telegram\Issue61WebAppLobbyEndpointsTests.cs`, `SkyTeam.TelegramBot\WebApp\WebAppEndpoints.cs`.

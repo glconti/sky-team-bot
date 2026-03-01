@@ -3137,3 +3137,87 @@ The current Telegram "Open app" button is implemented as a plain URL deep-link (
 - Optionally set the bot menu button to the same Web App URL for an additional launch surface.
 
 ---
+
+---
+
+## 2026-03-01T23:01:49Z: Issue #76 — Configure BotFather Main Mini App (Skiles)
+
+**By:** Skiles (Telegram Bot infrastructure)  
+**Issue:** #76 — Configure BotFather Main Mini App
+
+### Decision
+Deliver the first in-repo slice as **configuration guardrails + operator runbook**:
+1. Add startup validation for WebApp:MiniAppUrl / SKYTEAM_MINI_APP_URL so invalid Mini App URLs fail fast.
+2. Document exact BotFather/Main Mini App setup and startapp link syntax in eadme.md.
+3. Add focused tests for Mini App URL validation rules.
+
+### Rationale
+- BotFather setup is an external/manual step, but URL correctness is enforceable locally.
+- Failing fast on invalid URL avoids silent "Open app" misconfiguration in production.
+- Clear operator runbook reduces setup drift across environments and clients.
+
+### In-Repo Artifacts
+- SkyTeam.TelegramBot\WebApp\WebAppOptionsValidator.cs — startup validation
+- SkyTeam.TelegramBot\Program.cs — validator registration + ValidateOnStart
+- SkyTeam.Application.Tests\Telegram\Issue76BotFatherMainMiniAppConfigurationTests.cs — validation tests
+- eadme.md — BotFather checklist, startapp syntax, operator verification
+
+### Operator Steps (manual, external)
+1. Deploy Mini App shell on public HTTPS domain with a valid CA certificate.
+2. In BotFather: /mybots → select bot → **Bot Settings** → **Main Mini App**.
+3. Set Mini App URL to the same value used by SKYTEAM_MINI_APP_URL.
+4. Ensure app short name is ≤ 32 chars.
+5. Verify links work on iOS, Android, Desktop (no SSL errors).
+
+---
+
+## 2026-03-01T23:01:49Z: Epic #75 Triage & Execution Sequence (Sully)
+
+**By:** Sully (Architect)  
+**Epic:** #75 — Telegram Mini App-first Async Play Experience
+
+### Decision
+Established priority sequence and architecture review gates for 11-issue epic:
+- **P0 (Launch blockers):** #76 (BotFather config), #77 (Open app launchpad)
+- **P1 (Core functionality):** #78–#82 (UI, persistence, security, concurrency)
+- **P2 (Hardening & QA):** #83–#86 (notifications, rate limits, integration tests, QA)
+
+**Critical path:** #76 → #77 → #78 → #79 (MVP); #80 (persistence) parallel with UI; #81–#82 before production.
+
+### Ownership & Architecture Gates
+- **Skiles** → #76, #77, #78, #79, #80, #81, #82, #83, #84 (implementation)
+- **Sully** → Architecture review gates (domain aggregate, event emission, concurrency model)
+- **Aloha** → #85, #86 (integration tests + QA matrix)
+- **Tenerife** → Game rule validation (consulted on #79 if rules touched)
+
+### Key Architecture Decisions (Sully Gate)
+1. **#80 Persistence:** Game aggregate owns all state; atomically serialized to DB with Version field for optimistic locking.
+2. **#82 Concurrency:** Version field incremented on mutation; supports compare-and-swap in #82.
+3. **#77 Button Design:** Cockpit message exposes stable "Open app" button; 64-byte callback constraint respected.
+
+### Blockers Identified
+1. Persistence + Concurrency must be designed together; don't iterate sequentially.
+2. BotFather config may not persist; verify idempotency; document setup checklist.
+3. Telegram callback data constraint (64 bytes) applies to #77; token codec from prior session applies.
+
+---
+
+## 2026-03-01T23:01:49Z: Issue #85 — WebApp API Integration Tests (Aloha)
+
+**By:** Aloha (QA & Testing)  
+**Issue:** #85 — WebApp API Integration Tests for Create/Join/Start + Error Validation
+
+### Decision
+Expand coverage in existing integration suite Issue61WebAppLobbyEndpointsTests instead of creating new fixture:
+- Add one end-to-end lobby API flow test: 
+ew → join → join → start
+- Add one negative-path validation: start with only one seated player returns 409 Conflict
+
+### Rationale
+- Keeps changes minimal and aligned with issue scope.
+- Reuses deterministic WebApplicationFactory<Program> setup; avoids duplicate fixture code.
+- Validates server-side state transitions and error responses.
+
+### Validation
+- Test suite: **123 total, 107 passed, 16 skipped, 0 failed**
+- All new integration tests pass; no blockers for final integration phase (#86).

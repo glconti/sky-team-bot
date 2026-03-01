@@ -100,3 +100,12 @@ static bool ValidateInitData(string initData, string botToken, TimeSpan maxAge, 
 - **Only available** when launched via a **KeyboardButton** Mini App.
 
 For real-time gameplay, prefer calling your backend APIs directly (Mini App stays open).
+
+## Config guardrail pattern (BotFather Main Mini App URL)
+When Mini App launch depends on operator-managed BotFather settings, add local runtime guardrails:
+- Validate `WebApp:MiniAppUrl` / env override with `IValidateOptions<T>`:
+  - absolute URL required
+  - `https` scheme required
+  - no query/fragment (keep URL as stable app shell base)
+- Register `ValidateOnStart()` so misconfiguration fails fast at startup.
+- Cover with focused tests for valid HTTPS and invalid http/relative/query/fragment cases.
