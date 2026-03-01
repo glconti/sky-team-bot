@@ -296,3 +296,41 @@
 - Persistence + concurrency are inseparable; pair #80 + #82 co-design from day one.
 - Telegram API constraints (64-byte callback data) must be factored into Cockpit design (#77) early.
 - Team ownership clarity prevents rework: Skiles (implementation), Sully (review gates), Aloha (testing), Tenerife (rules validation).
+
+### Session 10: Issues #76 + #85 Completion & PR Workflow (2026-03-02T00:15:00Z)
+
+**Outcome:** Sully received completed code/test deliverables from Skiles (#76) and Aloha (#85), reviewed architecture, staged feature branch, committed cleanly, created draft PR #87, and posted progress comments to both GitHub issues.
+
+**Deliverables Reviewed:**
+- **Issue #76 (Skiles):** `WebAppOptionsValidator` with strict HTTPS + no query/fragment validation per BotFather spec. DI registration with `ValidateOnStart()`. readme documentation + operator checklist.
+- **Issue #85 (Aloha):** Lobby flow integration test (new→join→start), lobby start validation test (single-player rejection), test helper for authenticated requests. 2 new test suites.
+
+**Architectural Assessment:**
+- ✅ Validator design: Clean separation of concerns; lives in DI layer; fails fast on startup.
+- ✅ Test coverage: AAA pattern; both happy path (full flow) and failure path (insufficient players) covered.
+- ✅ Public API: No breaking changes; configuration strictly validated; operator procedures documented.
+- ✅ Domain boundary: Configuration validation stays in Telegram host layer; no domain model changes needed.
+- ✅ Test integration: New tests integrate seamlessly with existing 114 Application tests; all 259 passing (145 Domain + 114 Application).
+
+**Workflow Executed:**
+1. Created feature branch: `feat/issue-76-85-botfather-config-webapp-tests`
+2. Committed with detailed message referencing both issues + test validation
+3. Pushed to origin; created draft PR #87 via `gh` CLI
+4. Posted architecture approval comments on GitHub issues #76 (Skiles) and #85 (Aloha) with next-gate unblock info
+5. Cross-linked PR #87 in both issue comments for team visibility
+
+**Team Coordination:**
+- Skiles notified: #76 merged into draft PR; critical path #76→#77 unblocked pending merge approval
+- Aloha notified: #85 test coverage complete; integration ready for persistence layer (#80)
+- Gianluigi (user) receives draft PR for final merge decision; critical path visible
+
+**Pending Actions:**
+- Gianluigi approves/merges draft PR #87 to main
+- Skiles begins #77 (Open App Launchpad) with cockpit button + startapp deep link routing
+- Sully stands by for #80 aggregate design (persistence schema + Version field)
+
+**Learnings:**
+- Draft PR as collaboration gate enables architecture feedback before merge; reduces rework.
+- Issue comments with PR cross-links improve team context; no need for separate Slack/Discord coordination.
+- Feature branch naming convention (`feat/<issue>-<description>`) aids history traceability and multi-issue tracking.
+- Clean commit messages with issue references enable GitHub's automatic issue closure on PR merge.
