@@ -3546,3 +3546,166 @@ Documented explicit persistence contract and clarified versioning scope:
 - ✅ Persistence contract unblocked both #80 and #82.
 - ✅ Version field positioned for #82 optimistic-locking implementation.
 - ⏸️ #82 versioning APIs deferred (expectedVersion input, ConcurrencyConflict response) pending review.
+
+
+---
+
+# Skiles — Issue #80 PR Progress Report
+
+## Status
+Issue #80 durable game persistence vertical slice **PUBLISHED** on draft PR #87.
+
+## Scope (Closed)
+✅ **Acceptance Criteria Met:**
+- Game state serializes to JSON after each turn + cockpit edit/lifecycle preserved
+- Session recovery loads full game state on bot restart (deterministic rehydration from per-round logs)
+- Sessions keyed by (ChatId, GameId) with isolated concurrent game support
+- Round-trip persistence validation: play → persist → reload → verify correctness
+- All 273 tests passing (includes persistence round-trip + lifecycle rehydration)
+
+## Deferred to #82 (Out of Scope)
+- Version field + optimistic locking for concurrent update safety
+- TTL cleanup for abandoned sessions (> 24h)
+- Database schema migration (beyond JSON vertical slice)
+- Encryption at rest for sensitive data
+
+## PR #87 Integration
+- Consolidated #76 (BotFather config) + #85 (WebApp tests) + **#80 (persistence)** on single branch
+- 7 commits total, 4680 additions, 29 changed files
+- Status: Draft (awaiting team review)
+
+## Key Deliverables
+```
+SkyTeam.Application/GameSessions/GameSessionPersistence.cs
+  → Interface defining snapshot export/import contract
+
+SkyTeam.Application/GameSessions/InMemoryGroupGameSessionStore.cs (extended)
+  → Versioned snapshot export/import for round-trip validation
+
+SkyTeam.TelegramBot/Persistence/JsonGameSessionPersistence.cs
+  → JSON file persistence (data/game-sessions.json)
+  → NullGameSessionPersistence stub for testing
+
+SkyTeam.Application.Tests/GameSessions/InMemoryGroupGameSessionStoreTests.cs
+  → Round-trip: play → export → import → verify state
+  → Deterministic rehydration from dice + placement logs
+```
+
+## Architecture Notes
+- **DDD boundary:** Persistence port in Application layer, JSON impl in TelegramBot (framework concerns)
+- **Rehydration:** Deterministic replay of per-round dice + placements; no domain-level serialization
+- **Cockpit lifecycle:** Message ids persisted; edit-in-place works after restart
+- **Testing:** JsonGameSessionPersistence disabled in Testing environment (NullGameSessionPersistence)
+
+## Team Handoff
+- Next: #82 (versioning + concurrency safety) — Sully design pending review
+- Critical path: #80 → #81 (security-context-binding) → #82 before UI integration
+
+
+---
+
+# Skiles — Issue #56 PR
+
+- PR: https://github.com/glconti/sky-team-bot/pull/74
+- Branch: `skiles/issue-56-callback-hardening`
+- Draft: `false` (ready for review)
+- Mergeability: `clean`
+
+## Acceptance Summary
+- Introduced `CallbackDataCodec` with canonical versioned callback format `v1:grp:<action>` and validation.
+- Added `CallbackMenuStateStore` with 1-hour TTL cleanup, callback allow-list binding, and duplicate-delivery dedup handling.
+- Hardened `TelegramBotService` callback processing to reject malformed/expired callbacks and return clear toasts instead of throwing.
+- Added issue #56 tests covering codec round-trip/rejection and menu-state chat-binding, dedup, and TTL expiry.
+
+Closes #56
+
+---
+
+# Decision: Issue #76 + #85 PR Workflow & Architecture Approval
+
+**Date:** 2026-03-02T00:15:00Z  
+**Actor:** Sully (Lead / Architect)  
+**Context:** Issues #76 (BotFather config) and #85 (WebApp lobby tests) completed by Skiles and Aloha; ready for merge to main.
+
+## Decision
+
+**Approve both issues for merge via draft PR #87.**
+
+### Issue #76: BotFather Mini App Configuration Validation
+**Architecture Review: APPROVED ✅**
+
+**Rationale:**
+- Configuration validation cleanly separated in DI layer (`WebAppOptionsValidator`).
+- Enforces strict HTTPS + no query/fragment per Telegram BotFather spec.
+- Fails fast on startup via `ValidateOnStart()` — prevents silent misconfigurations.
+- No domain model changes; zero coupling to business logic.
+- Public API unchanged; documentation clear for operators.
+
+**Key Design Points:**
+- Immutable validation rules (HTTPS scheme check, URI parsing, query/fragment rejection).
+- `ValidateOptionsResult` pattern aligns with .NET DI best practices.
+- Readme updated with BotFather setup procedure + operator checklist.
+
+**Acceptance Criteria Met:**
+- ✅ Validator logic isolated and testable
+- ✅ DI integration validates at startup
+- ✅ Documentation covers setup + operator procedures
+- ✅ No new dependencies or external integrations required
+- ✅ All 145 Domain tests passing; 114 Application tests passing
+
+---
+
+### Issue #85: WebApp Lobby Endpoints Integration Tests
+**Architecture Review: APPROVED ✅**
+
+**Rationale:**
+- Two new integration tests cover happy path (3-step lobby flow) and failure path (single-player rejection).
+- Test helper method `CreateAuthenticatedRequest()` reduces boilerplate; reusable for future WebApp API tests.
+- AAA pattern + FluentAssertions; clean, readable, maintainable.
+- Tests validate HTTP status codes + response content; no fragile mocking.
+- Integration layer comprehensively tested before persistence layer (#80).
+
+**Key Design Points:**
+- Lobby flow test: Create → Join (pilot) → Join (copilot) → Start → Verify phase=InGame.
+- Validation test: Create → Join (1 player) → Start → Verify 409 Conflict + error message.
+- Test helper centralizes Telegram init data construction; DRY principle applied.
+
+**Acceptance Criteria Met:**
+- ✅ Lobby endpoints (new, join, start) fully tested with integration factory
+- ✅ Happy path (full 3-player flow) validates state transitions
+- ✅ Error path (insufficient players) validates 409 response + message
+- ✅ Test helpers reduce maintenance surface area
+- ✅ All 259 tests passing (145 Domain + 114 Application)
+
+---
+
+## Outcome
+
+**Draft PR #87 created** with both issues merged cleanly.
+
+**Branch:** `feat/issue-76-85-botfather-config-webapp-tests`  
+**Commit Hash:** f10c834  
+**Test Status:** 259 passing (145 Domain + 114 Application)  
+**GitHub PR:** https://github.com/glconti/sky-team-bot/pull/87
+
+**Issue Comments Posted:**
+- Issue #76: Architecture approval + next-gate unblock (PR link)
+- Issue #85: Architecture approval + integration readiness (PR link)
+
+---
+
+## Next Steps
+
+1. **Gianluigi (User):** Review + merge draft PR #87 to main (final decision).
+2. **Skiles:** Begin Issue #77 (Open App Launchpad) — cockpit button + startapp routing.
+3. **Sully:** Stand by for Issue #80 (Game Persistence) — architecture review of aggregate shape + Version field.
+4. **Aloha:** Prepare Issue #86 test harness for persistence layer integration.
+
+---
+
+## Team Coordination Notes
+
+- **Cross-issue traceability:** Feature branch + commit message reference both #76 and #85; GitHub closes both on merge.
+- **Async team workflow:** Draft PR enables async collaboration; architecture approval posted to issues before merge.
+- **Critical path unblocked:** #76 complete → #77 unblocked → #80 ready for design → #78–#79 UI dependent on both.
+- **No domain changes:** Both issues live in Telegram host/test layers; domain model untouched; ready for concurrent persistence work.
