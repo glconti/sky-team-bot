@@ -336,3 +336,12 @@
 - Convert host in-place (Web SDK) to keep in-memory stores shared via DI; move polling logic into hosted service to avoid static singletons.
 - Telegram `initData` validation is sensitive to HMAC key/data order (`secret_key = HMAC("WebAppData", bot_token)`); use constant-time compare and `auth_date` max age.
 - Tests that reflect on `Program` break with top-level statements; point brittle source-string assertions at a stable class (`TelegramBotService`) instead.
+
+### Session 3: Mini App Button Implementation (2026-03-01)
+
+**Outcome:** Proposed web_app button approach with signed chat context for Mini App launch.
+
+**Key Decision:**
+- Use InlineKeyboardButton.web_app for group cockpit Open app button
+- Derive game/group from signed chat.id; fallback to start_param for private launches
+- Artifacts: Orchestration log \& decision merged into decisions.md

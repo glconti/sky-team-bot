@@ -3040,3 +3040,67 @@ Revision changes from Sully (code) and Aloha (tests) are currently **unstaged** 
 
 
 
+
+---
+
+## 2026-03-01T21:40:52Z: User directive (Mini App UX preference)
+
+**By:** Gianluigi Conti (via Copilot)  
+**Directive:** Prefer a Telegram app (Mini App/Web App UX) over opening a private bot chat; improve the current flow so the app opens as an app, and refine backlog toward a fully working, well-designed experience.  
+**Context:** User request — captured for team memory  
+
+---
+
+## 2026-03-01T21:41:20Z: User directive (Go all-in on Mini App, async play)
+
+**By:** Gianluigi Conti (via Copilot)  
+**Directive:** Move away from / commands; go all-in on a Telegram Mini App (Web App) UX, and support asynchronous Sky Team play.  
+**Context:** User request — captured for team memory  
+
+---
+
+## 2026-03-01T21:55:00Z: Mini App launch surface (avoid private bot chat) — Sully
+
+**By:** Sully (Lead/Architect)  
+**Decision:** Chosen launch mechanism and BotFather config for Mini App "Open app" button.
+
+### Problem
+Users clicking the current "Open app" link can land in a **private chat with the bot** instead of experiencing a **Mini App-first** UX.
+
+### Decision
+1) Keep **\startapp\ deep links** as the primary launch mechanism because we must pass a **dynamic per-group identifier** (today: \start_param == groupChatId\) and Telegram inline \web_app\ buttons do not reliably provide a signed dynamic parameter.
+2) Make the \startapp\ links behave like an *app launch* by completing the required **BotFather configuration**:
+   - Enable/configure the bot's **Main Mini App** (so \https://t.me/<bot>?startapp=...\ launches the Mini App).
+   - Set the Mini App URL to our hosted HTTPS endpoint (root is OK because we serve default files).
+3) Group chat remains the launchpad: the cockpit message provides a single "Open app" button that uses \startapp=<groupChatId>\.
+
+### Implementation notes
+- If Main Mini App configuration proves insufficient in some clients, fallback is to use an explicit direct-link Mini App form (\https://t.me/<bot>/<appname>?startapp=...\) once we register an \ppname\ in BotFather.
+- Web backend continues to enforce \gameId == signed start_param\ for spoofing resistance.
+
+### QA / Acceptance
+- Clicking "Open app" from the **group cockpit** opens the Mini App in Telegram without forcing a DM-based flow.
+- Mini App API calls succeed with validated \initData\ and correct \start_param\ routing.
+
+---
+
+## 2026-03-01T21:55:00Z: Fix Mini App launch surface (Open app) — Skiles
+
+**By:** Skiles (Domain Dev)
+
+### Problem
+The current Telegram "Open app" button is implemented as a plain URL deep-link (\https://t.me/<bot>?startapp=<gameId>\). In Telegram clients this navigates to the bot's private chat instead of opening the Mini App overlay inside the group cockpit message.
+
+### Decision
+1. **Use \InlineKeyboardButton.web_app\** for the group cockpit "Open app" button, pointing to the configured Mini App HTTPS URL.
+2. **Derive the game/group id from signed WebApp initData chat context** (\chat.id\) when the Mini App is opened from a group chat, falling back to signed \start_param\ when launched from a deep link (private chat).
+
+### Rationale
+- \web_app\ buttons are the intended launch surface for opening the Mini App view directly.
+- Using the signed \chat\ payload avoids relying on \start_param\ for group launches while keeping the group/game selector tamper-resistant.
+
+### BotFather / Telegram setup steps
+- Configure the bot's Mini App URL (HTTPS) and allowed domain in BotFather.
+- Optionally set the bot menu button to the same Web App URL for an additional launch surface.
+
+---

@@ -233,3 +233,17 @@
 - Verified current callback keyboard path exposes `Refresh` callback and retains `/sky state` fallback contract (`ExpiredMenuToast` + group `/sky state` handling).
 - Captured explicit pending contracts (skip with rationale) for `New/Join/Start` callback paths, invalid press no-op side-effect assertions, and successful callback integration with existing handlers + cockpit edit lifecycle.
 - Current implementation appears partial versus issue #52 target behavior; tests are now ready to be unskipped as callback handlers are completed.
+
+### Session 6: Mini App Launch QA & Tests (2026-03-01)
+
+**Outcome:** QA test suite for Mini App launch surface covering all acceptance criteria.
+
+**Tests Added:**
+- Mini App launch from group cockpit message
+- Signed initData validation \& routing
+- Menu state transitions after launch
+- Static hosting HTTPS configuration
+
+**Artifacts:**
+- Orchestration log: 2026-03-01T21-55-06Z-aloha-miniapp-tests.md
+- Test cases for launch flow, callback state, static serving
