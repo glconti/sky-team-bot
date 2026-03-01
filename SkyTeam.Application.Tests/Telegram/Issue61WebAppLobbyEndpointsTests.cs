@@ -101,6 +101,62 @@ public sealed class Issue61WebAppLobbyEndpointsTests
     }
 
     [Fact]
+    public async Task LobbyFlow_ShouldCreateJoinAndStartGame_WhenTwoPlayersUseLobbyEndpoints()
+    {
+        // Arrange
+        const long groupChatId = 456;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act
+        using var createRequest = CreateAuthenticatedRequest(HttpMethod.Post, $"/api/webapp/lobby/new?gameId={groupChatId}", groupChatId, 111, "Alice");
+        var createResponse = await client.SendAsync(createRequest, cancellationToken);
+
+        using var joinPilotRequest = CreateAuthenticatedRequest(HttpMethod.Post, $"/api/webapp/lobby/join?gameId={groupChatId}", groupChatId, 111, "Alice");
+        var joinPilotResponse = await client.SendAsync(joinPilotRequest, cancellationToken);
+
+        using var joinCopilotRequest = CreateAuthenticatedRequest(HttpMethod.Post, $"/api/webapp/lobby/join?gameId={groupChatId}", groupChatId, 222, "Bob");
+        var joinCopilotResponse = await client.SendAsync(joinCopilotRequest, cancellationToken);
+
+        using var startRequest = CreateAuthenticatedRequest(HttpMethod.Post, $"/api/webapp/lobby/start?gameId={groupChatId}", groupChatId, 111, "Alice");
+        var startResponse = await client.SendAsync(startRequest, cancellationToken);
+        var startedState = await startResponse.Content.ReadFromJsonAsync<WebAppGameStateResponse>(JsonOptions, cancellationToken);
+
+        // Assert
+        createResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        joinPilotResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        joinCopilotResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        startResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        startedState!.Phase.Should().Be(WebAppGamePhase.InGame);
+        startedState.Viewer.Seat.Should().Be("Pilot");
+    }
+
+    [Fact]
+    public async Task LobbyStartEndpoint_ShouldReturnConflict_WhenLobbyHasOnlyOnePlayer()
+    {
+        // Arrange
+        const long groupChatId = 789;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        var lobbyStore = factory.Services.GetRequiredService<InMemoryGroupLobbyStore>();
+        lobbyStore.CreateNew(groupChatId);
+        lobbyStore.Join(groupChatId, new LobbyPlayer(111, "Alice"));
+
+        using var request = CreateAuthenticatedRequest(HttpMethod.Post, $"/api/webapp/lobby/start?gameId={groupChatId}", groupChatId, 111, "Alice");
+
+        // Act
+        var response = await client.SendAsync(request, cancellationToken);
+        var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        payload.Should().Contain("Lobby needs two players before start.");
+    }
+
+    [Fact]
     public async Task GameStateEndpoint_ShouldIncludePrivateHand_WhenViewerIsSeated()
     {
         // Arrange
@@ -165,6 +221,25 @@ public sealed class Issue61WebAppLobbyEndpointsTests
 
     private static WebApplicationFactory<Program> CreateFactory()
         => new TelegramBotWebAppFactory();
+
+    private static HttpRequestMessage CreateAuthenticatedRequest(
+        HttpMethod method,
+        string url,
+        long groupChatId,
+        long viewerUserId,
+        string viewerDisplayName)
+    {
+        var initData = BuildInitData(
+            TestBotToken,
+            DateTimeOffset.UtcNow,
+            viewerUserId,
+            viewerDisplayName,
+            groupChatId.ToString());
+
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.Add("X-Telegram-Init-Data", initData);
+        return request;
+    }
 
     private sealed class TelegramBotWebAppFactory : WebApplicationFactory<Program>
     {

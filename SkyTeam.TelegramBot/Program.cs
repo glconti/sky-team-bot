@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Options;
 using SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
 using SkyTeam.TelegramBot;
@@ -20,6 +21,8 @@ builder.Services.Configure<WebAppOptions>(options =>
     builder.Configuration.GetSection("WebApp").Bind(options);
     options.MiniAppUrl ??= builder.Configuration["SKYTEAM_MINI_APP_URL"];
 });
+builder.Services.AddSingleton<IValidateOptions<WebAppOptions>, WebAppOptionsValidator>();
+builder.Services.AddOptions<WebAppOptions>().ValidateOnStart();
 
 builder.Services.AddSingleton<TelegramInitDataValidator>();
 builder.Services.AddSingleton<TelegramBotService>();
