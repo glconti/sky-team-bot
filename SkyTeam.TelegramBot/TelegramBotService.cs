@@ -4,6 +4,7 @@ using SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
 using SkyTeam.Application.Presentation;
 using SkyTeam.Application.Round;
+using SkyTeam.TelegramBot.WebApp;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -15,6 +16,7 @@ public sealed class TelegramBotService(
     InMemoryGroupLobbyStore lobbyStore,
     InMemoryGroupGameSessionStore gameSessionStore,
     IOptions<TelegramBotOptions> botOptions,
+    IOptions<WebAppOptions> webAppOptions,
     ILogger<TelegramBotService> logger) : BackgroundService
 {
     private const int MaxRecentUpdateIds = 1_000;
@@ -418,7 +420,7 @@ public sealed class TelegramBotService(
         await botClient.SendMessage(
             groupChatId,
             "Open the Sky Team Mini App:",
-            replyMarkup: BuildOpenAppKeyboard(groupChatId, botUsername),
+            replyMarkup: BuildOpenAppKeyboardForGroup(groupChatId, botUsername, webAppOptions.Value.MiniAppUrl),
             cancellationToken: cancellationToken);
     }
 
@@ -566,7 +568,9 @@ public sealed class TelegramBotService(
         await botClient.SendMessage(
             message.Chat.Id,
             "Secret hand/place/undo actions are Mini App-only. Open the Sky Team Mini App:",
-            replyMarkup: BuildOpenAppKeyboard(groupChatId, botUsername),
+            replyMarkup: message.Chat.Type is ChatType.Private
+                ? BuildOpenAppKeyboardForPrivate(groupChatId, botUsername)
+                : BuildOpenAppKeyboardForGroup(groupChatId, botUsername, webAppOptions.Value.MiniAppUrl),
             cancellationToken: cancellationToken);
     }
 
@@ -591,7 +595,7 @@ public sealed class TelegramBotService(
         if (string.IsNullOrWhiteSpace(_botUsername))
             _botUsername = await GetBotUsernameAsync(botClient, cancellationToken);
 
-        var replyMarkup = BuildGroupStateKeyboard(groupChatId, _botUsername);
+        var replyMarkup = BuildGroupStateKeyboard(groupChatId, _botUsername, webAppOptions.Value.MiniAppUrl);
 
         if (gameSessionStore.TryGetCockpitMessageId(groupChatId, out var cockpitMessageId))
             if (await TryEditCockpitAsync(botClient, groupChatId, cockpitMessageId, text, replyMarkup, cancellationToken))
@@ -728,13 +732,13 @@ public sealed class TelegramBotService(
             [NewCallbackData, JoinCallbackData, StartCallbackData, RollCallbackData, PlaceDmCallbackData, RefreshCallbackData]);
     }
 
-    private static InlineKeyboardMarkup BuildGroupStateKeyboard(long groupChatId, string? botUsername)
+    private static InlineKeyboardMarkup BuildGroupStateKeyboard(long groupChatId, string? botUsername, string? miniAppUrl)
     {
         InlineKeyboardButton[] secondRow = string.IsNullOrWhiteSpace(botUsername)
             ? [InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)]
             :
             [
-                InlineKeyboardButton.WithUrl("Open app", BuildStartAppUrl(botUsername, groupChatId)),
+                BuildOpenAppButtonForGroup(groupChatId, botUsername, miniAppUrl),
                 InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)
             ];
 
@@ -748,8 +752,19 @@ public sealed class TelegramBotService(
         ]);
     }
 
-    private static InlineKeyboardMarkup BuildOpenAppKeyboard(long groupChatId, string botUsername)
+    private static InlineKeyboardMarkup BuildOpenAppKeyboardForGroup(long groupChatId, string botUsername, string? miniAppUrl)
+        => new([[BuildOpenAppButtonForGroup(groupChatId, botUsername, miniAppUrl)]]);
+
+    private static InlineKeyboardMarkup BuildOpenAppKeyboardForPrivate(long groupChatId, string botUsername)
         => new([[InlineKeyboardButton.WithUrl("Open app", BuildStartAppUrl(botUsername, groupChatId))]]);
+
+    private static InlineKeyboardButton BuildOpenAppButtonForGroup(long groupChatId, string botUsername, string? miniAppUrl)
+    {
+        if (!string.IsNullOrWhiteSpace(miniAppUrl))
+            return new("Open app") { WebApp = new() { Url = miniAppUrl } };
+
+        return InlineKeyboardButton.WithUrl("Open app", BuildStartAppUrl(botUsername, groupChatId));
+    }
 
     private static string BuildStartAppUrl(string botUsername, long groupChatId)
     {

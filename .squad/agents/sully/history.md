@@ -246,3 +246,11 @@
 - Scribe logs all work + merges decision inbox (3 files) + updates agent histories
 
 ---
+
+### Session 4: Mini App Launch Surface Architecture (2026-03-01)
+
+**Outcome:** Finalized Mini App launch surface design.
+
+**Key Decision:**
+- Mini App launch mechanism: startapp deep links with BotFather Main Mini App config
+- Artifacts: Orchestration log \& Session log created

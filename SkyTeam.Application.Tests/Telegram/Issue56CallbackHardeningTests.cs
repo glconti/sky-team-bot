@@ -33,6 +33,19 @@ public sealed class Issue56CallbackHardeningTests
     }
 
     [Fact]
+    public void CallbackDataCodec_ShouldReject_WhenPayloadExceedsTelegramMaxLength()
+    {
+        // Arrange
+        var payload = new string('x', 65);
+
+        // Act
+        var parsed = CallbackDataCodec.TryDecodeGroupAction(payload, out _);
+
+        // Assert
+        parsed.Should().BeFalse();
+    }
+
+    [Fact]
     public void MenuStateStore_ShouldReturnUnknownOrExpired_WhenChatBindingDoesNotMatch()
     {
         // Arrange
@@ -42,6 +55,56 @@ public sealed class Issue56CallbackHardeningTests
 
         // Act
         var status = store.ValidateAndMarkProcessed(userId: 1, groupChatId: 999, messageId: 10, callbackData);
+
+        // Assert
+        status.Should().Be(CallbackMenuValidationStatus.UnknownOrExpired);
+    }
+
+    [Fact]
+    public void MenuStateStore_ShouldAllowMultipleUsers_WhenMenuIsNotUserBound()
+    {
+        // Arrange
+        var store = new CallbackMenuStateStore();
+        var callbackData = CallbackDataCodec.EncodeGroupAction("refresh");
+        store.RegisterGroupMenu(groupChatId: 100, messageId: 10, [callbackData]);
+
+        // Act
+        var statuses = new[]
+        {
+            store.ValidateAndMarkProcessed(userId: 1, groupChatId: 100, messageId: 10, callbackData),
+            store.ValidateAndMarkProcessed(userId: 2, groupChatId: 100, messageId: 10, callbackData)
+        };
+
+        // Assert
+        statuses.Should().Equal(CallbackMenuValidationStatus.Valid, CallbackMenuValidationStatus.Valid);
+    }
+
+    [Fact]
+    public void MenuStateStore_ShouldRejectDifferentUser_WhenMenuIsUserBound()
+    {
+        // Arrange
+        var store = new CallbackMenuStateStore();
+        var callbackData = CallbackDataCodec.EncodeGroupAction("refresh");
+        store.RegisterGroupMenu(groupChatId: 100, messageId: 10, [callbackData], userId: 1);
+
+        // Act
+        var status = store.ValidateAndMarkProcessed(userId: 2, groupChatId: 100, messageId: 10, callbackData);
+
+        // Assert
+        status.Should().Be(CallbackMenuValidationStatus.UnknownOrExpired);
+    }
+
+    [Fact]
+    public void MenuStateStore_ShouldInvalidateOldMessageId_WhenGroupMenuIsReRegistered()
+    {
+        // Arrange
+        var store = new CallbackMenuStateStore();
+        var callbackData = CallbackDataCodec.EncodeGroupAction("refresh");
+        store.RegisterGroupMenu(groupChatId: 100, messageId: 10, [callbackData]);
+        store.RegisterGroupMenu(groupChatId: 100, messageId: 11, [callbackData]);
+
+        // Act
+        var status = store.ValidateAndMarkProcessed(userId: 1, groupChatId: 100, messageId: 10, callbackData);
 
         // Assert
         status.Should().Be(CallbackMenuValidationStatus.UnknownOrExpired);

@@ -397,20 +397,36 @@ public static class WebAppEndpoints
 
     private static (long? GroupChatId, TelegramInitDataContext? Context, IResult? Error) ResolveRequestContext(string? gameId, HttpContext httpContext)
     {
-        if (string.IsNullOrWhiteSpace(gameId))
-            return (null, null, Results.BadRequest(new { error = "Missing gameId." }));
-
         var tg = httpContext.GetTelegramInitDataContext();
 
-        if (string.IsNullOrWhiteSpace(tg.StartParam))
-            return (null, tg, Results.BadRequest(new { error = "Missing signed start_param." }));
+        long? requestedGameId = null;
+        if (!string.IsNullOrWhiteSpace(gameId))
+        {
+            if (!long.TryParse(gameId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedGameId))
+                return (null, tg, Results.BadRequest(new { error = "Invalid gameId." }));
 
-        if (!string.Equals(gameId, tg.StartParam, StringComparison.Ordinal))
-            return (null, tg, Results.BadRequest(new { error = "gameId does not match signed start_param." }));
+            requestedGameId = parsedGameId;
+        }
 
-        if (!long.TryParse(tg.StartParam, NumberStyles.Integer, CultureInfo.InvariantCulture, out var groupChatId))
-            return (null, tg, Results.BadRequest(new { error = "Invalid gameId." }));
+        if (tg.Chat is not null)
+        {
+            if (requestedGameId is not null && requestedGameId.Value != tg.Chat.ChatId)
+                return (null, tg, Results.BadRequest(new { error = "gameId does not match signed chat context." }));
 
-        return (groupChatId, tg, null);
+            return (tg.Chat.ChatId, tg, null);
+        }
+
+        if (!string.IsNullOrWhiteSpace(tg.StartParam))
+        {
+            if (!long.TryParse(tg.StartParam, NumberStyles.Integer, CultureInfo.InvariantCulture, out var groupChatId))
+                return (null, tg, Results.BadRequest(new { error = "Invalid gameId." }));
+
+            if (requestedGameId is not null && requestedGameId.Value != groupChatId)
+                return (null, tg, Results.BadRequest(new { error = "gameId does not match signed start_param." }));
+
+            return (groupChatId, tg, null);
+        }
+
+        return (null, tg, Results.BadRequest(new { error = "Missing chat context and signed start_param." }));
     }
 }

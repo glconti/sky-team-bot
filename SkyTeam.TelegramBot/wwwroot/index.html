@@ -39,9 +39,12 @@
 
       function getStartParam() {
         const fromInit = (tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
+        const fromChat = (tg.initDataUnsafe && tg.initDataUnsafe.chat && tg.initDataUnsafe.chat.id)
+          ? String(tg.initDataUnsafe.chat.id)
+          : '';
         const fromQuery = new URLSearchParams(window.location.search).get('tgWebAppStartParam') || '';
         const fromHash = new URLSearchParams((window.location.hash || '').replace(/^#/, '')).get('tgWebAppStartParam') || '';
-        return fromInit || fromQuery || fromHash || '';
+        return fromInit || fromChat || fromQuery || fromHash || '';
       }
 
       const startParam = getStartParam();

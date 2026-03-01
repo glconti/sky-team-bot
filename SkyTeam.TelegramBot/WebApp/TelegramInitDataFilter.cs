@@ -5,6 +5,7 @@ namespace SkyTeam.TelegramBot.WebApp;
 
 public sealed record TelegramInitDataContext(
     TelegramWebAppUser Viewer,
+    TelegramWebAppChat? Chat,
     string? StartParam,
     DateTimeOffset AuthDate);
 
@@ -31,6 +32,7 @@ public sealed class TelegramInitDataFilter(
 
         var initContext = new TelegramInitDataContext(
             Viewer: result.Viewer!,
+            Chat: result.Chat,
             StartParam: result.StartParam,
             AuthDate: result.AuthDate!.Value);
 
