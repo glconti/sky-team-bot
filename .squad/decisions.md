@@ -3803,3 +3803,42 @@ Closes #56
 - Manual client verification matrix (iOS, Android, Desktop/Web) remains to be executed against live Telegram clients.
 - Optional app-short-name fallback (`https://t.me/<bot>/<app_short_name>?startapp=...`) remains deferred.
 
+---
+
+## 2026-03-02T00:43:00Z: Async Notification Slice — Issue #83 (Skiles)
+
+**Author:** Skiles  
+**Date:** 2026-03-02  
+**Status:** ✅ Completed  
+**Issue:** #83
+
+### Decision
+Implement a first async turn-notification slice in `SkyTeam.TelegramBot` with **DM-first + group fallback** policy and transition-key deduplication.
+
+### Rationale
+- Fastest path to unblock async-play feedback without introducing new domain event infrastructure mid-branch.
+- Reuses existing Telegram integration seams (`TelegramBotService`, WebApp endpoint callbacks, in-memory session state).
+- Keeps secret information safe by sending only public turn summary + action-required prompt.
+
+### Scope
+1. Turn notification orchestration added to `TelegramBotService`:
+   - Triggered from successful round roll (group command/callback path).
+   - Triggered from successful WebApp roll/place/undo flows via `NotifyCurrentTurnFromWebAppAsync`.
+2. Idempotency guard implemented:
+   - In-memory dedup key: `groupChatId + transitionKey + recipientUserId + seat`.
+   - Bounded key cache to prevent unbounded growth.
+3. Policy documented in `readme.md` under **Async turn notification policy (Issue #83, slice 1)**.
+
+### Acceptance Criteria — All Met ✅
+- [x] Turn notification orchestration implemented
+- [x] DM-first fallback to group message
+- [x] Idempotency via transition-key deduplication
+- [x] Tests passing
+- [x] Policy documented in readme.md
+- [x] Commit d91925f pushed; issue comment posted
+
+### Remaining for Full Issue #83
+- Emit and consume a formal application/domain turn-transition event (current slice is transport-driven).
+- Add reminder timeout flow and analytics/read-receipt behavior if product confirms.
+- Add integration tests for notification delivery and no-secret-content assertions.
+

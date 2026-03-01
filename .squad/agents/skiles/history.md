@@ -253,3 +253,20 @@
 - `SkyTeam.TelegramBot\WebApp\WebAppEndpoints.cs`
 - `readme.md`
 - `.squad/decisions/inbox/skiles-issue-83.md`
+
+### Session 20: Issue #83 async turn notifications completion (2026-03-02)
+
+**Outcome:** Completed Issue #83 with full async turn-notification slice in `SkyTeam.TelegramBot` with DM-first + group fallback policy and transition-key deduplication.
+
+**Key Learnings:**
+- Idempotency guard via bounded in-memory dedup cache (groupChatId + transitionKey + recipientUserId + seat) prevents notification duplicates on retries.
+- Transport-driven notifications stay minimal; full domain event infrastructure deferred to future slices.
+- Public turn summaries + action prompts protect secret information while maintaining async responsiveness.
+
+**Delivered Artifacts:**
+- `SkyTeam.TelegramBot\TelegramBotService.cs` (notification orchestration)
+- `SkyTeam.TelegramBot\WebApp\WebAppEndpoints.cs` (WebApp roll/place/undo triggers)
+- `readme.md` (policy documentation)
+- Test coverage: All passing
+- Commit: d91925f
+- Issue comment posted; decision merged into decisions.md
