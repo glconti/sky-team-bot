@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using Microsoft.Extensions.Options;
 using SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
@@ -416,11 +417,19 @@ public sealed class TelegramBotService(
         }
 
         var groupChatId = message.Chat.Id;
+        if (!TryBuildStartAppUrl(botUsername, groupChatId, out var startAppUrl))
+        {
+            await botClient.SendMessage(
+                groupChatId,
+                "Open app link is temporarily unavailable. Run /sky state and try again.",
+                cancellationToken: cancellationToken);
+            return;
+        }
 
         await botClient.SendMessage(
             groupChatId,
             "Open the Sky Team Mini App:",
-            replyMarkup: BuildOpenAppKeyboardForGroup(groupChatId, botUsername, webAppOptions.Value.MiniAppUrl),
+            replyMarkup: BuildOpenAppKeyboard(startAppUrl),
             cancellationToken: cancellationToken);
     }
 
@@ -565,12 +574,19 @@ public sealed class TelegramBotService(
             return;
         }
 
+        if (!TryBuildStartAppUrl(botUsername, groupChatId, out var startAppUrl))
+        {
+            await botClient.SendMessage(
+                message.Chat.Id,
+                "Secret hand/place/undo actions are Mini App-only. Open app link is temporarily unavailable; run /sky state and retry.",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
         await botClient.SendMessage(
             message.Chat.Id,
             "Secret hand/place/undo actions are Mini App-only. Open the Sky Team Mini App:",
-            replyMarkup: message.Chat.Type is ChatType.Private
-                ? BuildOpenAppKeyboardForPrivate(groupChatId, botUsername)
-                : BuildOpenAppKeyboardForGroup(groupChatId, botUsername, webAppOptions.Value.MiniAppUrl),
+            replyMarkup: BuildOpenAppKeyboard(startAppUrl),
             cancellationToken: cancellationToken);
     }
 
@@ -734,13 +750,10 @@ public sealed class TelegramBotService(
 
     private static InlineKeyboardMarkup BuildGroupStateKeyboard(long groupChatId, string? botUsername, string? miniAppUrl)
     {
-        InlineKeyboardButton[] secondRow = string.IsNullOrWhiteSpace(botUsername)
-            ? [InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)]
-            :
-            [
-                BuildOpenAppButtonForGroup(groupChatId, botUsername, miniAppUrl),
-                InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)
-            ];
+        _ = miniAppUrl;
+        InlineKeyboardButton[] secondRow = TryBuildStartAppUrl(botUsername, groupChatId, out var startAppUrl)
+            ? [InlineKeyboardButton.WithUrl("Open app", startAppUrl), InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)]
+            : [InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)];
 
         return new([
             [
@@ -752,24 +765,34 @@ public sealed class TelegramBotService(
         ]);
     }
 
-    private static InlineKeyboardMarkup BuildOpenAppKeyboardForGroup(long groupChatId, string botUsername, string? miniAppUrl)
-        => new([[BuildOpenAppButtonForGroup(groupChatId, botUsername, miniAppUrl)]]);
+    private static InlineKeyboardMarkup BuildOpenAppKeyboard(string startAppUrl)
+        => new([[InlineKeyboardButton.WithUrl("Open app", startAppUrl)]]);
 
-    private static InlineKeyboardMarkup BuildOpenAppKeyboardForPrivate(long groupChatId, string botUsername)
-        => new([[InlineKeyboardButton.WithUrl("Open app", BuildStartAppUrl(botUsername, groupChatId))]]);
-
-    private static InlineKeyboardButton BuildOpenAppButtonForGroup(long groupChatId, string botUsername, string? miniAppUrl)
+    private static bool TryBuildStartAppUrl(string? botUsername, long groupChatId, out string startAppUrl)
     {
-        if (!string.IsNullOrWhiteSpace(miniAppUrl))
-            return new("Open app") { WebApp = new() { Url = miniAppUrl } };
+        startAppUrl = string.Empty;
+        if (groupChatId == 0 || string.IsNullOrWhiteSpace(botUsername))
+            return false;
 
-        return InlineKeyboardButton.WithUrl("Open app", BuildStartAppUrl(botUsername, groupChatId));
+        var username = botUsername.Trim().TrimStart('@');
+        if (!IsValidBotUsername(username))
+            return false;
+
+        startAppUrl = BuildStartAppUrl(username, groupChatId);
+        return true;
+    }
+
+    private static bool IsValidBotUsername(string username)
+    {
+        if (username.Length is < 5 or > 32)
+            return false;
+
+        return username.All(ch => char.IsLetterOrDigit(ch) || ch == '_');
     }
 
     private static string BuildStartAppUrl(string botUsername, long groupChatId)
     {
-        var username = botUsername.TrimStart('@');
-        return $"https://t.me/{username}?startapp={Uri.EscapeDataString(groupChatId.ToString())}";
+        return $"https://t.me/{botUsername}?startapp={Uri.EscapeDataString(groupChatId.ToString(CultureInfo.InvariantCulture))}";
     }
 
     private bool TryResolveSecretFlowGroupChatId(Message message, out long groupChatId)

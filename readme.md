@@ -49,6 +49,11 @@ Bot commands remain as fallback and will redirect you to the Mini App when secre
 - Optional app-short-name variant (fallback if needed on some clients):
   - `https://t.me/<bot_username>/<app_short_name>?startapp=<groupChatId>`
 
+### In-group launchpad persistence
+- The cockpit remains the persistent launch surface and is refreshed in-place after lobby/game transitions.
+- The **Open app** button in group contexts uses `startapp=<groupChatId>` to preserve signed game routing constraints.
+- If a safe deep-link cannot be built, the bot keeps fallback controls (`Refresh` + `/sky state`) instead of redirecting users to DM-first flows.
+
 ### Operator verification checklist
 - `SKYTEAM_MINI_APP_URL` resolves directly over HTTPS (no redirect loops, no TLS warnings).
 - Tapping **Open app** or a `startapp` link opens the Mini App on Telegram iOS, Android, and Desktop.

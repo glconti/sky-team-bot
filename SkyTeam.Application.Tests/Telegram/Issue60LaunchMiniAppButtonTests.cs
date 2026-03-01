@@ -8,7 +8,7 @@ namespace SkyTeam.Application.Tests.Telegram;
 public sealed class Issue60LaunchMiniAppButtonTests
 {
     [Fact]
-    public void BuildGroupStateKeyboard_ShouldIncludeOpenAppWebAppButton_WhenBotUsernameIsKnown()
+    public void BuildGroupStateKeyboard_ShouldIncludeOpenAppStartAppUrl_WhenBotUsernameIsKnown()
     {
         // Arrange
         var type = ResolveBotServiceTypeOrSkip();
@@ -29,7 +29,8 @@ public sealed class Issue60LaunchMiniAppButtonTests
         keyboard.Should().NotBeNull();
 
         var buttons = keyboard!.InlineKeyboard.SelectMany(row => row).ToArray();
-        buttons.Should().Contain(b => b.WebApp != null && b.WebApp.Url == miniAppUrl);
+        buttons.Should().Contain(b => b.Url == "https://t.me/sky_team_bot?startapp=123");
+        buttons.Should().NotContain(b => b.WebApp != null);
     }
 
     [Fact]
@@ -54,6 +55,28 @@ public sealed class Issue60LaunchMiniAppButtonTests
 
         var buttons = keyboard!.InlineKeyboard.SelectMany(row => row).ToArray();
         buttons.Should().Contain(b => b.Url == "https://t.me/sky_team_bot?startapp=-123");
+    }
+
+    [Fact]
+    public void BuildGroupStateKeyboard_ShouldHideOpenAppButton_WhenBotUsernameIsInvalid()
+    {
+        // Arrange
+        var type = ResolveBotServiceTypeOrSkip();
+        var buildKeyboard = type.GetMethod(
+            "BuildGroupStateKeyboard",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        buildKeyboard.Should().NotBeNull();
+
+        // Act
+        var keyboard = (InlineKeyboardMarkup?)buildKeyboard!.Invoke(null, [123L, "sky team bot", "https://example.test/"]);
+
+        // Assert
+        keyboard.Should().NotBeNull();
+
+        var buttons = keyboard!.InlineKeyboard.SelectMany(row => row).ToArray();
+        buttons.Should().NotContain(b => b.Text == "Open app");
+        buttons.Should().Contain(b => b.Text == "Refresh" && b.CallbackData != null);
     }
 
     private static Type ResolveBotServiceTypeOrSkip()

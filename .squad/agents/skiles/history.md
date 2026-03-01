@@ -223,3 +223,18 @@
 4. Created decision document for team reference
 
 **Test Status:** All 273 tests passing (includes round-trip persistence + deterministic rehydration)
+
+### Session 18: Issue #77 launchpad hardening slice (2026-03-02)
+
+**Outcome:** Started Issue #77 on PR #87 branch with an in-group launchpad hardening slice focused on robust Open app deeplinks and safe fallback behavior.
+
+**Key Learnings:**
+- In-group Open app reliability improves when cockpit launch uses `startapp=<groupChatId>` consistently instead of mixing launch surfaces.
+- Deeplink safety should be explicit in transport code: validate bot username shape and chat id before emitting Telegram URLs.
+- When launch URL generation is unsafe/unavailable, preserving group fallback (`Refresh` + `/sky state`) keeps users in Mini App-first flow without DM-first drift.
+
+**Delivered Artifacts:**
+- `SkyTeam.TelegramBot\TelegramBotService.cs`
+- `SkyTeam.Application.Tests\Telegram\Issue60LaunchMiniAppButtonTests.cs`
+- `readme.md`
+- `.squad/decisions/inbox/skiles-issue-77.md`
