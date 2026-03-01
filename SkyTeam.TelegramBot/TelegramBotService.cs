@@ -478,21 +478,21 @@ public sealed class TelegramBotService(
         long groupChatId,
         CancellationToken cancellationToken)
     {
-        var snapshot = lobbyStore.GetSnapshot(groupChatId);
-        if (snapshot is null)
-        {
-            await botClient.SendMessage(groupChatId, "No lobby yet. Create one with /sky new", cancellationToken: cancellationToken);
-            return;
-        }
-
-        if (!snapshot.IsReady)
-        {
-            await botClient.SendMessage(groupChatId, "Lobby is not ready yet. Two players must /sky join before rolling dice.", cancellationToken: cancellationToken);
-            return;
-        }
-
         if (gameSessionStore.GetSnapshot(groupChatId) is null)
         {
+            var snapshot = lobbyStore.GetSnapshot(groupChatId);
+            if (snapshot is null)
+            {
+                await botClient.SendMessage(groupChatId, "No lobby yet. Create one with /sky new", cancellationToken: cancellationToken);
+                return;
+            }
+
+            if (!snapshot.IsReady)
+            {
+                await botClient.SendMessage(groupChatId, "Lobby is not ready yet. Two players must /sky join before rolling dice.", cancellationToken: cancellationToken);
+                return;
+            }
+
             await botClient.SendMessage(groupChatId, "Game is not started yet. Run /sky start first.", cancellationToken: cancellationToken);
             return;
         }

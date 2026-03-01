@@ -3,11 +3,18 @@ using Microsoft.Extensions.Options;
 using SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
 using SkyTeam.TelegramBot;
+using SkyTeam.TelegramBot.Persistence;
 using SkyTeam.TelegramBot.WebApp;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<InMemoryGroupLobbyStore>();
+
+if (builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddSingleton<IGameSessionPersistence>(NullGameSessionPersistence.Instance);
+else
+    builder.Services.AddSingleton<IGameSessionPersistence, JsonGameSessionPersistence>();
+
 builder.Services.AddSingleton<InMemoryGroupGameSessionStore>();
 
 builder.Services.Configure<TelegramBotOptions>(options =>

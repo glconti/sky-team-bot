@@ -199,15 +199,17 @@ public static class WebAppEndpoints
         if (result.Error is not null)
             return result.Error;
 
-        var lobby = lobbyStore.GetSnapshot(result.GroupChatId!.Value);
-        if (lobby is null)
-            return Results.Conflict(new { error = "No lobby yet. Press New first." });
+        if (gameSessionStore.GetSnapshot(result.GroupChatId!.Value) is null)
+        {
+            var lobby = lobbyStore.GetSnapshot(result.GroupChatId.Value);
+            if (lobby is null)
+                return Results.Conflict(new { error = "No lobby yet. Press New first." });
 
-        if (!lobby.IsReady)
-            return Results.Conflict(new { error = "Lobby needs two players before roll." });
+            if (!lobby.IsReady)
+                return Results.Conflict(new { error = "Lobby needs two players before roll." });
 
-        if (gameSessionStore.GetSnapshot(result.GroupChatId.Value) is null)
             return Results.Conflict(new { error = "Game is not started yet. Press Start first." });
+        }
 
         var rollResult = gameSessionStore.RegisterRoll(result.GroupChatId.Value, SecretDiceRoller.Roll(() => Random.Shared.Next(1, 7)));
         if (rollResult.Status == GameSessionRollStatus.RoundNotAwaitingRoll)

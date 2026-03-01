@@ -148,10 +148,23 @@ public readonly record struct GameHandResult(
 
 public sealed class InMemoryGroupGameSessionStore
 {
+    private const int PersistenceSchemaVersion = 1;
     private readonly object _sync = new();
+    private readonly IGameSessionPersistence _persistence;
     private readonly Dictionary<long, GameSession> _sessions = new();
     private readonly Dictionary<long, long> _groupChatIdByUserId = new();
     private readonly Dictionary<long, int> _cockpitMessageIdByGroupChatId = new();
+
+    public InMemoryGroupGameSessionStore()
+        : this(NullGameSessionPersistence.Instance)
+    {
+    }
+
+    public InMemoryGroupGameSessionStore(IGameSessionPersistence persistence)
+    {
+        _persistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
+        Restore(_persistence.Load());
+    }
 
     public GameSessionStartResult Start(long groupChatId, LobbySnapshot? lobbySnapshot, long requestingUserId)
     {
@@ -174,6 +187,7 @@ public sealed class InMemoryGroupGameSessionStore
 
             _groupChatIdByUserId[created.Pilot.UserId] = groupChatId;
             _groupChatIdByUserId[created.Copilot.UserId] = groupChatId;
+            PersistState();
 
             return new(GameSessionStartStatus.Started, created.ToSnapshot());
         }
@@ -204,7 +218,10 @@ public sealed class InMemoryGroupGameSessionStore
     public void SetCockpitMessageId(long groupChatId, int cockpitMessageId)
     {
         lock (_sync)
+        {
             _cockpitMessageIdByGroupChatId[groupChatId] = cockpitMessageId;
+            PersistState();
+        }
     }
 
     public GameSessionPublicState? GetPublicState(long groupChatId)
@@ -237,6 +254,8 @@ public sealed class InMemoryGroupGameSessionStore
                 return new(GameSessionRollStatus.RoundNotAwaitingRoll, session.ToSnapshot(), StartingPlayer: null);
 
             var actualStartingPlayer = session.InitializeRoundFromRoll(roll, startingPlayer);
+            session.IncrementVersion();
+            PersistState();
             return new(GameSessionRollStatus.Rolled, session.ToSnapshot(), actualStartingPlayer);
         }
     }
@@ -356,7 +375,7 @@ public sealed class InMemoryGroupGameSessionStore
                 return new(GamePlacementStatus.DomainError, PublicInfo: null, ResolutionInfo: null, ErrorMessage: exception.Message);
             }
 
-            session.LogPlacement(command.CommandId, command.DisplayName);
+            session.LogPlacement(seat, dieIndex, command.CommandId, command.DisplayName);
             session.TurnState = session.TurnState.RegisterPlacement(seat, dieIndex, commandId);
 
             var placed = session.TurnState.Placements[^1];
@@ -383,6 +402,9 @@ public sealed class InMemoryGroupGameSessionStore
 
             if (!string.IsNullOrWhiteSpace(idempotencyKey))
                 session.RememberPlacementResult(idempotencyKey, result);
+
+            session.IncrementVersion();
+            PersistState();
 
             return result;
         }
@@ -424,6 +446,9 @@ public sealed class InMemoryGroupGameSessionStore
                     NextPlayer: session.TurnState.CurrentPlayer,
                     PlacementsRemaining: session.TurnState.PlacementsRemaining);
 
+                session.IncrementVersion();
+                PersistState();
+
                 return new(GameUndoStatus.Undone, publicInfo, ErrorMessage: null);
             }
             catch (Exception exception)
@@ -457,10 +482,37 @@ public sealed class InMemoryGroupGameSessionStore
         return _sessions.TryGetValue(groupChatId, out session!);
     }
 
+    private void Restore(PersistedGameSessionStoreState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        if (state.SchemaVersion != PersistenceSchemaVersion)
+            return;
+
+        foreach (var persistedSession in state.Sessions)
+        {
+            var restored = GameSession.Restore(persistedSession);
+            _sessions[restored.GroupChatId] = restored;
+            _groupChatIdByUserId[restored.Pilot.UserId] = restored.GroupChatId;
+            _groupChatIdByUserId[restored.Copilot.UserId] = restored.GroupChatId;
+        }
+
+        foreach (var cockpitMessage in state.CockpitMessages)
+            _cockpitMessageIdByGroupChatId[cockpitMessage.GroupChatId] = cockpitMessage.CockpitMessageId;
+    }
+
+    private void PersistState()
+        => _persistence.Save(new(
+            SchemaVersion: PersistenceSchemaVersion,
+            Sessions: _sessions.Values.Select(session => session.ToPersisted()).ToArray(),
+            CockpitMessages: _cockpitMessageIdByGroupChatId
+                .Select(pair => new PersistedCockpitMessage(pair.Key, pair.Value))
+                .ToArray()));
+
     private sealed class GameSession
     {
         private const int MaxRecentPlacementResults = 256;
-        private sealed record LoggedPlacement(string CommandId, string CommandDisplayName);
+        private sealed record LoggedPlacement(string CommandId, string CommandDisplayName, PlayerSeat Player, int DieIndex);
 
         private sealed class RoundLog
         {
@@ -507,11 +559,65 @@ public sealed class InMemoryGroupGameSessionStore
         public LobbyPlayer Copilot { get; }
 
         public Game DomainGame { get; private set; } = null!;
+        public long Version { get; private set; } = 1;
 
         public GameRoundSnapshot Round { get; set; } = GameRoundSnapshot.StartNew(roundNumber: 1);
         public RoundTurnState? TurnState { get; set; }
 
         public GameSessionSnapshot ToSnapshot() => new(GroupChatId, Pilot, Copilot, Round);
+
+        public PersistedGameSession ToPersisted()
+            => new(
+                GroupChatId,
+                Pilot,
+                Copilot,
+                Round,
+                Version,
+                _roundLogs
+                    .Select(log => new PersistedRoundLog(
+                        log.RoundNumber,
+                        log.PilotDice,
+                        log.CopilotDice,
+                        log.Placements.Select(placement => new PersistedLoggedPlacement(
+                            placement.CommandId,
+                            placement.CommandDisplayName,
+                            placement.Player,
+                            placement.DieIndex)).ToArray(),
+                        log.IsCompleted))
+                    .ToArray());
+
+        public static GameSession Restore(PersistedGameSession persisted)
+        {
+            ArgumentNullException.ThrowIfNull(persisted);
+
+            var restored = new GameSession(persisted.GroupChatId, persisted.Pilot, persisted.Copilot)
+            {
+                Round = persisted.Round,
+                Version = Math.Max(1, persisted.Version)
+            };
+
+            restored._roundLogs.Clear();
+
+            foreach (var log in persisted.RoundLogs)
+            {
+                var restoredLog = new RoundLog(log.RoundNumber, log.PilotDice, log.CopilotDice)
+                {
+                    IsCompleted = log.IsCompleted
+                };
+
+                restoredLog.Placements.AddRange(log.Placements.Select(placement => new LoggedPlacement(
+                    placement.CommandId,
+                    placement.CommandDisplayName,
+                    placement.Player,
+                    placement.DieIndex)));
+
+                restored._roundLogs.Add(restoredLog);
+            }
+
+            restored.RebuildDomainGameFromLogs();
+            restored.TurnState = restored.RebuildTurnStateFromCurrentRound();
+            return restored;
+        }
 
         public bool TryGetSeat(long userId, out PlayerSeat seat, out LobbyPlayer? player)
         {
@@ -556,6 +662,8 @@ public sealed class InMemoryGroupGameSessionStore
             return actualStartingPlayer;
         }
 
+        public void IncrementVersion() => Version++;
+
         public bool TryGetPlacementResult(string idempotencyKey, out GamePlacementResult result)
             => _recentPlacementResults.TryGetValue(idempotencyKey, out result);
 
@@ -573,15 +681,18 @@ public sealed class InMemoryGroupGameSessionStore
             }
         }
 
-        public void LogPlacement(string commandId, string commandDisplayName)
+        public void LogPlacement(PlayerSeat player, int dieIndex, string commandId, string commandDisplayName)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(commandId);
             ArgumentException.ThrowIfNullOrWhiteSpace(commandDisplayName);
 
+            if (dieIndex is < 0 or >= SecretDiceHand.DicePerHand)
+                throw new ArgumentOutOfRangeException(nameof(dieIndex));
+
             if (_roundLogs.Count == 0)
                 throw new InvalidOperationException("Cannot log a placement before the round has been rolled.");
 
-            _roundLogs[^1].Placements.Add(new(commandId, commandDisplayName));
+            _roundLogs[^1].Placements.Add(new(commandId, commandDisplayName, player, dieIndex));
         }
 
         public (string CommandId, string CommandDisplayName) RemoveLastLoggedPlacement()
@@ -614,6 +725,31 @@ public sealed class InMemoryGroupGameSessionStore
                 if (round.IsCompleted && DomainGame.Status == GameStatus.InProgress)
                     DomainGame.ExecuteCommand("NextRound");
             }
+        }
+
+        private RoundTurnState? RebuildTurnStateFromCurrentRound()
+        {
+            if (Round.Status != GameRoundStatus.AwaitingPlacements)
+                return null;
+
+            var roundLog = _roundLogs.LastOrDefault(log => log.RoundNumber == Round.RoundNumber && !log.IsCompleted);
+            if (roundLog is null)
+                return null;
+
+            var startingPlayer = roundLog.Placements.Count > 0
+                ? roundLog.Placements[0].Player
+                : ToSeat(DomainGame.CurrentPlayer);
+
+            var turnState = RoundTurnState.StartNew(
+                roundLog.RoundNumber,
+                startingPlayer,
+                SecretDiceHand.Create(roundLog.PilotDice),
+                SecretDiceHand.Create(roundLog.CopilotDice));
+
+            foreach (var placement in roundLog.Placements)
+                turnState = turnState.RegisterPlacement(placement.Player, placement.DieIndex, placement.CommandId);
+
+            return turnState;
         }
 
         private void ExecutePlacementCommand(string commandId)

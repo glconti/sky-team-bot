@@ -15,7 +15,7 @@
    dotnet run --project .\SkyTeam.TelegramBot\
    ```
 
-The bot uses long polling and keeps in-memory state while the process is running.
+The bot uses long polling, keeps lobby state in-memory, and persists active game sessions to `data/game-sessions.json` so in-progress games survive restarts.
 
 ## How to play
 
@@ -32,6 +32,7 @@ The bot uses long polling and keeps in-memory state while the process is running
 ### Mini App flow (for seated players)
 Set a public HTTPS URL for the Mini App shell (served by this host):
 - `SKYTEAM_MINI_APP_URL` (or `WebApp:MiniAppUrl`)
+- Optional persistence file override: `Persistence:GameSessionsFilePath`
 
 Bot commands remain as fallback and will redirect you to the Mini App when secret info is required.
 

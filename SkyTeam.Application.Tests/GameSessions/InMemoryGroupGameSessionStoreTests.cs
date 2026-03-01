@@ -593,8 +593,102 @@ public sealed class InMemoryGroupGameSessionStoreTests
         spectatorHand.Status.Should().Be(GameHandStatus.NoActiveSession);
     }
 
+    [Fact]
+    public async Task PlaceDie_ShouldAcceptSinglePlacement_WhenConcurrentSubmissionsTargetSameDie()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        var (pilot, copilot, lobby) = CreateReadyLobby();
+        store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        var currentUser = roll.StartingPlayer == PlayerSeat.Pilot ? pilot.UserId : copilot.UserId;
+        var commandId = GetCommandIdForDie(store, currentUser, dieIndex: 0);
+
+        using var gate = new ManualResetEventSlim(false);
+        var firstRequest = Task.Run(() =>
+        {
+            gate.Wait();
+            return store.PlaceDie(currentUser, dieIndex: 0, commandId);
+        });
+
+        var secondRequest = Task.Run(() =>
+        {
+            gate.Wait();
+            return store.PlaceDie(currentUser, dieIndex: 0, commandId);
+        });
+
+        // Act
+        gate.Set();
+        var results = await Task.WhenAll(firstRequest, secondRequest);
+        var state = store.GetPublicState(GroupChatId);
+
+        // Assert
+        new
+        {
+            Statuses = results.Select(result => result.Status).OrderBy(status => status.ToString()).ToArray(),
+            PlacementsMade = state!.PlacementsMade
+        }
+        .Should()
+        .BeEquivalentTo(new
+        {
+            Statuses = (new[] { GamePlacementStatus.NotPlayersTurn, GamePlacementStatus.Placed }).OrderBy(status => status.ToString()).ToArray(),
+            PlacementsMade = 1
+        });
+    }
+
+    [Fact]
+    public void PersistenceRoundTrip_ShouldRestoreSessionState_WhenStoreIsRehydrated()
+    {
+        // Arrange
+        var persistence = new InMemoryGameSessionPersistence();
+        var store = new InMemoryGroupGameSessionStore(persistence);
+        var (pilot, copilot, lobby) = CreateReadyLobby();
+
+        store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
+        store.SetCockpitMessageId(GroupChatId, cockpitMessageId: 77);
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        var currentUser = roll.StartingPlayer == PlayerSeat.Pilot ? pilot.UserId : copilot.UserId;
+        var commandId = GetCommandIdForDie(store, currentUser, dieIndex: 0);
+        store.PlaceDie(currentUser, dieIndex: 0, commandId).Status.Should().Be(GamePlacementStatus.Placed);
+
+        // Act
+        var restored = new InMemoryGroupGameSessionStore(persistence);
+        var restoredState = restored.GetPublicState(GroupChatId);
+        var restoredHand = restored.GetHand(currentUser);
+        var hasCockpit = restored.TryGetCockpitMessageId(GroupChatId, out var cockpitMessageId);
+
+        // Assert
+        restoredState.Should().NotBeNull();
+        restoredState!.Session.Round.Status.Should().Be(GameRoundStatus.AwaitingPlacements);
+        restoredState.PlacementsMade.Should().Be(1);
+
+        restoredHand.Status.Should().Be(GameHandStatus.Ok);
+        restoredHand.Hand!.Dice[0].IsUsed.Should().BeTrue();
+
+        hasCockpit.Should().BeTrue();
+        cockpitMessageId.Should().Be(77);
+
+        persistence.State.Sessions.Single().Version.Should().Be(3);
+    }
+
+    [Fact(Skip = "Issue #80 needs versioned updates; current APIs do not accept expected/current version tokens.")]
+    public void Update_ShouldReturnVersionConflict_WhenExpectedVersionIsOutdated()
+    {
+    }
+
     [Fact(Skip = "Auth expiry UX is implemented in Telegram/WebApp transport layer, not in application store.")]
     public void AuthExpiryUx_ShouldPromptReopenFlow_WhenSessionTokenIsExpired()
     {
+    }
+
+    private sealed class InMemoryGameSessionPersistence : IGameSessionPersistence
+    {
+        public PersistedGameSessionStoreState State { get; private set; } = PersistedGameSessionStoreState.Empty;
+
+        public PersistedGameSessionStoreState Load() => State;
+
+        public void Save(PersistedGameSessionStoreState state) => State = state;
     }
 }
