@@ -207,3 +207,19 @@
 - `SkyTeam.TelegramBot\Persistence\JsonGameSessionPersistence.cs`
 - `SkyTeam.Application.Tests\GameSessions\InMemoryGroupGameSessionStoreTests.cs` (persistence round-trip)
 - `.squad/decisions/inbox/skiles-issue-80.md`
+
+### Session 17: Issue #80 publish (2026-03-02)
+
+**Outcome:** Committed and pushed durable persistence vertical slice on feat/issue-76-85-botfather-config-webapp-tests branch; consolidated with #76 + #85 work in draft PR #87.
+
+**Scope:**
+- All #80 acceptance criteria met: Game state survives restart, sessions keyed by (ChatId, GameId), round-trip persistence validation passing
+- Deferred to #82: Version field + optimistic locking, TTL cleanup, database migration (beyond initial vertical slice scope)
+
+**Executed Actions:**
+1. Committed 8 file changes (395 insertions) with clean message: `feat(issue-80): Durable game session persistence...`
+2. Pushed branch to origin; +1 commit on PR #87 (now 7 total commits, 4680 additions)
+3. Documented in history (this entry)
+4. Created decision document for team reference
+
+**Test Status:** All 273 tests passing (includes round-trip persistence + deterministic rehydration)
