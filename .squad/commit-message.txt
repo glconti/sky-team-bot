@@ -1,9 +1,10 @@
-.squad: Merge 3 decision inbox entries, post orchestration logs, update team history
+squad: merge skiles issue #77 completion & capture orchestration state
 
-- Orchestration logs: Sully (Epic #75 triage), Skiles (Issue #76), Aloha (Issue #85)
-- Session log: Ralph cycle (spawn manifest outcomes)
-- Decisions: Merged inbox entries; Epic #75 triage sequence, Issue #76 config validation, Issue #85 integration tests
-- History: Updated Skiles, Sully, Aloha with cross-team context and critical path
-- Inbox: Deleted 3 merged decision files
+- Scribe: Orchestration log for Skiles background task completion (issue #77 slice 1)
+- Scribe: Session log (Ralph round 6) for post-spawn manifest processing
+- Decisions: Merged inbox entry (skiles-issue-77.md) → decisions.md
+- Decisions: Deleted processed inbox file
+- Scope: Launchpad hardening, deeplink safety validation, deliverables captured
+- Impact: Issue #77 slice 1 ready for QA sign-off; optional fallback deferred by design
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
