@@ -54,6 +54,11 @@ Bot commands remain as fallback and will redirect you to the Mini App when secre
 - The **Open app** button in group contexts uses `startapp=<groupChatId>` to preserve signed game routing constraints.
 - If a safe deep-link cannot be built, the bot keeps fallback controls (`Refresh` + `/sky state`) instead of redirecting users to DM-first flows.
 
+### Async turn notification policy (Issue #83, slice 1)
+- On each turn transition (round roll, successful place, undo), the bot attempts one DM notification to the active seated player.
+- Notifications are deduplicated per transition key to avoid duplicate sends on retries.
+- If DM delivery fails, the bot posts a group-chat fallback ping with action-required text only (no secret hand/module details).
+
 ### Operator verification checklist
 - `SKYTEAM_MINI_APP_URL` resolves directly over HTTPS (no redirect loops, no TLS warnings).
 - Tapping **Open app** or a `startapp` link opens the Mini App on Telegram iOS, Android, and Desktop.

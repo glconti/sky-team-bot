@@ -238,3 +238,18 @@
 - `SkyTeam.Application.Tests\Telegram\Issue60LaunchMiniAppButtonTests.cs`
 - `readme.md`
 - `.squad/decisions/inbox/skiles-issue-77.md`
+
+### Session 19: Issue #83 async turn notifications slice (2026-03-01)
+
+**Outcome:** Started issue #83 with a minimal async turn notification implementation wired into existing Telegram + WebApp flows.
+
+**Key Learnings:**
+- A Telegram-side notification orchestrator can stay minimal by deriving active-turn context from `GetSnapshot` + `GetPublicState`, avoiding immediate domain-event refactors.
+- Transition-key deduplication (`roll/place/undo`) is a low-risk first idempotency layer that fits existing in-memory state patterns.
+- DM-first with group fallback keeps async responsiveness high while preserving delivery when private chat permissions block direct messages.
+
+**Delivered Artifacts:**
+- `SkyTeam.TelegramBot\TelegramBotService.cs`
+- `SkyTeam.TelegramBot\WebApp\WebAppEndpoints.cs`
+- `readme.md`
+- `.squad/decisions/inbox/skiles-issue-83.md`

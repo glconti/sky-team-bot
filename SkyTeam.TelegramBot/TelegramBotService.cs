@@ -21,6 +21,7 @@ public sealed class TelegramBotService(
     ILogger<TelegramBotService> logger) : BackgroundService
 {
     private const int MaxRecentUpdateIds = 1_000;
+    private const int MaxRecentTurnNotificationKeys = 2_000;
     private const string NewCallbackAction = "new";
     private const string JoinCallbackAction = "join";
     private const string StartCallbackAction = "start";
@@ -46,6 +47,9 @@ public sealed class TelegramBotService(
     private readonly Lock _updateDedupSync = new();
     private readonly Queue<int> _recentUpdateIds = new();
     private readonly HashSet<int> _recentUpdateIdSet = [];
+    private readonly Lock _turnNotificationDedupSync = new();
+    private readonly Queue<string> _recentTurnNotificationKeys = new();
+    private readonly HashSet<string> _recentTurnNotificationKeySet = new(StringComparer.Ordinal);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -516,6 +520,11 @@ public sealed class TelegramBotService(
         }
 
         await RefreshGroupCockpitAsync(botClient, groupChatId, cancellationToken);
+        await NotifyCurrentTurnAsync(
+            botClient,
+            groupChatId,
+            transitionKey: $"roll:{rollResult.Snapshot?.Round.RoundNumber ?? 0}",
+            cancellationToken: cancellationToken);
         await botClient.SendMessage(groupChatId, "Dice rolled. Open /sky app to view your private hand and continue.", cancellationToken: cancellationToken);
     }
 
@@ -639,6 +648,14 @@ public sealed class TelegramBotService(
         await RefreshGroupCockpitAsync(_botClient, groupChatId, cancellationToken);
     }
 
+    internal async Task NotifyCurrentTurnFromWebAppAsync(long groupChatId, string transitionKey, CancellationToken cancellationToken)
+    {
+        if (_botClient is null)
+            return;
+
+        await NotifyCurrentTurnAsync(_botClient, groupChatId, transitionKey, cancellationToken);
+    }
+
     private static async Task<bool> TryEditCockpitAsync(
         ITelegramBotClient botClient,
         long groupChatId,
@@ -677,6 +694,65 @@ public sealed class TelegramBotService(
         catch
         {
             // best effort
+        }
+    }
+
+    private async Task NotifyCurrentTurnAsync(
+        ITelegramBotClient botClient,
+        long groupChatId,
+        string transitionKey,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(transitionKey))
+            return;
+
+        var session = gameSessionStore.GetSnapshot(groupChatId);
+        var state = gameSessionStore.GetPublicState(groupChatId);
+
+        if (session is null || state?.CurrentPlayer is null || state.Session.Round.Status != GameRoundStatus.AwaitingPlacements)
+            return;
+
+        var seat = state.CurrentPlayer.Value;
+        var recipient = seat == PlayerSeat.Pilot ? session.Pilot : session.Copilot;
+
+        var dedupKey = $"{groupChatId}:{transitionKey}:{recipient.UserId}:{seat}";
+        if (!TryRegisterTurnNotification(dedupKey))
+            return;
+
+        var placementsRemaining = state.PlacementsRemaining ?? 0;
+        var placementLabel = placementsRemaining == 1 ? "placement" : "placements";
+
+        var messageText =
+            $"🔔 Your turn in Sky Team ({seat}).\n" +
+            $"Round {state.Session.Round.RoundNumber}, {placementsRemaining} {placementLabel} remaining.\n" +
+            $"Game status: {state.GameStatus}\n" +
+            "Action required: open /sky app and place one die.";
+
+        if (await TrySendDirectMessageAsync(botClient, recipient.UserId, messageText, cancellationToken))
+            return;
+
+        await botClient.SendMessage(
+            groupChatId,
+            $"🔔 {recipient.DisplayName} ({seat}), your turn. Open /sky app and place one die.",
+            cancellationToken: cancellationToken);
+    }
+
+    private bool TryRegisterTurnNotification(string key)
+    {
+        lock (_turnNotificationDedupSync)
+        {
+            if (!_recentTurnNotificationKeySet.Add(key))
+                return false;
+
+            _recentTurnNotificationKeys.Enqueue(key);
+
+            while (_recentTurnNotificationKeys.Count > MaxRecentTurnNotificationKeys)
+            {
+                var oldest = _recentTurnNotificationKeys.Dequeue();
+                _recentTurnNotificationKeySet.Remove(oldest);
+            }
+
+            return true;
         }
     }
 

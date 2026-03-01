@@ -219,6 +219,10 @@ public static class WebAppEndpoints
             return Results.Conflict(new { error = "Game is not started yet. Press Start first." });
 
         await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId.Value, cancellationToken);
+        await telegramBotService.NotifyCurrentTurnFromWebAppAsync(
+            result.GroupChatId.Value,
+            transitionKey: $"roll:{rollResult.Snapshot?.Round.RoundNumber ?? 0}",
+            cancellationToken: cancellationToken);
         var state = gameSessionStore.GetPublicState(result.GroupChatId.Value)!;
 
         return Results.Ok(MapStateResponse(
@@ -253,6 +257,10 @@ public static class WebAppEndpoints
         await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId!.Value, cancellationToken);
 
         var state = gameSessionStore.GetPublicState(result.GroupChatId.Value)!;
+        await telegramBotService.NotifyCurrentTurnFromWebAppAsync(
+            result.GroupChatId.Value,
+            transitionKey: $"place:{state.Session.Round.RoundNumber}:{placement.PublicInfo!.PlacementIndex}",
+            cancellationToken: cancellationToken);
         return Results.Ok(MapStateResponse(
             state,
             result.GroupChatId.Value,
@@ -278,6 +286,10 @@ public static class WebAppEndpoints
         await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId!.Value, cancellationToken);
 
         var state = gameSessionStore.GetPublicState(result.GroupChatId.Value)!;
+        await telegramBotService.NotifyCurrentTurnFromWebAppAsync(
+            result.GroupChatId.Value,
+            transitionKey: $"undo:{state.Session.Round.RoundNumber}:{undo.PublicInfo!.UndonePlacementIndex}",
+            cancellationToken: cancellationToken);
         return Results.Ok(MapStateResponse(
             state,
             result.GroupChatId.Value,
