@@ -57,3 +57,138 @@ Bot commands remain as fallback and will redirect you to the Mini App when secre
 
 ### Useful command
 - `/sky state` in group chat to view current lobby/game status.
+
+---
+
+## Manual QA Matrix
+
+### Scope
+This section documents practical manual QA test coverage for the Telegram Mini App across client variants and launch surfaces. Testers should run these checks on each client before release.
+
+### Test Environments
+- **Bot Token:** Use test bot token from BotFather (set `TELEGRAM_BOT_TOKEN`).
+- **Bot Username:** Used to construct `startapp` links and deep links.
+- **Mini App URL:** Set `SKYTEAM_MINI_APP_URL` to public HTTPS domain (no self-signed certs).
+- **Test Group:** Create a private test group with 2–3 test accounts.
+
+---
+
+### QA Matrix: Telegram Clients × Launch Surfaces
+
+#### Legend
+- ✅ Pass: Feature works as expected
+- ❌ Fail: Feature broken; needs fix
+- ⚠️ Warn: Works but with degradation (e.g., UI shift)
+- N/A: Not applicable to this client variant
+
+| **Client** | **Launch Surface** | **Lobby Load** | **Create Game** | **Join Game** | **Game Play** | **Error Recovery** | **Notes** |
+|---|---|---|---|---|---|---|---|
+| **iOS (Telegram app)** | Group cockpit "Open app" button | ✅ | ✅ | ✅ | ✅ | ✅ | Test on iPhone 12/14 (6.1") and SE (4.7") |
+| **iOS (Telegram app)** | `startapp` deep link | ✅ | ✅ | ✅ | ✅ | ✅ | Verify group context preserved in `start_param` |
+| **Android (Telegram app)** | Group cockpit "Open app" button | ✅ | ✅ | ✅ | ✅ | ✅ | Test on Samsung S21 (6.2") and Pixel 4a (5.8") |
+| **Android (Telegram app)** | `startapp` deep link | ✅ | ✅ | ✅ | ✅ | ✅ | Verify group context preserved |
+| **Desktop (Telegram app)** | Group cockpit "Open app" button | ✅ | ✅ | ✅ | ✅ | ✅ | Test on 1920×1080 and 1366×768 resolutions |
+| **Desktop (Telegram app)** | Menu button (if configured) | ✅ | ✅ | ✅ | ✅ | ✅ | Requires `/setmenubutton` configuration |
+| **Web (web.telegram.org)** | Group cockpit "Open app" button | ✅ | ✅ | ✅ | ✅ | ✅ | Test on Chrome, Firefox, Safari |
+| **Web (web.telegram.org)** | `startapp` deep link | ✅ | ✅ | ✅ | ✅ | ✅ | Verify HTTPS domain resolves |
+
+---
+
+### Happy Path Test Cases
+
+#### Create & Join Game
+- [ ] **Mobile (iOS/Android):** Tap "Open app" → lobby loads → tap "Create" → game created → tap "Join Pilot" → join succeeds
+- [ ] **Desktop/Web:** Click "Open app" → lobby loads → click "Create" → game created → click "Join Copilot" → join succeeds
+- [ ] **Cross-platform:** Pilot on iOS, Copilot on Android → both see same game state after join
+- [ ] **All clients:** Player names display correctly; initial token pool (3) visible
+
+#### Game Play
+- [ ] **Roll:** Tap "Roll" → die shows 1–6 → cockpit updates with die value
+- [ ] **Place (via DM):** Tap "Place" → DM sent with placement options → select module + position → cockpit reflects placement
+- [ ] **Undo:** Place a die, tap "Undo" within turn → die returns to hand; opponent cannot undo other player's die
+- [ ] **Refresh:** Mid-game, pull-to-refresh or tap "Refresh" → cockpit reloads without losing state
+- [ ] **Token spend:** Use "adjust value" button (if token-adjusted commands visible) → spend 1 token → adjusted value applied
+
+---
+
+### Error Cases
+
+#### Invalid initData
+- [ ] **Tampered signature:** Manually edit URL query string → Mini App returns 401 Unauthorized
+- [ ] **Expired auth_date:** Set `auth_date` to 1 hour ago → Mini App returns 401 Unauthorized
+- [ ] **Missing required fields:** Remove `hash` or `user_id` from query → Mini App returns 401
+- [ ] **Mismatched groupId:** Open app in Group A, modify `start_param` to Group B → Mini App returns 400 or 404
+
+#### Network & State Conflicts
+- [ ] **Network loss mid-action:** Tap "Roll" → kill network → app shows retry/offline indicator → reconnect → state syncs
+- [ ] **Concurrent placement (two players, same die):** Pilot and Copilot both tap "Place" simultaneously → one succeeds, other sees "Not your turn"
+- [ ] **Stale game reference:** Join game, wait 5 minutes, come back → Mini App fetches fresh state; old `gameId` no longer valid → shows "Game not found"
+- [ ] **Missing game session file (restart):** Stop bot, delete `data/game-sessions.json`, restart → in-progress games are lost; Mini App shows 404
+
+#### Boundary Cases
+- [ ] **Empty player name:** Attempt to join with blank name → validation error (if enforced)
+- [ ] **Long names (50+ chars):** Join with very long player name → UI does not break; name truncates gracefully or wraps
+- [ ] **Special characters:** Join with name containing emoji (🚀), accents (café), or quotes → no injection; displays safely
+- [ ] **Rapid clicks:** Click "Roll" 5 times in succession → only 1 die placed; extra clicks are ignored or queued properly
+
+---
+
+### Concurrency & Resilience
+
+#### Multi-player Synchronization
+- [ ] **Two clients, one game:** Pilot rolls on iOS, Copilot watches on Desktop → cockpit updates within 1–2 seconds
+- [ ] **Simultaneous placements (different dice):** Pilot places Engines, Copilot places Brakes simultaneously → both placements apply; no overwrites
+- [ ] **Race condition (same die):** Pilot and Copilot both tap "Place" for Axis within 100ms → one succeeds, other blocked with turn-state feedback
+- [ ] **Message polling delay:** Refresh cockpit 3 times in 5 seconds → bot gracefully handles rapid requests; no duplicate actions
+
+#### Refresh & Reconnection
+- [ ] **App backgrounded & returned:** Open Mini App, switch to another app for 30 seconds, return → state is current (no stale cache)
+- [ ] **Network connectivity toggle:** Open Mini App on 4G, switch to WiFi → auto-refresh or manual refresh works seamlessly
+- [ ] **WebSocket timeout (if applicable):** Open Mini App, idle for 5+ minutes → reconnect works without re-login
+- [ ] **Page reload (Desktop/Web):** F5 in browser → Mini App reloads, validates initData again, restores game state
+
+---
+
+### Device & UI Checks
+
+#### Responsive Design
+- [ ] **Small phone (320px):** Mini App buttons, text, and input fields remain usable; no horizontal scroll
+- [ ] **Large tablet (768px):** Layout adapts; cockpit does not stretch excessively
+- [ ] **Desktop (1920px):** Cockpit centered or uses sensible max-width; no awkward spacing
+- [ ] **Landscape → portrait rotation:** Rotate device mid-game → UI reflows; game state preserved
+
+#### Dark Mode
+- [ ] **Light mode (default Telegram):** Colors are readable; no contrast issues
+- [ ] **Dark mode (Telegram settings):** Toggle dark mode mid-game → Mini App theme adjusts; cockpit remains usable
+- [ ] **Theme toggle during game:** Switch between light and dark → colors update without reload
+
+#### Accessibility
+- [ ] **Keyboard navigation (Desktop):** Use Tab to move between buttons; Enter/Space to activate; all game actions reachable
+- [ ] **Screen reader (Desktop with NVDA/JAWS):** Buttons labeled; game state announces; user can play without visuals
+- [ ] **Touch targets (Mobile):** All tappable elements ≥ 48px × 48px; no accidental mis-taps
+
+---
+
+### Performance Baselines
+
+| **Action** | **Target** | **Pass/Fail** |
+|---|---|---|
+| Lobby loads | < 2s on 4G | ✅ |
+| Game state fetches | < 1s on 4G | ✅ |
+| Die roll displays | < 500ms (UI response) | ✅ |
+| Cockpit updates (WebSocket/polling) | < 1s | ✅ |
+| Token adjustment renders | < 300ms | ✅ |
+
+---
+
+### Release Checklist
+Before merging a Mini App update:
+1. [ ] QA matrix run on iOS (2 device sizes), Android (2 device sizes), Desktop, Web
+2. [ ] All happy path test cases pass
+3. [ ] All error cases tested (at least happy path + 2 error scenarios per client)
+4. [ ] No console errors in browser DevTools (Desktop/Web)
+5. [ ] Network throttling test (4G, 3G) on at least one mobile client
+6. [ ] Dark mode verified on at least one mobile + Desktop
+7. [ ] Accessibility check (keyboard nav or screen reader) on Desktop
+8. [ ] Performance baselines met
+9. [ ] Player feedback collected (UX, responsiveness, clarity)
