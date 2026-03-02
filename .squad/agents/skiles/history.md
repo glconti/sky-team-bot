@@ -5,15 +5,14 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Cross-Team Status (2026-03-02T01:22:00Z) — Round 11 Scribe Sync
-- **Skiles (You):** Issue #83 COMPLETED. Transport-driven async turn notifications hardened. DM→group fallback best-effort. Tests + operator docs. Commit b6239c8. PR #87 ready for merge.
-- **Sully:** Closure audit (Round 10) complete. Issues #80–#84 remain open (acceptance criteria untouched). PR #87 (BotFather + WebApp tests) ready to merge. Priority order refreshed: #80 → #81 → #82 → #83/#84.
-- **Aloha:** Completed #80 QA coverage. Available for #77 UI implementation.
-- **Tenerife:** #83 scope complete (Skiles). Standby for downstream (#84).
-- **Epic #75 Progress:** 3/11 complete (#76, #85, #86). Next gate: Validate #80 persistence + full #81 scope before #82 expansion.
-- **Critical Path:** #80 (persistence done) → #81 (slice 1 done, full scope pending) → #82 (slice 1 done, conflict expansion pending) → #83 (complete) → #84 (parallel).
-- **Blockers Resolved:** Skiles' #83 practical scope complete. Ready to finalize #81 full scope and expand #82 parallel tests.
-- **Next:** Merge PR #87. Finalize #81 full scope. Expand #82 conflict tests. Schedule #84 rate limits.
+## Cross-Team Status (2026-03-02T01:40:00Z) — Round 13 Scribe Sync (Remediation + Audit)
+- **Skiles (You):** Issue #80 REMEDIATION COMPLETE (Round 13). Delivered repository contract (CRUD + CleanupExpired), lifecycle policy (TTL metadata + config), restart integration test. Commit 8bd9d1d (PR #87). Outstanding: Game aggregate schema + migration.
+- **Sully:** Issue #80 CLOSURE AUDIT COMPLETE (Round 13). Verified deliverables: repository contract ✅, TTL policy ✅, restart evidence ✅, versioning ✅. Outstanding blocker: Schema/migration criterion. Path forward: DB implementation or scope revision.
+- **Aloha:** QA verdict (Round 12) identified gaps. Skiles + Sully remediation/audit completed. Issue #80 remains open pending schema/migration decision.
+- **Tenerife:** Standby. Awaiting #80 closure decision before #81 expansion.
+- **Critical Path:** Issue #80 schema/migration decision → close → #81 full scope → #82 expansion.
+- **Blockers:** Game aggregate schema + migration (design + implementation decision required).
+- **Next:** Schema/migration owner to commit. PR #87 merge contingent on #80 closure path clarity.
 
 ## Core Context (Summarized from Sessions 1–23)
 
