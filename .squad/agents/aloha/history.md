@@ -5,6 +5,8 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
+**Archive Note:** Full history summarized into `core-context.md`. Sessions 1–11 (2026-02-21 to 2026-03-02) condensed below.
+
 ## Cross-Team Status (2026-03-02T01:10:22Z) — Round 10 Scribe Sync
 - **Sully:** Closure audit complete. PR #87 ready for merge. Architecting #81 full scope (identity/role binding). #82 slice 1 (conflict enforcement) unblocks full scope expansion.
 - **Skiles:** Issue #82 Slice 1 COMPLETED (commit 6001682). Optimistic concurrency CAS mutations + 409 responses in WebApp. Tests active; parallel stale write + non-WebApp surface expansion pending.
@@ -13,7 +15,13 @@
 - **Critical Path:** #80 (done) → #81 (slice 1 done, final scope review + close) → #82 (slice 1 done, conflict expansion testing) → #77/#83/#84 (parallel).
 - **Next:** Aloha activate expanded concurrency QA matrix. Sully finalize #81 scope. Skiles expand #82 parallel tests.
 
-## Cross-Team Status (2026-03-02T00:25:39Z)
+## Archived Core Learnings (Full Summary in core-context.md)
+- Deterministic concurrency testing via shared-gate placement pairs (one succeeds, one blocked)
+- Persistence round-trip QA using `IGameSessionPersistence` seam with in-memory double
+- Manual QA matrix (client × surface × feature) most effective when scoped, deterministic, integrated with release
+- Version-conflict tests blocked until expectedVersion APIs land (Skiles completed in #82 Slice 1)
+- WebApp integration pattern: `WebApplicationFactory<Program>` + disabled polling for hermetic tests
+- Token pool + die value boundaries validated via comprehensive domain test matrix (7 modules, win/loss criteria)
 - **Sully:** Issue #80/#82 architecture contract designed. Persistence contract stabilized; versioning scope deferred to #82. Next: #81 design + #82 API review.
 - **Skiles:** Issue #80 vertical slice COMPLETED. Persistence + version tracking + tests passing. #82 versioning APIs pending design review.
 - **Aloha (You):** Issue #80 QA coverage COMPLETED. Round-trip + deterministic concurrency validated. Version-conflict test skipped (blocked on #82 API).
