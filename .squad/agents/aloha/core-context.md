@@ -1,13 +1,20 @@
-# Aloha — Core Context (Summarized from History.md)
+# Aloha — Core Context
 
-## Identity
-**Role:** QA Engineer  
-**Focus:** Mini App QA matrix, concurrency testing, deterministic test harness validation
+**Agent:** Aloha (QA Lead)  
+**Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team  
+**Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Current Position (2026-03-02T01:10:22Z)
-- **Issue #86 Status:** COMPLETED — Manual QA matrix (8 client × surface, 30+ test cases) merged to readme.md
-- **Issue #82 Integration:** Ready to activate expanded concurrency conflict tests on Skiles' #82 Slice 1 CAS implementation
-- **Issue #81 Coordination:** Available for #81 full scope (security-context-binding) final QA sign-off
+## Mission
+Validate implementation against domain acceptance criteria. Provide deterministic QA coverage for critical paths (concurrency, persistence, security, token mechanics). Post evidence-backed verdicts that unblock merge decisions.
+
+## Current Status (2026-03-02T01:26:00Z — Round 12)
+- **Issue #80 (Durable Persistence):** QA COMPLETED. Verdict: **Not close-ready**.
+  - ✅ Rehydration round-trip + version conflict mechanics tested (3/3 focused tests pass).
+  - ❌ Contract gaps: DB schema/migration, GameRepository CRUD/List, TTL policy, file-backed restart test.
+  - **Action:** QA verdict posted to GitHub #80 with explicit 3-item blocker checklist.
+  - **Blocks:** Epic #75 (#81 full scope, #82 expansion). PR #87 merge.
+
+## Key QA Patterns (Established & Reusable)
 - **Next Phase:** Run #82 conflict matrix, begin #77 UI launch validation
 
 ## Key Technical Learnings
