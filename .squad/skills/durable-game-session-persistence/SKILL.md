@@ -19,3 +19,10 @@ Use this pattern when an in-memory game/session store must survive process resta
 - Minimizes serialization coupling to rich aggregate internals.
 - Makes restart behavior reliable with small, explicit contracts.
 - Future-proofs concurrency work by carrying version in the persistence schema early.
+
+## QA close-ready gate
+Before marking a durability issue close-ready, validate both:
+1. **Behavior evidence:** rehydration round-trip + stale-write/version-conflict tests are green.
+2. **Contract evidence:** implementation artifacts match issue scope (storage contract, lifecycle policy like TTL, and documented operational behavior).
+
+If behavior tests pass but contract artifacts are missing, issue a **not close-ready** verdict with an explicit remaining checklist.

@@ -7,14 +7,11 @@
 
 **Archive Note:** Full history summarized into `core-context.md`. Sessions 1–11 (2026-02-21 to 2026-03-02) condensed below.
 
-## Cross-Team Status (2026-03-02T01:22:00Z) — Round 11 Scribe Sync
-- **Sully:** Closure audit (Round 10) complete. Issues #80–#84 remain open (acceptance criteria untouched). PR #87 ready to merge. Priority: #80 → #81 → #82 → #83/#84.
-- **Skiles:** Issue #83 COMPLETED. Async notification hardening (dedup reset + group fallback best-effort). Tests + operator docs. Commit b6239c8. PR #87 ready for merge.
-- **Aloha (You):** Issue #86 QA matrix COMPLETED. Available for #77 UI launch or #82 expanded concurrency QA matrix.
-- **Tenerife:** #83 scope complete (Skiles). Standby for downstream.
-- **Epic #75 Progress:** 3/11 complete (#76, #85, #86). Next gate: #80 persistence validation + #81 full scope before #82 expansion.
-- **Critical Path:** #80 (done) → #81 (slice 1 done, full scope pending) → #82 (slice 1 done, conflict expansion pending) → #83 (complete) → #84 (parallel).
-- **Next:** Merge PR #87. Finalize #81 full scope. Expand #82 parallel tests. Launch #77 UI or #84 rate limits.
+## Cross-Team Status (2026-03-02T01:26:00Z) — Round 12 Scribe Sync (Aloha QA Verdict)
+- **Aloha (You):** Issue #80 QA COMPLETED. Verdict: Not close-ready. Posted explicit gap list on GitHub; awaiting implementation alignment to contract (DB schema + migration + repository CRUD + TTL policy + restart test).
+- **Sully, Skiles, Tenerife:** Standby. Epic #75 gates on #80 closure. #81 full scope + #82 expansion pending #80 completion.
+- **Critical Path:** #80 (QA verdict posted) → contract alignment → close → #81 full scope → #82 expansion.
+- **Next:** Implement #80 gaps. Revalidate. Close PR #87.
 
 ## Archived Core Learnings (Full Summary in core-context.md)
 - Deterministic concurrency testing via shared-gate placement pairs (one succeeds, one blocked)
@@ -321,3 +318,11 @@ Manual QA matrix is most effective when:
 3. **Integrated with release:** Release checklist ties matrix to merge gates
 4. **Developer-friendly:** Lives in readme alongside setup instructions
 5. **Incrementally testable:** Tester can validate one row (e.g., iOS) before full suite
+
+### Session 12: Issue #80 — Durable persistence QA validation (2026-03-02)
+**Outcome:** Validated issue #80 on PR #87 branch and posted QA verdict on the issue thread.
+
+**Learnings:**
+- Separate **behavior validation** (rehydration + stale-write conflict tests) from **contract validation** (issue-specified persistence architecture) when issuing close-ready decisions.
+- Focused persistence checks plus a full-suite sanity run provide high confidence quickly: 3/3 focused tests green and full suite remained green.
+- Passing tests alone are insufficient for close-ready if acceptance criteria still require missing artifacts (DB migration/repository contract/TTL policy).
