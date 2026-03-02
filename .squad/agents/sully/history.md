@@ -5,12 +5,13 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Cross-Team Status (2026-03-02T00:25:39Z)
-- **Sully (You):** Issue #80/#82 architecture contract designed + decision records posted. Persistence contract stabilized; versioning scope deferred to #82.
-- **Skiles:** Issue #80 vertical slice COMPLETED (persistence + version tracking + tests passing). #82 versioning APIs pending design review.
-- **Aloha:** Issue #80 QA coverage COMPLETED (round-trip + deterministic concurrency). Version-conflict test skipped (blocked on #82 API implementation).
-- **Critical Path:** #80→#81 (security-context-binding) → #82 (versioning/concurrency) before UI integration.
-- **Next:** Begin #81 security-context-binding design; review #82 versioning API contract (expectedVersion input + ConcurrencyConflict response).
+## Cross-Team Status (2026-03-02T00:58:00Z) — Round 9 Completion
+- **Sully (You):** Closure audit complete for #77/#80/#83/#84/#75. All 4 targets remain OPEN; PR #87 closes only #76/#85 (18% epic completion). Next: Design #81 security-context-binding; review #82 API.
+- **Skiles:** Issue #81 first slice COMPLETED. Chat/game binding enforced at app boundary via explicit `(groupChatId, userId)` mutations. Tests + commit 70d84ef + issue updated.
+- **Aloha:** Standby (Issue #80 QA coverage completed in prior round).
+- **Tenerife:** Standby.
+- **Critical Path:** #80 (completed) → #81 (slice 1 done, full scope pending) → #82 (versioning/concurrency) → #77 (group launchpad UI).
+- **Next:** Merge PR #87 (BotFather + WebApp); finalize #81 security-context-binding design; implement #81 full scope.
 
 ## Core Context
 
@@ -308,3 +309,53 @@ GameSessions: GameId (PK/UUID), GroupChatId (indexed), PilotUserId, CopilotUserI
 **Artifacts:**
 - .squad/decisions/inbox/sully-issue-closure-round7.md → merged to decisions.md
 - Updated Epic #75 progress tracking
+
+### Session 13: Round 9 Closure Audit (#77, #80, #83, #84, #75) (2026-03-02T01:00:00Z)
+
+**Outcome:** Sully audited PR #87 against four core open issues (#77, #80, #83, #84) and epic #75. Determined PR #87 addresses only #76 + #85. All four audit targets remain OPEN; no closures warranted at this time.
+
+**Audit Findings:**
+
+1. **Issue #77 — Harden in-group Open App launchpad**
+   - **Status:** OPEN (no changes in PR #87)
+   - **Assessment:** UI feature (group cockpit rendering + button state persistence). Blocked on #76 completion (BotFather config). Remaining scope: render "Open app" button, validate callback data < 64 bytes, persist button state across message edits, run integration tests.
+   - **Recommendation:** Keep OPEN; unblock for implementation once PR #87 merged.
+
+2. **Issue #80 — Add durable game persistence**
+   - **Status:** OPEN (no changes in PR #87)
+   - **Assessment:** Infrastructure feature (Game aggregate serialization, TTL cleanup, optimistic locking). Skiles completed vertical slice (persistence implementation + version tracking + tests). Architecture contract stabilized by Sully; versioning APIs (expectedVersion input, ConcurrencyConflict response) deferred to #82.
+   - **Recommendation:** Keep OPEN; critical path blocker for #81 security-context-binding.
+
+3. **Issue #83 — Add async turn notifications**
+   - **Status:** OPEN (no changes in PR #87)
+   - **Assessment:** Application feature (domain event emission + notification service dispatch). No infrastructure blocker; can proceed in parallel. Remaining scope: TurnTransitioned event, idempotency key (gameId + playerId + turnNumber), content validation (no secret leaks), integration test.
+   - **Recommendation:** Keep OPEN; can proceed in parallel with #80/#81/#82.
+
+4. **Issue #84 — Add abuse/rate limits and input validation**
+   - **Status:** OPEN (no changes in PR #87)
+   - **Assessment:** Infrastructure/security feature (rate limiting middleware, input validation). No domain blocker; can proceed in parallel. Remaining scope: AspNetCoreRateLimit middleware, per-user/IP/game limits, 429/400 responses, abuse logging, integration tests.
+   - **Recommendation:** Keep OPEN; low-medium priority for MVP (gates production but not feature completeness).
+
+5. **Epic #75 — Telegram Mini App-first Async Play Experience**
+   - **Status:** OPEN; progress 2/11 (18% complete via PR #87)
+   - **Completed via PR #87:** #76 (BotFather config), #85 (WebApp API tests)
+   - **Still OPEN:** #77 (group launchpad), #78 (lobby UI), #79 (in-game UI), #80 (persistence), #81 (security binding), #82 (concurrency), #83 (turn notifications), #84 (rate limits), #86 (QA matrix—Aloha completed, merged to readme.md)
+   - **Critical Path Next:** #80 (persistence) → #81 (security-context-binding) → #82 (versioning/concurrency) must complete before #77 can ship.
+
+**Architecture & Design Notes:**
+
+- **#80 Persistence Contract:** ✅ Signed off; schema finalized (GameId PK/UUID, GroupChatId indexed, Version int CAS field, State JSON). Implementation PR pending merge.
+- **#81 Security Context Binding:** ⚠️ Not yet started; design due before #80 closes. Requirement: Game aggregate bound to ChatId at creation (immutable); all commands must provide ChatId for validation.
+- **#82 Versioning & Concurrency:** ⚠️ Contract sketched; API design in review. Update command includes expectedVersion; response: Success OR ConcurrencyConflict (version mismatch).
+
+**Decision Documentation:**
+
+- Created `.squad/decisions/inbox/sully-round9-closure-audit.md` — Full audit report with acceptance criteria status per issue, remaining scope checklists, critical path sequence, and next gates.
+
+**Learnings:**
+
+- **Audit cadence valuable:** Reviewing open issues against PR scope prevents accidental closures and validates critical path alignment.
+- **Epic decomposition:** 11 sub-issues covering launch (1), UI (2), infrastructure (4), notifications (1), security (2), testing (1) shows healthy granularity.
+- **No premature closures:** All four audit targets are architectural prerequisites or independent features; closing prematurely would misrepresent progress.
+- **Critical path is narrow:** #80→#81→#82 sequence must complete sequentially; #83/#84 can run in parallel to unblock UI development (#77–#79).
+- **Shared review gate model working:** Sully approves architectural contracts; Skiles implements; Aloha tests. Clear boundaries prevent rework.

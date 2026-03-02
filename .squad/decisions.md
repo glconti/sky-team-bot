@@ -4043,3 +4043,174 @@ Implement lightweight WebApp transport guardrails via endpoint filters + in-memo
 - External/distributed limiter backend for multi-instance deployments.
 - Broader abuse telemetry/alerting policy beyond warning logs.
 
+# Skiles — Issue #81 first implementation slice (2026-03-02T01:25:00Z)
+
+## Context
+Issue #81 requires enforcing chat/game binding so a user cannot mutate a game outside the chat context that originated the action.
+
+## Decision
+For this first slice, enforce binding at the application boundary by requiring explicit `(groupChatId, userId)` on game mutation methods and use signed WebApp chat context to call those methods.
+
+## Done in this slice
+- Added context-bound mutation overloads in `InMemoryGroupGameSessionStore`:
+  - `PlaceDie(long groupChatId, long requestingUserId, ...)`
+  - `UndoLastPlacement(long groupChatId, long requestingUserId)`
+- Kept legacy user-only overloads as compatibility wrappers.
+- Updated WebApp mutation endpoints to pass resolved `groupChatId`:
+  - `POST /api/webapp/game/place`
+  - `POST /api/webapp/game/undo`
+- Documented security invariant in store class XML summary.
+- Added tests for:
+  - multi-session same-user routing bound to requested chat
+  - cross-chat mutation rejection when user is not seated in requested session
+  - WebApp integration path for context-bound placement
+
+## Remaining scope
+- Propagate explicit context-bound mutation calls to any future non-WebApp mutation surfaces.
+- Consider replacing single `userId -> groupChatId` index with multi-chat membership mapping.
+- Decide whether product/API should expose a dedicated `InvalidGameContext` status instead of current `NotSeated` conflict semantics.
+
+---
+# Sully — Round 9 Closure Audit (2026-03-02T01:00:00Z)
+
+## Executive Summary
+Audited issues #77, #80, #83, #84, #75 against PR #87 state. **PR #87 addresses only #76 + #85** (BotFather config, WebApp tests). All four audit targets remain **OPEN**; no closures warranted. Epic #75 tracking 11 issues; PR #87 will close 2/11 (18% completion).
+
+## Audit Results
+
+### Issue #77 — Harden in-group Open App launchpad
+- **Status:** OPEN
+- **PR #87 Coverage:** ❌ None
+- **Assessment:** Telegram group cockpit UI feature (UI rendering, button state persistence, callback data validation under 64-byte limit). Requires implementation in presentation/WebApp layers. Requires #76 (BotFather config) as prerequisite—which PR #87 provides.
+- **Recommendation:** Keep OPEN; unblock for implementation once PR #87 merged.
+- **Remaining Scope:**
+  - [ ] GroupChatCockpitRenderer validates game state before rendering
+  - [ ] "Open app" button rendered with `startapp` deeplink per Telegram spec
+  - [ ] Callback data codec ensures payloads stay < 64 bytes
+  - [ ] Button persists across cockpit message edits (no stale data)
+  - [ ] Integration tests pass on all platforms (iOS, Android, Desktop)
+  - [ ] Manual QA matrix run (#86 checklist) before merge
+
+---
+
+### Issue #80 — Add durable game persistence
+- **Status:** OPEN
+- **PR #87 Coverage:** ❌ None
+- **Assessment:** Infrastructure/domain feature (game state serialization, TTL cleanup, optimistic locking). Skiles completed vertical slice with persistence implementation + version tracking + tests. Architecture contract stabilized by Sully; versioning APIs (expectedVersion, ConcurrencyConflict) deferred to #82.
+- **Recommendation:** Keep OPEN; critical path blocker for #81 (chat/game binding).
+- **Remaining Scope:**
+  - [ ] GameRepository Create/Update/GetById/List fully implemented
+  - [ ] Game state survives bot restart (verified with integration test)
+  - [ ] TTL cleanup policy documented (e.g., 30-day retention for abandoned games)
+  - [ ] Version field supports optimistic locking (expectedVersion input on Update)
+  - [ ] ConcurrencyConflict response type implemented (for #82)
+  - [ ] Session recovery loads full state within 100ms (performance test)
+  - [ ] End-to-end integration test: create→persist→restart→recover passes
+
+---
+
+### Issue #83 — Add async turn notifications
+- **Status:** OPEN
+- **PR #87 Coverage:** ❌ None
+- **Assessment:** Application/Telegram feature (domain event emission, notification service, idempotency). Requires turn transition event wiring + Telegram notification dispatch. No infrastructure blocker.
+- **Recommendation:** Keep OPEN; may proceed in parallel with #80/#81/#82.
+- **Remaining Scope:**
+  - [ ] TurnTransitioned domain event emitted on turn state change
+  - [ ] TurnNotificationService subscribes and dispatches message
+  - [ ] Notification content validated (no secret hand/placements leaked)
+  - [ ] Idempotency key (gameId + playerId + turnNumber) prevents duplicates
+  - [ ] Integration test: event emitted + notification sent to active player only
+  - [ ] Manual QA: turn notification reaches player within expected latency
+
+---
+
+### Issue #84 — Add abuse/rate limits and input validation
+- **Status:** OPEN
+- **PR #87 Coverage:** ❌ None
+- **Assessment:** Infrastructure/security feature (rate limiting middleware, input validation, 429/400 responses). No domain blockers; can proceed in parallel.
+- **Recommendation:** Keep OPEN; low-medium priority (gates production deployment but not MVP feature completeness).
+- **Remaining Scope:**
+  - [ ] Rate limiting middleware registered (e.g., AspNetCoreRateLimit)
+  - [ ] Per-user, per-IP, per-game limits defined and tested
+  - [ ] Input validation on all endpoints (game creation, joins, actions)
+  - [ ] 429 Too Many Requests + 400 Bad Request responses implemented
+  - [ ] Retry-After header included in rate-limited responses
+  - [ ] Abuse logging configured for monitoring
+  - [ ] Integration test: rate limit triggered + rejected appropriately
+  - [ ] Load test validates limits under concurrent load
+
+---
+
+### Epic #75 — Telegram Mini App-first Async Play Experience
+- **Status:** OPEN
+- **Progress:** 2/11 issues closed via PR #87 (#76, #85)
+- **Completion Percentage:** 18% (2 of 11)
+- **Critical Path Next Gate:** #80 (persistence) → #81 (security-context-binding) → #82 (versioning/concurrency) must complete before #77 (group launchpad) can be released.
+- **Updated Acceptance Criteria Status:**
+  - [ ] #76: BotFather config ← PR #87 (ready to merge)
+  - [ ] #77: Group launchpad UI ← Blocked on #76, open for design
+  - [ ] #78: Lobby UI ← Not yet started
+  - [ ] #79: In-game UI ← Not yet started
+  - [ ] #80: Persistence ← In review, contract stabilized, awaiting PR
+  - [ ] #81: Security binding ← Not yet started (depends on #80)
+  - [ ] #82: Concurrency/versioning ← Contract designed, awaiting implementation (depends on #80)
+  - [ ] #83: Turn notifications ← Not yet started (independent)
+  - [ ] #84: Rate limiting ← Not yet started (independent)
+  - [ ] #85: WebApp API tests ← PR #87 (ready to merge)
+  - [ ] #86: Manual QA matrix ← Aloha completed, merged to readme.md
+
+---
+
+## Architecture & Design Notes
+
+### #80 Persistence Contract (Sully Round 8)
+**Status:** ✅ Signed off; implementation PR pending merge
+- Game aggregate schema: gameId, state, players, turn, timestamps, version
+- IGameSessionPersistence seam allows in-memory double for testing
+- Version field added; expectedVersion/ConcurrencyConflict deferred to #82
+- TTL cleanup policy: configurable (default 30 days for abandoned sessions)
+- Session keying: (ChatId, GameId) supports concurrent games in same group
+
+### #81 Security Context Binding (Sully Round 9)
+**Status:** ⚠️ Not yet started; design due before #80 closes
+- Requirement: Game aggregate must be bound to ChatId at creation (immutable)
+- Domain invariant: All commands must provide ChatId; Game validates it matches
+- Side effect: Prevents cross-chat game access; enables session isolation
+- Follow-up: See `.squad/decisions/inbox/sully-issue-81-security-contract.md` (pending)
+
+### #82 Versioning & Concurrency (Sully Round 8 sketch, awaiting full design)
+**Status:** ⚠️ Contract sketched; API design in review
+- Optimistic locking approach: Update command includes `expectedVersion`
+- Response: Success OR ConcurrencyConflict (version mismatch)
+- Test contract: Skipped version-conflict test in Aloha suite; blocks #82 implementation
+- Versioning increment: On every state change (rolls, placements, turns)
+
+---
+
+## Next Critical Path
+
+**Immediate (blocking):**
+1. Merge PR #87 (#76 BotFather + #85 WebApp tests) — unblocks #77 implementation
+2. Review & merge #80 persistence PR (Skiles) — unblocks #81 design
+3. **Design #81 security-context-binding** (Sully) — unblocks #82 versioning API design
+
+**Following (parallel possible):**
+- Implement #81 security binding
+- Implement #82 versioning/concurrency API
+- Implement #83 turn notifications (independent)
+- Implement #84 rate limiting (independent)
+
+**Final gate before release:**
+- Run #86 QA matrix on iOS/Android/Desktop/Web
+- All acceptance criteria verified
+- Manual QA sign-off
+
+---
+
+## Audit Metadata
+- **Auditor:** Sully (Lead/Architect)
+- **PR Reviewed:** #87 (draft, BotFather + WebApp tests)
+- **Issues Reviewed:** #77, #80, #83, #84, #75
+- **Timestamp:** 2026-03-02T01:00:00Z
+- **Status:** Complete; no closures; all open issues remain on critical path
+

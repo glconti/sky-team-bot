@@ -5,12 +5,14 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Cross-Team Status (2026-03-02T00:25:39Z)
-- **Sully:** Issue #80/#82 architecture contract designed. Persistence contract stabilized; versioning scope deferred to #82. Next: #81 design + #82 API review.
-- **Skiles (You):** Issue #80 vertical slice COMPLETED. Persistence + version tracking + tests passing. #82 versioning APIs pending design review.
-- **Aloha:** Issue #80 QA coverage COMPLETED. Round-trip + deterministic concurrency validated. Version-conflict test skipped (blocked on #82 API).
-- **Critical Path:** #80→#81 (security-context-binding) → #82 (versioning/concurrency) before UI integration.
-- **Blockers Resolved:** Persistence contract unblocked downstream; #82 versioning scope clarified.
+## Cross-Team Status (2026-03-02T00:58:00Z) — Round 9 Completion
+- **Sully:** Closure audit complete for #77/#80/#83/#84/#75. All 4 targets remain OPEN; PR #87 closes only #76/#85 (18% epic completion). Next: Design #81; review #82 API.
+- **Skiles (You):** Issue #81 first slice COMPLETED. Chat/game binding enforced at app boundary via `(groupChatId, userId)` mutations. Tests + commit 70d84ef posted. Full scope remaining.
+- **Aloha:** Standby (Issue #80 QA coverage completed in prior round).
+- **Tenerife:** Standby.
+- **Critical Path:** #80 (done) → #81 (slice 1 done, full scope pending) → #82 (design + implementation) → #77 (UI).
+- **Blockers Resolved:** Sully's closure audit clears no issues; #81 first slice unblocks full #81 implementation. #82 remains blocked on #81 completion.
+- **Next:** Merge PR #87; finalize #81 security-context-binding design; implement #81 full scope + #82 versioning/concurrency APIs.
 
 ## Learnings
 
