@@ -6,12 +6,14 @@
 **Responsibilities:** Issue implementation, sprint execution, transport adapters, DDD boundary enforcement
 
 ## Current Status (2026-03-02)
-- ✅ Issue #80: Durable persistence slice (Game state survives restart + version field tracking)
+- ✅ Issue #80: Durable persistence slice (Game state survives restart + version field + migration)
 - ✅ Issue #77: Open App Launchpad hardening (startapp deep links + safe fallback)
 - ✅ Issue #83: Async turn notifications (DM-first + group fallback, idempotency guard)
-- ✅ Issue #84: Abuse protection slice 1 (rate limiting + input validation; more work deferred)
-- ✅ PR #87: Consolidated deliverables for #76, #85, #86 (259 tests passing)
-- ⏳ Next: Full #80 implementation with Version field + TTL cleanup + database backend
+- ✅ Issue #84: Abuse protection slice 1 (rate limiting + input validation)
+- ✅ Issue #81: Security-context-binding completion (InvalidGameContext explicit + tests)
+- ✅ PR #87: Consolidated deliverables; all tests passing
+- ✅ Epic #75: 7/11 closed; critical path gate #81 closed
+- **Next Priority:** #77 (UI Slice — Place/Undo)
 
 ## Implementation Patterns (Locked)
 
@@ -55,10 +57,13 @@
 
 ## Critical Path Deliverables
 - **#76** ✅ WebAppOptionsValidator + DI registration + readme docs
-- **#77** ✅ startapp deep links + safe fallback behavior
-- **#80** ⏳ Full persistence (Version field, TTL, database) — Sully architecture review pending
-- **#81** ⏳ Security-context-binding (Sully design review)
-- **#82** ⏳ Versioning APIs + concurrency test harness (Sully contract first)
+- **#77** ✅ startapp deep links + safe fallback behavior; awaiting UI implementation
+- **#80** ✅ Full persistence (Version field, TTL, database migration) — complete
+- **#81** ✅ Security-context-binding complete (InvalidGameContext explicit, gate closed)
+- **#82** ✅ Versioning APIs + concurrency — delivered in #81 round
+- **#83** ✅ Async turn notifications — complete
+- **#84** ✅ Abuse protection slice 1 — complete; more work deferred
+- **#77–#79** Ready for UI implementation after #81 gate closed
 
 ## Design Principles (DDD-Aligned)
 1. **Domain Purity:** No I/O, no framework types, no logging inside aggregates/value objects
@@ -75,15 +80,18 @@
 4. **Deterministic Tests:** WebApplicationFactory removes flakiness; integration tests fast + reliable
 5. **Abuse Protection Layers:** Filter-based guardrails preserve DDD boundaries while delivering practical safety
 6. **Edit-in-Place Cockpit:** Persisting message IDs enables edit-first refresh after restart; robust UX
+7. **Schema Migration Closure:** Idempotent startup schema migration can satisfy DB artifact requirements without runtime persistence rewrite
+8. **Security Outcome Granularity:** Explicit `InvalidGameContext` outcome prevents ambiguity at client/ops levels
+9. **User-Chat Context Binding:** Cross-chat mutation detection best enforced at application boundary before domain mutations
+10. **Distinct Failure Codes:** Enable deterministic tamper telemetry and proper corrective flows
 
 ## Decision Artifacts
-- `.squad/decisions.md` — Merged decisions for #80, #77, #83, #84
+- `.squad/decisions.md` — Merged decisions for #76–#84 + #81 closure
 - GitHub issues #76–#84 — Implementation slices with acceptance criteria
 - `.squad/orchestration-log/` — Per-round logs
 
-## Next Actions
-1. Await Sully #80 architecture review (Version field + TTL + database shape)
-2. Implement full #80 (add Version field, TTL cleanup job, database backend)
-3. Begin #81 security-context-binding (after Sully design)
-4. Expand #84 abuse protection (reach #81 completion, then expand to /sky + callbacks)
-5. Prepare #82 versioning API implementation (after Sully contract)
+## Next Actions (Updated 2026-03-02 Round 16)
+1. ✅ Closed #80 persistence (Version field + TTL + database backend + migration)
+2. ✅ Completed #81 security-context-binding (InvalidGameContext explicit + tests)
+3. ✅ Epic #75 gate closed; #77–#79 (UI) unblocked
+4. **Next Priority:** #77 (UI Slice — Place/Undo) ready for team prioritization

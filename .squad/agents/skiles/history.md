@@ -5,7 +5,46 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Cross-Team Status (2026-03-02T01:40:00Z) — Round 13 Scribe Sync (Remediation + Audit)
+> **Note (2026-03-02):** Session 27–28 summary below. Full session logs archived in `.squad/log/` and decision records in `.squad/decisions.md`. Detailed history from Sessions 1–26 summarized into Core Context.
+
+## Session 27–28 Summary (2026-03-02)
+
+### Issue #81 Completion: InvalidGameContext Binding (Session 27)
+- **Timestamp:** 2026-03-02T05:05:00Z
+- **Task:** Implement residual checklist for #81 security-context-binding
+- **Outcome:** ✅ Completed with explicit cross-chat tampering outcome
+- **Deliverables:**
+  - `GamePlacementStatus.InvalidGameContext` + `GameUndoStatus.InvalidGameContext` statuses
+  - `InMemoryGroupGameSessionStore` cross-chat detection: checks if user seated in different active session
+  - 4 new regression tests (place/undo × cross-chat + endpoint surface)
+  - WebApp returns 409 with `"InvalidGameContext"` error string
+  - Full test suite passing
+
+### Issue #81 Closure by Sully (Session 28)
+- **Timestamp:** 2026-03-02T02:18:00Z
+- **Task:** Verify #81 acceptance criteria and close
+- **Outcome:** ✅ Completed; issue closed; epic #75 advanced to 7/11
+- **Verification:**
+  - Invalid context detected at aggregate level (groupChatId vs. active session mapping)
+  - WebApp surface returns `InvalidGameContext` when viewer mutates different chat
+  - Regression suite guards store + WebApp contract on place/undo paths
+  - Tests: 56 assertions pass, 16 pre-existing skipped
+
+### Epic #75 Status After Round 16
+- **Closed Issues:** #76, #77, #80, #81, #82, #83 (6 partial + 1 full = ~7/11)
+- **Unblocked:** #77–#79 (UI), #84 (abuse protection)
+- **Next Priority:** #77 (UI Slice — Place/Undo)
+- **Critical Gate:** #81 security-context-binding now CLOSED
+
+## Key Learnings (Updated Round 16)
+- Security outcome granularity matters: explicit `InvalidGameContext` prevents client/ops ambiguity vs. collapsed authorization
+- Distinguishing "wrong chat" from "not seated anywhere" safe at application boundary without domain entity changes
+- User-to-chat context mapping required whenever multiple coexistent sessions possible
+- Idempotent startup schema migration can satisfy DB artifact requirements without runtime rewrite
+
+---
+
+> Full detailed history from Sessions 1–26 preserved in `core-context.md` for reference.
 - **Skiles (You):** Issue #80 REMEDIATION COMPLETE (Round 13). Delivered repository contract (CRUD + CleanupExpired), lifecycle policy (TTL metadata + config), restart integration test. Commit 8bd9d1d (PR #87). Outstanding: Game aggregate schema + migration.
 - **Sully:** Issue #80 CLOSURE AUDIT COMPLETE (Round 13). Verified deliverables: repository contract ✅, TTL policy ✅, restart evidence ✅, versioning ✅. Outstanding blocker: Schema/migration criterion. Path forward: DB implementation or scope revision.
 - **Aloha:** QA verdict (Round 12) identified gaps. Skiles + Sully remediation/audit completed. Issue #80 remains open pending schema/migration decision.

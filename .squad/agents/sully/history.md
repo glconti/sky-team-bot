@@ -5,7 +5,35 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Cross-Team Status (2026-03-02T01:40:00Z) — Round 13 Scribe Sync (Remediation + Audit)
+> **Note (2026-03-02 Round 16):** Session 28 summary below. Full session logs archived in `.squad/log/` and decision records in `.squad/decisions.md`. Detailed history from Sessions 1–25 summarized into Core Context.
+
+## Session 28 Summary (2026-03-02 Round 16)
+
+### Issue #81 Closure Verification
+- **Timestamp:** 2026-03-02T02:18:00Z
+- **Task:** Verify Skiles' Session 27 InvalidGameContext binding + close #81
+- **Outcome:** ✅ Completed; #81 closed in GitHub; epic #75 advanced to 7/11
+- **Verification:**
+  - Invalid context detected at aggregate level (groupChatId vs. active session mapping)
+  - WebApp surface returns `InvalidGameContext` when viewer mutates different chat
+  - Regression suite guards store + WebApp contract (place/undo paths)
+  - Tests: 56 assertions pass; 16 pre-existing skipped
+
+### Epic #75 Status After Round 16
+- **Closed Issues:** 7/11 (#76, #80, #81, #82, #83, #85, #86)
+- **Unblocked:** #77–#79 (UI Slice), #84 (Abuse Protection expansion)
+- **Critical Gate:** #81 security-context-binding CLOSED
+- **Next Priority:** #77 (UI Slice — Place/Undo)
+
+## Key Learnings (Updated Round 16)
+- Security outcome granularity enables deterministic tamper telemetry + corrective flows
+- Explicit `InvalidGameContext` prevents client/ops ambiguity vs. collapsed authorization
+- Audit cadence validates critical path alignment + catches acceptance gaps early
+- Gate closure (#81) unblocks parallel execution of UI (#77–#79) + abuse protection (#84)
+
+---
+
+> Full detailed history from Sessions 1–25 preserved in `core-context.md` for reference.
 - **Sully (You):** Issue #80 CLOSURE AUDIT COMPLETE (Round 13). Verified Skiles remediation deliverables: repository contract (CRUD + CleanupExpired) ✅, TTL policy (config + documentation) ✅, restart evidence (Issue80FileBackedRestartPersistenceTests) ✅, versioning (expectedVersion + conflict detection) ✅. Outstanding blocker: Game aggregate schema + migration. Scope options: DB implementation or formal revision to embrace JSON persistence.
 - **Skiles:** Issue #80 REMEDIATION COMPLETE (Round 13). Delivered repository contract, lifecycle policy (metadata + retention config), restart integration test. Commit 8bd9d1d (PR #87). Awaiting audit closure and schema/migration path decision.
 - **Aloha:** QA verdict (Round 12) identified contract/schema gaps. Skiles remediation addressed behavior validation. Sully audit confirmed findings. Outstanding: Database schema implementation.

@@ -6,12 +6,12 @@
 **Responsibilities:** Architecture review, issue triage, decision records, critical path coordination
 
 ## Current Status (2026-03-02)
-- ✅ Issue closure round 8: Closed #76 (BotFather config), #85 (WebApp tests), #86 (QA matrix)
-- ✅ Epic #75 progress: 7/11 child issues complete (#76, #80, #81, #82, #83, #85, #86); #77 still pending while #84 (abuse protection) and the UI slices wait for the remaining gates
-- ✅ Issue #80 closure audit: GameSessions schema migration + TTL confirmed; JSON persistence contract validated
-- ✅ Issue #81 security-context-binding closure: explicit InvalidGameContext invariants surface at the aggregate and WebApp layers, backed by regression coverage
-- ⏳ Immediate gate: #77 Open App launchpad hardening and QA now that the core persistence/security stack is steady
-- ⏳ Next: Ship #84 abuse protection plus #78–#79 Mini App UI once the #77 gate passes
+- ✅ Issue #80: Game Persistence (schema migration + TTL confirmed)
+- ✅ Issue #81: Security-context-binding (InvalidGameContext invariants + regression coverage)
+- ✅ Issue #82: Versioning/Concurrency APIs (expectedVersion + 409 ConcurrencyConflict)
+- ✅ Epic #75: 7/11 child issues complete (#76, #80, #81, #82, #83, #85, #86)
+- ✅ Critical Path Gate #81: CLOSED
+- **Next Priority:** #77 (UI Slice — Place/Undo); #84 (Abuse Protection expansion)
 
 ## Architectural Decisions (Locked)
 
@@ -35,11 +35,11 @@
 
 ## Critical Path (Locked)
 1. **#76** ✅ BotFather config validation (complete)
-2. **#77** ⏳ Open App Launchpad hardening (awaiting merge + QA rerun now that #80–#83 compliance is validated)
-3. **#80** ✅ Game Persistence (schema + TTL audit closed; contract satisfied)
-4. **#81** ✅ Security-context-binding (cross-chat InvalidGameContext invariants enforced)
-5. **#82** ✅ Versioning/Concurrency APIs (expectedVersion + ConcurrencyConflict semantics shipped)
-6. **#78–#79** ⏳ Mini App UI (blocked until #77 UI refinements and #84 abuse protection land)
+2. **#80** ✅ Game Persistence (schema + TTL + migration complete)
+3. **#81** ✅ Security-context-binding (InvalidGameContext invariants enforced; gate closed)
+4. **#82** ✅ Versioning/Concurrency APIs (complete)
+5. **#77** ⏳ Open App Launchpad hardening (awaiting UI implementation; persistence/security stack unblocked)
+6. **#78–#79** ⏳ Mini App UI (ready after #77 completion)
 
 ## Team Coordination Model
 - **Skiles:** Implementation (carries critical path work)
@@ -54,13 +54,17 @@
 4. **Persistence ≠ Concurrency:** Must design together as atomic unit; cannot separate
 5. **Epic Chaining:** Requires upfront design of foundational layers to prevent rework
 6. **Issue Comments with PR Cross-Links:** Improves team context; enables automatic closure on merge
+7. **Schema Migration Closure:** Idempotent startup migration satisfies DB artifacts without runtime rewrite
+8. **Security Outcome Granularity:** Explicit InvalidGameContext prevents ambiguity vs. collapsed authorization
+9. **Audit Cadence:** Regular scope audits validate critical path alignment and catch acceptance gaps early
+10. **Gate Closure Impact:** Closing #81 security gate unblocks UI (#77–#79) and abuse protection (#84) for parallel execution
 
 ## Decision Artifacts
-- `.squad/decisions.md` — Merged inbox decisions from all team agents
+- `.squad/decisions.md` — Merged inbox decisions for #76–#84 + #81 closure
 - `.squad/orchestration-log/` — Per-agent timestamped logs
 - GitHub issues #75–#86 — Epic + child issues with architecture review gates
 
-## Next Actions
-1. Drive #77 Open App launchpad sign-off (UI hardening + QA rerun) now that the core persistence/security stack is steady
-2. Coordinate #84 abuse protection (rate limits and tamper detection) so the UI slices can ship with guardrails
-3. Approve #78–#79 Mini App UI release plan once #77/#84 completion criteria are met
+## Next Actions (Updated 2026-03-02 Round 16)
+1. ✅ Epic #75 critical path gate #81 closed; #77–#79 (UI) unblocked
+2. **Next Priority:** #77 Open App launchpad UI implementation; #84 abuse protection expansion
+3. Coordinate team prioritization for #77 UI slice (Place/Undo buttons + turn summary display)
