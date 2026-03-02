@@ -14,6 +14,14 @@
 - **Blockers:** Game aggregate schema + migration (design + implementation decision required).
 - **Next:** Schema/migration owner to commit. PR #87 merge contingent on #80 closure path clarity.
 
+## Cross-Team Status (2026-03-02T01:51:00Z) — Round 14 Scribe Sync (Schema Migration + Closure)
+- **Skiles (You):** SCHEMA MIGRATION DELIVERED (Round 14, Commit ab61d0e). Implemented `0001_game_sessions_schema.sql` migration artifact, `GameSessionsSchemaMigrator` runner, runtime wiring in `JsonGameSessionPersistence`. Migration applies on startup with idempotent SQL. Issue #80 now ready for closure.
+- **Sully:** FINAL CLOSURE VERIFIED (Round 14). All acceptance criteria confirmed: GameSessions schema ✅, repository contract ✅, TTL config ✅, restart tests ✅, version/lock semantics ✅. Issue #80 close-ready. Critical path advances to #81 (security-context-binding) and #82 (versioning/concurrency) before UI (#77–#79) ships.
+- **Aloha:** QA cycle complete. Restart integration test + schema migration both validated. Issue #80 meets all acceptance criteria.
+- **Tenerife:** Ready for #81 expansion on #80 closure.
+- **Epic #75 Status:** #80 → CLOSED (critical path unblocked); #81–#82 priority critical; #83–#86 queue pending concurrency gate.
+- **Next:** Close issue #80 on GitHub. Merge PR #87. Begin #81 security-context-binding design.
+
 ## Core Context (Summarized from Sessions 1–23)
 
 ### Foundational Work (Sessions 1–2, 2026-02-21)

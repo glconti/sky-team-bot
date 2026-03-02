@@ -7,10 +7,10 @@
 
 ## Current Status (2026-03-02)
 - ✅ Issue closure round 8: Closed #76 (BotFather config), #85 (WebApp tests), #86 (QA matrix)
-- ✅ Epic #75 progress: 3/11 child issues complete (#76, #85, #86); #77 still pending while foundational gates (#80, #81, #82) remain open
-- ⏳ Immediate gate: Validate Skiles #80 persistence implementation (Version field + TTL) so the domain can anchor #81/#82
-- ⏳ Next: Begin #81 security-context-binding design review after #80 verification
-- ⏳ Pending: Review #82 versioning API contract before #78–#79 UI integration
+- ✅ Epic #75 progress: 4/11 child issues complete (#76, #80, #85, #86); #77 still pending while foundational gates (#81, #82) remain open
+- ✅ Issue #80 closure audit: GameSessions schema migration + TTL confirmed; JSON persistence contract validated
+- ⏳ Immediate gate: Begin #81 security-context-binding design review now that #80 is validated
+- ⏳ Next: Review #82 versioning API contract before #78–#79 UI integration
 
 ## Architectural Decisions (Locked)
 
@@ -34,8 +34,8 @@
 
 ## Critical Path (Locked)
 1. **#76** ✅ BotFather config validation (complete)
-2. **#77** ⏳ Open App Launchpad hardening (awaiting merge + QA rerun once #80 passes)
-3. **#80** ⏳ Game Persistence (in progress; architecture contract delivered)
+2. **#77** ⏳ Open App Launchpad hardening (awaiting merge + QA rerun now that #80 passes)
+3. **#80** ✅ Game Persistence (schema + TTL audit closed; contract satisfied)
 4. **#81** ⏳ Security-context-binding (design pending)
 5. **#82** ⏳ Versioning/Concurrency APIs (design pending)
 6. **#78–#79** ⏳ Mini App UI (blocked until #80–#82 complete)
@@ -60,7 +60,6 @@
 - GitHub issues #75–#86 — Epic + child issues with architecture review gates
 
 ## Next Actions
-1. Validate Skiles #80 persistence implementation (Version field, TTL, repository interface)
-2. Begin #81 security-context-binding contract (before Skiles implements)
-3. Review #82 versioning API shape (expectedVersion parameter, ConcurrencyConflict response)
-4. Approve #82 test suite design (6 required tests: concurrency, persistence, version, conflicts, TTL)
+1. Begin #81 security-context-binding contract review now that the persistence gate is satisfied
+2. Review #82 versioning API shape (expectedVersion parameter, ConcurrencyConflict response)
+3. Approve #82 test suite design (6 required tests: concurrency, persistence, version, conflicts, TTL)

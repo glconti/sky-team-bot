@@ -14,6 +14,14 @@
 - **Blockers:** Game aggregate schema + migration (design + decision required). PR #87 merge contingent on #80 closure roadmap clarity.
 - **Next:** Schema/migration owner to decide. Link findings to PR #87 comments. Merge when path is clear.
 
+## Cross-Team Status (2026-03-02T01:51:00Z) — Round 14 Scribe Sync (Schema Migration + Closure)
+- **Sully (You):** FINAL CLOSURE VERIFIED (Round 14). All acceptance criteria confirmed: GameSessions schema ✅, repository contract ✅, TTL config ✅, restart tests ✅, version/lock semantics ✅. Issue #80 close-ready. Critical path advances to #81 (security-context-binding) and #82 (versioning/concurrency) before UI (#77–#79) ships.
+- **Skiles:** SCHEMA MIGRATION DELIVERED (Round 14, Commit ab61d0e). Implemented `0001_game_sessions_schema.sql` migration artifact, `GameSessionsSchemaMigrator` runner, runtime wiring in `JsonGameSessionPersistence`. Migration applies on startup with idempotent SQL. Issue #80 now ready for closure.
+- **Aloha:** QA cycle complete. Restart integration test + schema migration both validated. Issue #80 meets all acceptance criteria.
+- **Tenerife:** Ready for #81 expansion on #80 closure.
+- **Epic #75 Status:** #80 → CLOSED (critical path unblocked); #81–#82 priority critical; #83–#86 queue pending concurrency gate.
+- **Next:** Close issue #80 on GitHub. Merge PR #87. Begin #81 security-context-binding design.
+
 ## Core Context (Summarized from Sessions 1–13)
 
 ### Foundational Phases (2026-02-20 to 2026-02-22)
@@ -74,6 +82,7 @@ Architected Telegram Mini App as primary UI (from cockpit-centric design). Desig
 - Shared review gate model (Sully architecture, Skiles implementation, Aloha testing) prevents rework
 - Round 10 closure audit confirmed PR #87 only satisfies #76/#85; #80–#84 still pending, so persistence (#80) is the immediate gate for the epic
 - Persistent storage auditing must keep the DB schema requirement explicit; successful JSON persistence demos do not fulfill acceptance until we either add the GameSessions migration or amend the issue scope.
+- Adding the explicit GameSessions schema migration against the JSON persistence proof point finally satisfied the acceptance gate and allows the critical path to move forward.
 
 ---
 
