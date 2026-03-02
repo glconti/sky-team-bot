@@ -428,7 +428,7 @@ public sealed class TelegramBotService(
         {
             await botClient.SendMessage(
                 groupChatId,
-                "Open app link is temporarily unavailable. Run /sky state and try again.",
+                "Open app link is temporarily unavailable. Run /sky state in this group and try again.",
                 cancellationToken: cancellationToken);
             return;
         }
@@ -593,7 +593,7 @@ public sealed class TelegramBotService(
         {
             await botClient.SendMessage(
                 message.Chat.Id,
-                "Secret hand/place/undo actions are Mini App-only. Open app link is temporarily unavailable; run /sky state and retry.",
+                "Secret hand/place/undo actions are Mini App-only. Open app link is temporarily unavailable; run /sky state in your group chat and retry.",
                 cancellationToken: cancellationToken);
             return;
         }

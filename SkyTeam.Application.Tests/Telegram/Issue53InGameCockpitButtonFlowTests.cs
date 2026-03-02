@@ -96,6 +96,25 @@ public sealed class Issue53InGameCockpitButtonFlowTests
         hasPrivateHandFallback.Should().BeTrue("private fallback /sky hand must remain supported");
     }
 
+    [Fact]
+    public void SecretFlowFallbackMessaging_ShouldKeepUsersOnGroupLaunchpad_WhenOpenAppLinkIsUnavailable()
+    {
+        // Arrange
+        var programSource = File.ReadAllText(ResolveProgramSourcePath());
+
+        // Act
+        var keepsGroupSkyAppFallback = programSource.Contains(
+            "Secret hand/place/undo actions are Mini App-only. Use /sky app in your group chat.",
+            StringComparison.Ordinal);
+        var keepsGroupSkyStateFallback = programSource.Contains(
+            "Secret hand/place/undo actions are Mini App-only. Open app link is temporarily unavailable; run /sky state in your group chat and retry.",
+            StringComparison.Ordinal);
+
+        // Assert
+        keepsGroupSkyAppFallback.Should().BeTrue("fallback guidance should keep players in the group launchpad");
+        keepsGroupSkyStateFallback.Should().BeTrue("fallback guidance should keep retries on group cockpit refresh");
+    }
+
     private static string ResolveProgramSourcePath()
         => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "SkyTeam.TelegramBot",
             "TelegramBotService.cs"));

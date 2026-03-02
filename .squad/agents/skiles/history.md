@@ -229,3 +229,5 @@ All work consolidated on `feat/issue-76-85-botfather-config-webapp-tests` branch
 - The safest compatibility path is to emit `InvalidGameContext` only when the user is seated in another active session, while leaving true non-participants on `NotSeated`.
 - Security outcome granularity matters for tamper detection and ops visibility.
 - Aggregates must maintain user-to-chat mappings when multiple coexistent sessions are possible.
+- Group launchpad fallbacks should always point back to group controls (`/sky app`, `/sky state`) so Mini App-first navigation does not regress into DM-first behavior.
+- Callback payload budget needs explicit regression coverage at the cockpit-button layer, not only at codec decode time, to keep Telegram 64-byte guarantees visible.

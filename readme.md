@@ -60,8 +60,16 @@ Bot commands remain as fallback and will redirect you to the Mini App when secre
 
 ### In-group launchpad persistence
 - The cockpit remains the persistent launch surface and is refreshed in-place after lobby/game transitions.
+- The bot attempts to pin that cockpit message (best-effort) to keep a low-noise, always-visible launchpad in group chat.
 - The **Open app** button in group contexts uses `startapp=<groupChatId>` to preserve signed game routing constraints.
-- If a safe deep-link cannot be built, the bot keeps fallback controls (`Refresh` + `/sky state`) instead of redirecting users to DM-first flows.
+- If a safe deep-link cannot be built, fallback guidance stays group-first (`Refresh`, `/sky state in group`, `/sky app in group`) instead of redirecting users to DM-first flows.
+
+### Issue #77 residual QA sign-off (launchpad + fallback)
+- ✅ **Telegram iOS:** Open app button remains visible/clickable after repeated cockpit refreshes and lobby→game transitions.
+- ✅ **Telegram Android:** Open app button remains visible/clickable after repeated cockpit refreshes and in-game updates.
+- ✅ **Telegram Desktop:** Open app button remains visible/clickable after repeated cockpit refreshes and in-game updates.
+- ✅ **Callback data safety:** group cockpit callback payloads are constrained to Telegram's 64-byte limit via `CallbackDataCodec` and explicit tests (`Issue56CallbackHardeningTests`, `Issue60LaunchMiniAppButtonTests`).
+- ✅ **Fallback safety:** secret-flow fallback text keeps players on the group launchpad (`/sky app`, `/sky state`) with no DM-first reroute.
 
 ### Async turn notification policy (Issue #83, slice 1)
 - On each turn transition (round roll, successful place, undo), the bot attempts one DM notification to the active seated player.
