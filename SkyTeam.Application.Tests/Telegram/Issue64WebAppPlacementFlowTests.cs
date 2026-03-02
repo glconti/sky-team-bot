@@ -117,6 +117,35 @@ public sealed class Issue64WebAppPlacementFlowTests
     }
 
     [Fact]
+    public async Task PlaceEndpoint_ShouldReturnConcurrencyConflict_WhenExpectedVersionIsOutdated()
+    {
+        // Arrange
+        const long groupChatId = 123;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var (userId, dieIndex, commandId) = SeedTurnForPlacement(factory, groupChatId);
+        var gameSessionStore = factory.Services.GetRequiredService<InMemoryGroupGameSessionStore>();
+        var staleVersion = gameSessionStore.GetSnapshot(groupChatId)!.Version;
+
+        using var firstRequest = CreatePlaceRequest(groupChatId, userId, "Player", dieIndex, commandId, staleVersion);
+        using var staleRequest = CreatePlaceRequest(groupChatId, userId, "Player", dieIndex, commandId, staleVersion);
+
+        // Act
+        var firstResponse = await client.SendAsync(firstRequest);
+        var staleResponse = await client.SendAsync(staleRequest);
+        var conflict = await staleResponse.Content.ReadFromJsonAsync<WebAppConcurrencyConflictResponse>(JsonOptions);
+        var state = gameSessionStore.GetPublicState(groupChatId);
+
+        // Assert
+        firstResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        staleResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        conflict!.Error.Should().Be("ConcurrencyConflict");
+        conflict.CurrentVersion.Should().Be(state!.Session.Version);
+        state.PlacementsMade.Should().Be(1);
+    }
+
+    [Fact]
     public async Task WebAppTransportFlow_ShouldCoverOpenLobbyStartRollPlaceUndo()
     {
         // Arrange
@@ -282,11 +311,14 @@ public sealed class Issue64WebAppPlacementFlowTests
         return dice.First(d => !d.IsUsed && d.Value == rolledValue).Index;
     }
 
-    private static HttpRequestMessage CreatePlaceRequest(long groupChatId, long viewerUserId, string viewerDisplayName, int dieIndex, string commandId)
+    private static HttpRequestMessage CreatePlaceRequest(long groupChatId, long viewerUserId, string viewerDisplayName, int dieIndex, string commandId, long? expectedVersion = null)
     {
         var initData = BuildInitData(TestBotToken, DateTimeOffset.UtcNow, viewerUserId, viewerDisplayName, groupChatId.ToString());
+        var url = expectedVersion.HasValue
+            ? $"/api/webapp/game/place?gameId={groupChatId}&expectedVersion={expectedVersion.Value}"
+            : $"/api/webapp/game/place?gameId={groupChatId}";
 
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/webapp/game/place?gameId={groupChatId}");
+        var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Headers.Add("X-Telegram-Init-Data", initData);
         request.Content = JsonContent.Create(new { dieIndex, commandId });
         return request;

@@ -60,7 +60,13 @@ public sealed record WebAppGameStateResponse(
     WebAppCockpitState? Cockpit,
     string GameStatus,
     WebAppViewer Viewer,
+    long? Version = null,
     WebAppPrivateHandState? PrivateHand = null);
+
+public sealed record WebAppConcurrencyConflictResponse(
+    string Error,
+    long? CurrentVersion,
+    string Message);
 
 public static class WebAppEndpoints
 {
@@ -197,6 +203,7 @@ public static class WebAppEndpoints
 
     private static async Task<IResult> RollGame(
         string? gameId,
+        long? expectedVersion,
         HttpContext httpContext,
         InMemoryGroupLobbyStore lobbyStore,
         InMemoryGroupGameSessionStore gameSessionStore,
@@ -219,7 +226,14 @@ public static class WebAppEndpoints
             return Results.Conflict(new { error = "Game is not started yet. Press Start first." });
         }
 
-        var rollResult = gameSessionStore.RegisterRoll(result.GroupChatId.Value, SecretDiceRoller.Roll(() => Random.Shared.Next(1, 7)));
+        var roll = SecretDiceRoller.Roll(() => Random.Shared.Next(1, 7));
+        var rollResult = expectedVersion.HasValue
+            ? gameSessionStore.RegisterRoll(result.GroupChatId.Value, roll, expectedVersion.Value)
+            : gameSessionStore.RegisterRoll(result.GroupChatId.Value, roll);
+
+        if (rollResult.Status == GameSessionRollStatus.VersionConflict)
+            return CreateConcurrencyConflictResult(rollResult.CurrentVersion);
+
         if (rollResult.Status == GameSessionRollStatus.RoundNotAwaitingRoll)
             return Results.Conflict(new { error = "This round has already been rolled." });
 
@@ -243,6 +257,7 @@ public static class WebAppEndpoints
     private static async Task<IResult> PlaceDie(
         string? gameId,
         WebAppPlaceDieRequest request,
+        long? expectedVersion,
         HttpContext httpContext,
         InMemoryGroupGameSessionStore gameSessionStore,
         TelegramBotService telegramBotService,
@@ -262,7 +277,13 @@ public static class WebAppEndpoints
         if (commandId.Length > MaxCommandIdLength || commandId.Any(char.IsWhiteSpace))
             return Results.BadRequest(new { error = "Invalid commandId." });
 
-        var placement = gameSessionStore.PlaceDie(result.GroupChatId!.Value, result.Context!.Viewer.UserId, request.DieIndex, commandId);
+        var placement = expectedVersion.HasValue
+            ? gameSessionStore.PlaceDie(result.GroupChatId!.Value, result.Context!.Viewer.UserId, request.DieIndex, commandId, expectedVersion.Value)
+            : gameSessionStore.PlaceDie(result.GroupChatId!.Value, result.Context!.Viewer.UserId, request.DieIndex, commandId);
+
+        if (placement.Status == GamePlacementStatus.VersionConflict)
+            return CreateConcurrencyConflictResult(placement.CurrentVersion);
+
         if (placement.Status != GamePlacementStatus.Placed)
             return Results.Conflict(new { error = MapPlacementError(placement) });
 
@@ -282,6 +303,7 @@ public static class WebAppEndpoints
 
     private static async Task<IResult> UndoLastPlacement(
         string? gameId,
+        long? expectedVersion,
         HttpContext httpContext,
         InMemoryGroupGameSessionStore gameSessionStore,
         TelegramBotService telegramBotService,
@@ -291,7 +313,13 @@ public static class WebAppEndpoints
         if (result.Error is not null)
             return result.Error;
 
-        var undo = gameSessionStore.UndoLastPlacement(result.GroupChatId!.Value, result.Context!.Viewer.UserId);
+        var undo = expectedVersion.HasValue
+            ? gameSessionStore.UndoLastPlacement(result.GroupChatId!.Value, result.Context!.Viewer.UserId, expectedVersion.Value)
+            : gameSessionStore.UndoLastPlacement(result.GroupChatId!.Value, result.Context!.Viewer.UserId);
+
+        if (undo.Status == GameUndoStatus.VersionConflict)
+            return CreateConcurrencyConflictResult(undo.CurrentVersion);
+
         if (undo.Status != GameUndoStatus.Undone)
             return Results.Conflict(new { error = MapUndoError(undo) });
 
@@ -360,6 +388,7 @@ public static class WebAppEndpoints
             Cockpit: MapCockpit(sessionState),
             GameStatus: sessionState.GameStatus,
             Viewer: new WebAppViewer(viewerUserId, MapViewerSeat(sessionState.Session, viewerUserId)),
+            Version: sessionState.Session.Version,
             PrivateHand: MapPrivateHand(handResult));
     }
 
@@ -377,6 +406,7 @@ public static class WebAppEndpoints
             Cockpit: null,
             GameStatus: "InProgress",
             Viewer: new WebAppViewer(viewerUserId, MapViewerSeat(lobby, viewerUserId)),
+            Version: null,
             PrivateHand: null);
     }
 
@@ -406,6 +436,7 @@ public static class WebAppEndpoints
             GamePlacementStatus.InvalidTarget => "A command id is required.",
             GamePlacementStatus.CommandDoesNotMatchDie => "That command does not match the selected die.",
             GamePlacementStatus.CommandNotAvailable => "That command is not currently available.",
+            GamePlacementStatus.VersionConflict => "Game state changed. Please refresh and retry.",
             GamePlacementStatus.DomainError => result.ErrorMessage ?? "Cannot place die (domain error).",
             _ => "Cannot place die."
         };
@@ -417,9 +448,16 @@ public static class WebAppEndpoints
             GameUndoStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
             GameUndoStatus.RoundNotRolled => "This round has not been rolled yet.",
             GameUndoStatus.UndoNotAllowed => "Undo not allowed. You can only undo your last placement before the other player places.",
+            GameUndoStatus.VersionConflict => "Game state changed. Please refresh and retry.",
             GameUndoStatus.DomainError => result.ErrorMessage ?? "Cannot undo (domain error).",
             _ => "Cannot undo."
         };
+
+    private static IResult CreateConcurrencyConflictResult(long? currentVersion)
+        => Results.Conflict(new WebAppConcurrencyConflictResponse(
+            Error: "ConcurrencyConflict",
+            CurrentVersion: currentVersion,
+            Message: "Game state changed. Please refresh and retry."));
 
     private static (long? GroupChatId, TelegramInitDataContext? Context, IResult? Error) ResolveRequestContext(string? gameId, HttpContext httpContext)
     {

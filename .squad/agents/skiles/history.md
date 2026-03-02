@@ -333,3 +333,19 @@
 - `SkyTeam.Application.Tests\GameSessions\InMemoryGroupGameSessionStoreTests.cs`
 - `SkyTeam.Application.Tests\Telegram\Issue64WebAppPlacementFlowTests.cs`
 - `.squad/decisions/inbox/skiles-issue-81.md`
+
+### Session 24: Issue #82 optimistic concurrency first slice (2026-03-02T02:10:00Z)
+
+**Outcome:** Started issue #82 by adding expected-version optimistic concurrency guards on roll/place/undo mutations with explicit conflict responses for stale writes.
+
+**Key Learnings:**
+- Compare-and-swap checks are safest when enforced before turn/command validation so stale writes always fail deterministically with a conflict contract.
+- Carrying `Version` on public session snapshots lets transport layers implement retryable optimistic locking without leaking persistence concerns into domain entities.
+- Returning `ConcurrencyConflict` with `CurrentVersion` creates a clear non-200 recovery path for Mini App clients (refresh + retry).
+
+**Delivered Artifacts:**
+- `SkyTeam.Application\GameSessions\InMemoryGroupGameSessionStore.cs`
+- `SkyTeam.TelegramBot\WebApp\WebAppEndpoints.cs`
+- `SkyTeam.Application.Tests\GameSessions\InMemoryGroupGameSessionStoreTests.cs`
+- `SkyTeam.Application.Tests\Telegram\Issue64WebAppPlacementFlowTests.cs`
+- `.squad/decisions/inbox/skiles-issue-82.md`

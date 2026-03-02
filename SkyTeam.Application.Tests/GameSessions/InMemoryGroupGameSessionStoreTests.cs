@@ -728,9 +728,32 @@ public sealed class InMemoryGroupGameSessionStoreTests
         persistence.State.Sessions.Single().Version.Should().Be(3);
     }
 
-    [Fact(Skip = "Issue #80 needs versioned updates; current APIs do not accept expected/current version tokens.")]
+    [Fact]
     public void Update_ShouldReturnVersionConflict_WhenExpectedVersionIsOutdated()
     {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        var (pilot, copilot, lobby) = CreateReadyLobby();
+        store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        var staleVersion = store.GetSnapshot(GroupChatId)!.Version;
+        var currentUser = roll.StartingPlayer == PlayerSeat.Pilot ? pilot.UserId : copilot.UserId;
+        var nextUser = currentUser == pilot.UserId ? copilot.UserId : pilot.UserId;
+
+        var currentCommandId = GetCommandIdForDie(store, currentUser, dieIndex: 0);
+        store.PlaceDie(GroupChatId, currentUser, dieIndex: 0, currentCommandId, staleVersion).Status.Should().Be(GamePlacementStatus.Placed);
+
+        var nextCommandId = GetCommandIdForDie(store, nextUser, dieIndex: 0);
+
+        // Act
+        var staleUpdate = store.PlaceDie(GroupChatId, nextUser, dieIndex: 0, nextCommandId, staleVersion);
+        var state = store.GetPublicState(GroupChatId);
+
+        // Assert
+        staleUpdate.Status.Should().Be(GamePlacementStatus.VersionConflict);
+        staleUpdate.CurrentVersion.Should().Be(state!.Session.Version);
+        state.PlacementsMade.Should().Be(1);
     }
 
     [Fact(Skip = "Auth expiry UX is implemented in Telegram/WebApp transport layer, not in application store.")]
