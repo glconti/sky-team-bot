@@ -5,13 +5,13 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Cross-Team Status (2026-03-02T00:58:00Z) — Round 9 Completion
-- **Sully (You):** Closure audit complete for #77/#80/#83/#84/#75. All 4 targets remain OPEN; PR #87 closes only #76/#85 (18% epic completion). Next: Design #81 security-context-binding; review #82 API.
-- **Skiles:** Issue #81 first slice COMPLETED. Chat/game binding enforced at app boundary via explicit `(groupChatId, userId)` mutations. Tests + commit 70d84ef + issue updated.
-- **Aloha:** Standby (Issue #80 QA coverage completed in prior round).
-- **Tenerife:** Standby.
-- **Critical Path:** #80 (completed) → #81 (slice 1 done, full scope pending) → #82 (versioning/concurrency) → #77 (group launchpad UI).
-- **Next:** Merge PR #87 (BotFather + WebApp); finalize #81 security-context-binding design; implement #81 full scope.
+## Cross-Team Status (2026-03-02T01:10:22Z) — Round 10 Scribe Sync
+- **Sully (You):** Closure audit (Round 9) complete. PR #87 (BotFather + WebApp tests) merged candidate. Architecting #81 full scope (identity/role context binding + UI state). Ready to design #82 full conflict expansion.
+- **Skiles:** Issue #82 Slice 1 COMPLETED. Optimistic concurrency (CAS mutations + 409 responses) in place. Version exposed in GameSessionSnapshot. Commit 6001682 posted. Tests active; parallel stale write expansion pending.
+- **Aloha:** Completed #80 QA coverage. Available for #77 UI implementation.
+- **Tenerife:** Standby for #83 turn notifications.
+- **Critical Path:** #80 (persistence done) → #81 (slice 1 done, architecture review + full scope pending) → #82 (slice 1 done, parallel tests + non-WebApp surfaces pending) → #83/#84 (parallel).
+- **Next:** Merge PR #87. Review #81 full scope design. Plan #82 conflict test expansion. Schedule #83/#84 parallel start.
 
 ## Core Context (Summarized from Sessions 1–13)
 

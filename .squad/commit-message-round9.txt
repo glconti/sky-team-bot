@@ -1,0 +1,25 @@
+.squad: Round 9 completion — Sully closure audit + Skiles issue #81 slice
+
+Orchestration:
+- Sully: Audited #77/#80/#83/#84/#75; all 4 targets remain OPEN (PR #87 closes 2/11 = 18% epic)
+- Skiles: Issue #81 first slice — chat/game binding enforced at app boundary via (groupChatId, userId)
+
+Logging:
+- Orchestration logs: Sully (2026-03-02T00-58-00Z), Skiles (2026-03-02T00-58-00Z)
+- Session log: ralph-round9 (2026-03-02T00-58-00Z)
+
+Decisions:
+- Merged inbox entries (skiles-issue-81.md, sully-round9-closure-audit.md) into decisions.md
+- Deleted inbox files after merge
+
+Cross-Agent Context:
+- Updated Sully's history.md with Round 9 closure audit + team status
+- Updated Skiles' history.md with Round 9 issue #81 first slice + team status
+
+Archive:
+- No archiving needed (all decisions within 30 days)
+
+Critical Path:
+#80 (done) → #81 (slice 1 done) → #82 (pending design) → #77 (UI)
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

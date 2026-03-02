@@ -5,14 +5,14 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Cross-Team Status (2026-03-02T00:58:00Z) — Round 9 Completion
-- **Sully:** Closure audit complete for #77/#80/#83/#84/#75. All 4 targets remain OPEN; PR #87 closes only #76/#85 (18% epic completion). Next: Design #81; review #82 API.
-- **Skiles (You):** Issue #81 first slice COMPLETED. Chat/game binding enforced at app boundary via `(groupChatId, userId)` mutations. Tests + commit 70d84ef posted. Full scope remaining.
-- **Aloha:** Standby (Issue #80 QA coverage completed in prior round).
-- **Tenerife:** Standby.
-- **Critical Path:** #80 (done) → #81 (slice 1 done, full scope pending) → #82 (design + implementation) → #77 (UI).
-- **Blockers Resolved:** Sully's closure audit clears no issues; #81 first slice unblocks full #81 implementation. #82 remains blocked on #81 completion.
-- **Next:** Merge PR #87; finalize #81 security-context-binding design; implement #81 full scope + #82 versioning/concurrency APIs.
+## Cross-Team Status (2026-03-02T01:10:22Z) — Round 10 Scribe Sync
+- **Sully:** Closure audit (Round 9) complete. PR #87 (BotFather + WebApp) ready. Architecting #81 full scope. Awaiting #82 final API review.
+- **Skiles (You):** Issue #82 Slice 1 COMPLETED. Optimistic concurrency enforcement (CAS mutations) + 409 Conflict responses + tests. Commit 6001682 posted. Remaining scope: parallel stale write tests, non-WebApp surface enforcement.
+- **Aloha:** Completed #80 QA coverage. Standby for #77.
+- **Tenerife:** Standby for #83 turn notifications.
+- **Critical Path:** #80 (persistence done) → #81 (slice 1 done, full scope pending) → #82 (slice 1 done, conflict expansion pending) → #83/#84 (parallel).
+- **Blockers Resolved:** Skiles' #82 slice 1 unblocks #81 completion. #82 full scope depends on #81 closure + parallel test expansion.
+- **Next:** Merge PR #87. Finalize #81 full scope. Expand #82 parallel conflict tests. Unblock #83/#84.
 
 ## Core Context (Summarized from Sessions 1–23)
 

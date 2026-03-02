@@ -5,13 +5,13 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Cross-Team Status (2026-03-02T00:35:00Z)
-- **Sully:** Issue #80/#82 architecture contract designed. Persistence contract stabilized; versioning scope deferred to #82. Next: #81 design + #82 API review.
-- **Skiles:** Issue #80 vertical slice COMPLETED. Persistence + version tracking + tests passing. #82 versioning APIs pending design review.
-- **Aloha (You):** Issue #86 QA COMPLETED. Manual QA matrix for Mini App (8 client × launch surface matrix, 5 happy path, 8 error cases, 7 multi-player sync, release checklist) merged to readme.md & decisions.md. Next: Run matrix on iOS/Android before PR #87 merge.
-- **Coordinator Update:** Focus area now explicit — Telegram Mini App rollout (persistence, launch flow, QA hardening). Active issues: [76, 80, 85, 86, 87].
-- **Critical Path:** #80→#81 (security-context-binding) → #82 (versioning/concurrency) before UI integration; #86 QA matrix now gates Mini App releases.
-- **Next:** Activate skipped version-conflict test; expand concurrency suite using QA matrix multi-player scenarios; run full matrix on real devices before PR #87 merge.
+## Cross-Team Status (2026-03-02T01:10:22Z) — Round 10 Scribe Sync
+- **Sully:** Closure audit complete. PR #87 ready for merge. Architecting #81 full scope (identity/role binding). #82 slice 1 (conflict enforcement) unblocks full scope expansion.
+- **Skiles:** Issue #82 Slice 1 COMPLETED (commit 6001682). Optimistic concurrency CAS mutations + 409 responses in WebApp. Tests active; parallel stale write + non-WebApp surface expansion pending.
+- **Aloha (You):** Issue #86 QA matrix COMPLETED (released). Ready to pivot: Run expanded concurrency matrix on #82 slice 1 + #81 final scope. Available for #77 UI launch.
+- **Tenerife:** Standby for #83 turn notifications.
+- **Critical Path:** #80 (done) → #81 (slice 1 done, final scope review + close) → #82 (slice 1 done, conflict expansion testing) → #77/#83/#84 (parallel).
+- **Next:** Aloha activate expanded concurrency QA matrix. Sully finalize #81 scope. Skiles expand #82 parallel tests.
 
 ## Cross-Team Status (2026-03-02T00:25:39Z)
 - **Sully:** Issue #80/#82 architecture contract designed. Persistence contract stabilized; versioning scope deferred to #82. Next: #81 design + #82 API review.
