@@ -146,6 +146,10 @@ public readonly record struct GameHandResult(
     int? PlacementsRemaining,
     IReadOnlyList<AvailableGameCommand>? AvailableCommands);
 
+/// <summary>
+/// Stores active game sessions bound to a Telegram group chat.
+/// Security invariant: mutation APIs must validate both group chat id and user id against the same session.
+/// </summary>
 public sealed class InMemoryGroupGameSessionStore
 {
     private const int PersistenceSchemaVersion = 1;
@@ -317,12 +321,23 @@ public sealed class InMemoryGroupGameSessionStore
 
     public GamePlacementResult PlaceDie(long requestingUserId, int dieIndex, string commandId, string? idempotencyKey)
     {
+        if (!TryGetGroupChatIdForUserId(requestingUserId, out var groupChatId))
+            return new(GamePlacementStatus.NoActiveSession, PublicInfo: null, ResolutionInfo: null, ErrorMessage: null);
+
+        return PlaceDie(groupChatId, requestingUserId, dieIndex, commandId, idempotencyKey);
+    }
+
+    public GamePlacementResult PlaceDie(long groupChatId, long requestingUserId, int dieIndex, string commandId)
+        => PlaceDie(groupChatId, requestingUserId, dieIndex, commandId, idempotencyKey: null);
+
+    public GamePlacementResult PlaceDie(long groupChatId, long requestingUserId, int dieIndex, string commandId, string? idempotencyKey)
+    {
         if (string.IsNullOrWhiteSpace(commandId))
             return new(GamePlacementStatus.InvalidTarget, PublicInfo: null, ResolutionInfo: null, ErrorMessage: null);
 
         lock (_sync)
         {
-            if (!TryGetSessionByUserId(requestingUserId, out var session))
+            if (!_sessions.TryGetValue(groupChatId, out var session))
                 return new(GamePlacementStatus.NoActiveSession, PublicInfo: null, ResolutionInfo: null, ErrorMessage: null);
 
             if (!string.IsNullOrWhiteSpace(idempotencyKey) &&
@@ -412,9 +427,17 @@ public sealed class InMemoryGroupGameSessionStore
 
     public GameUndoResult UndoLastPlacement(long requestingUserId)
     {
+        if (!TryGetGroupChatIdForUserId(requestingUserId, out var groupChatId))
+            return new(GameUndoStatus.NoActiveSession, PublicInfo: null, ErrorMessage: null);
+
+        return UndoLastPlacement(groupChatId, requestingUserId);
+    }
+
+    public GameUndoResult UndoLastPlacement(long groupChatId, long requestingUserId)
+    {
         lock (_sync)
         {
-            if (!TryGetSessionByUserId(requestingUserId, out var session))
+            if (!_sessions.TryGetValue(groupChatId, out var session))
                 return new(GameUndoStatus.NoActiveSession, PublicInfo: null, ErrorMessage: null);
 
             if (!session.TryGetSeat(requestingUserId, out var seat, out var player))

@@ -90,6 +90,33 @@ public sealed class Issue64WebAppPlacementFlowTests
     }
 
     [Fact]
+    public async Task PlaceEndpoint_ShouldBindPlacementToRequestedGame_WhenViewerHasAnotherActiveSession()
+    {
+        // Arrange
+        const long primaryGroupChatId = 123;
+        const long secondaryGroupChatId = 456;
+        const long sharedUserId = 111;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var (dieIndex, commandId) = SeedPlacementAcrossMultipleGames(factory, primaryGroupChatId, secondaryGroupChatId, sharedUserId);
+        using var placeRequest = CreatePlaceRequest(primaryGroupChatId, sharedUserId, "Alice", dieIndex, commandId);
+
+        // Act
+        var response = await client.SendAsync(placeRequest);
+        var state = await response.Content.ReadFromJsonAsync<WebAppGameStateResponse>(JsonOptions);
+        var gameSessionStore = factory.Services.GetRequiredService<InMemoryGroupGameSessionStore>();
+        var primaryState = gameSessionStore.GetPublicState(primaryGroupChatId);
+        var secondaryState = gameSessionStore.GetPublicState(secondaryGroupChatId);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        state!.Phase.Should().Be(WebAppGamePhase.InGame);
+        primaryState!.PlacementsMade.Should().Be(1);
+        secondaryState!.PlacementsMade.Should().Be(0);
+    }
+
+    [Fact]
     public async Task WebAppTransportFlow_ShouldCoverOpenLobbyStartRollPlaceUndo()
     {
         // Arrange
@@ -195,6 +222,34 @@ public sealed class Issue64WebAppPlacementFlowTests
         var dieIndex = FindDieIndex(hand.Hand!, command);
 
         return (currentUserId, dieIndex, command);
+    }
+
+    private static (int DieIndex, string CommandId) SeedPlacementAcrossMultipleGames(
+        WebApplicationFactory<Program> factory,
+        long primaryGroupChatId,
+        long secondaryGroupChatId,
+        long sharedUserId)
+    {
+        var lobbyStore = factory.Services.GetRequiredService<InMemoryGroupLobbyStore>();
+        var gameSessionStore = factory.Services.GetRequiredService<InMemoryGroupGameSessionStore>();
+
+        lobbyStore.CreateNew(primaryGroupChatId);
+        lobbyStore.Join(primaryGroupChatId, new LobbyPlayer(sharedUserId, "Alice"));
+        lobbyStore.Join(primaryGroupChatId, new LobbyPlayer(222, "Bob"));
+        gameSessionStore.Start(primaryGroupChatId, lobbyStore.GetSnapshot(primaryGroupChatId), requestingUserId: sharedUserId);
+        gameSessionStore.RegisterRoll(primaryGroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        var primaryHand = gameSessionStore.GetHand(primaryGroupChatId, sharedUserId);
+        var commandId = primaryHand.AvailableCommands!.First().CommandId;
+        var dieIndex = FindDieIndex(primaryHand.Hand!, commandId);
+
+        lobbyStore.CreateNew(secondaryGroupChatId);
+        lobbyStore.Join(secondaryGroupChatId, new LobbyPlayer(sharedUserId, "Alice"));
+        lobbyStore.Join(secondaryGroupChatId, new LobbyPlayer(333, "Charlie"));
+        gameSessionStore.Start(secondaryGroupChatId, lobbyStore.GetSnapshot(secondaryGroupChatId), requestingUserId: sharedUserId);
+        gameSessionStore.RegisterRoll(secondaryGroupChatId, new SecretDiceRoll([6, 6, 6, 6], [6, 6, 6, 6]));
+
+        return (dieIndex, commandId);
     }
 
     private static int FindDieIndex(SecretDiceHand hand, string commandId)

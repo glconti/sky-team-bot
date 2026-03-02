@@ -262,7 +262,7 @@ public static class WebAppEndpoints
         if (commandId.Length > MaxCommandIdLength || commandId.Any(char.IsWhiteSpace))
             return Results.BadRequest(new { error = "Invalid commandId." });
 
-        var placement = gameSessionStore.PlaceDie(result.Context!.Viewer.UserId, request.DieIndex, commandId);
+        var placement = gameSessionStore.PlaceDie(result.GroupChatId!.Value, result.Context!.Viewer.UserId, request.DieIndex, commandId);
         if (placement.Status != GamePlacementStatus.Placed)
             return Results.Conflict(new { error = MapPlacementError(placement) });
 
@@ -291,7 +291,7 @@ public static class WebAppEndpoints
         if (result.Error is not null)
             return result.Error;
 
-        var undo = gameSessionStore.UndoLastPlacement(result.Context!.Viewer.UserId);
+        var undo = gameSessionStore.UndoLastPlacement(result.GroupChatId!.Value, result.Context!.Viewer.UserId);
         if (undo.Status != GameUndoStatus.Undone)
             return Results.Conflict(new { error = MapUndoError(undo) });
 

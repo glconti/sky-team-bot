@@ -313,3 +313,21 @@
 - SkyTeam.Application.Tests\Telegram\*AbusProtectionTests.cs
 - .squad/decisions/inbox/skiles-issue-84.md → merged to decisions.md
 - Commit: 02293fe
+
+### Session 23: Issue #81 chat/game binding first slice (2026-03-02T01:25:00Z)
+
+**Outcome:** Started issue #81 by binding mutation calls to explicit `(groupChatId, userId)` context at the application boundary and wiring WebApp mutation endpoints to that context.
+
+**Key Learnings:**
+- User-only mutation lookup is unsafe once the same player is active in multiple group chats; explicit chat context is required for deterministic routing.
+- Binding WebApp actions to signed request chat context + seated-player validation safely rejects cross-chat mutation attempts.
+- Backward-compatible wrappers let us migrate callers incrementally without breaking existing test scaffolding.
+
+**Test Status:** Focused suite passing (`InMemoryGroupGameSessionStoreTests` + `Issue64WebAppPlacement*`), solution build passing.
+
+**Delivered Artifacts:**
+- `SkyTeam.Application\GameSessions\InMemoryGroupGameSessionStore.cs`
+- `SkyTeam.TelegramBot\WebApp\WebAppEndpoints.cs`
+- `SkyTeam.Application.Tests\GameSessions\InMemoryGroupGameSessionStoreTests.cs`
+- `SkyTeam.Application.Tests\Telegram\Issue64WebAppPlacementFlowTests.cs`
+- `.squad/decisions/inbox/skiles-issue-81.md`

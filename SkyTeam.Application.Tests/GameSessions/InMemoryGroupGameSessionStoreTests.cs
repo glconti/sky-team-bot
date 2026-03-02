@@ -247,6 +247,61 @@ public sealed class InMemoryGroupGameSessionStoreTests
     }
 
     [Fact]
+    public void PlaceDie_ShouldBindToRequestedGroupChat_WhenUserHasMultipleActiveSessions()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        const long firstGroupChatId = 123;
+        const long secondGroupChatId = 456;
+        var sharedPilot = new LobbyPlayer(1, "Pilot");
+        var firstCopilot = new LobbyPlayer(2, "Copilot A");
+        var secondCopilot = new LobbyPlayer(3, "Copilot B");
+
+        store.Start(firstGroupChatId, new LobbySnapshot(firstGroupChatId, sharedPilot, firstCopilot), requestingUserId: sharedPilot.UserId);
+        store.RegisterRoll(firstGroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+        var commandId = GetCommandIdForDie(store, sharedPilot.UserId, dieIndex: 0);
+
+        store.Start(secondGroupChatId, new LobbySnapshot(secondGroupChatId, sharedPilot, secondCopilot), requestingUserId: sharedPilot.UserId);
+        store.RegisterRoll(secondGroupChatId, new([6, 6, 6, 6], [6, 6, 6, 6]));
+
+        // Act
+        var result = store.PlaceDie(firstGroupChatId, sharedPilot.UserId, dieIndex: 0, commandId);
+        var firstState = store.GetPublicState(firstGroupChatId);
+        var secondState = store.GetPublicState(secondGroupChatId);
+
+        // Assert
+        result.Status.Should().Be(GamePlacementStatus.Placed);
+        firstState!.PlacementsMade.Should().Be(1);
+        secondState!.PlacementsMade.Should().Be(0);
+    }
+
+    [Fact]
+    public void PlaceDie_ShouldRejectCrossChatMutation_WhenUserIsNotSeatedInRequestedSession()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        const long firstGroupChatId = 123;
+        const long secondGroupChatId = 456;
+        var firstPilot = new LobbyPlayer(1, "Pilot");
+        var firstCopilot = new LobbyPlayer(2, "Copilot A");
+        var secondPilot = new LobbyPlayer(3, "Pilot B");
+        var secondCopilot = new LobbyPlayer(4, "Copilot B");
+
+        store.Start(firstGroupChatId, new LobbySnapshot(firstGroupChatId, firstPilot, firstCopilot), requestingUserId: firstPilot.UserId);
+        store.RegisterRoll(firstGroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        store.Start(secondGroupChatId, new LobbySnapshot(secondGroupChatId, secondPilot, secondCopilot), requestingUserId: secondPilot.UserId);
+        store.RegisterRoll(secondGroupChatId, new([6, 6, 6, 6], [6, 6, 6, 6]));
+        var secondCommand = GetCommandIdForDie(store, secondPilot.UserId, dieIndex: 0);
+
+        // Act
+        var result = store.PlaceDie(secondGroupChatId, firstPilot.UserId, dieIndex: 0, secondCommand);
+
+        // Assert
+        result.Status.Should().Be(GamePlacementStatus.NotSeated);
+    }
+
+    [Fact]
     public void PlaceDie_ShouldMarkOnlyRequestingPlayersDieUsed_WhenPlacementIsAccepted()
     {
         // Arrange
