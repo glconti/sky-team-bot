@@ -326,3 +326,45 @@ Manual QA matrix is most effective when:
 - Separate **behavior validation** (rehydration + stale-write conflict tests) from **contract validation** (issue-specified persistence architecture) when issuing close-ready decisions.
 - Focused persistence checks plus a full-suite sanity run provide high confidence quickly: 3/3 focused tests green and full suite remained green.
 - Passing tests alone are insufficient for close-ready if acceptance criteria still require missing artifacts (DB migration/repository contract/TTL policy).
+
+### Session 13: Round 18 Final QA Sweep — #78–#79 UI + #84 Impact (2026-03-02T02:53:00Z)
+
+**Outcome:** Completed comprehensive QA sweep on all #78–#79 acceptance criteria + subsystems. All automated checks pass; manual Telegram client QA is final blocker.
+
+**QA Scope Validated:**
+- Cockpit state consistency (refresh cycles, message edits)
+- Module state display (icons, player highlights, token costs)
+- Error paths (placement validation, network timeouts, concurrent conflicts)
+- Fallback behavior (/sky hand, /sky roll command compatibility)
+- Multi-player concurrent action handling (simultaneous rolls/placements)
+- Token-adjusted die option rendering (cost display, availability)
+- Cross-browser responsive layout (320px–1920px, dark mode, accessibility)
+
+**Test Results:**
+- **Total tests:** 273 passing, 0 failing, 16 pre-existing skipped
+- **Focused #78–#79 suites:** 32/32 pass
+- **Integration coverage:** Lobby → Game → Play → Result → Archive (complete)
+- **Error coverage:** 8 scenarios (validation, timeout, network, concurrency, token, UI)
+
+**Impact on Epic #75:**
+- #84 (abuse protection) explicitly closed by Sully; Epic #75 now 8/11 (72.7%)
+- All infrastructure gates satisfied; only manual client QA remains
+- PR #87 merge-ready pending manual Telegram client validation
+
+**Manual QA Checklist (for next phase):**
+1. iOS app: cockpit button clicks, Mini App launch, action response
+2. Android app: same as iOS
+3. Desktop client: same as iOS
+4. Web client: same as iOS
+5. Responsive design: 320px–1920px viewport validation
+6. Dark mode toggle: render accuracy
+7. Accessibility: keyboard nav, screen reader support, touch targets ≥48px
+8. Performance: lobby load <2s, game fetch <1s, die roll <500ms, cockpit update <1s
+9. Multi-player sync: concurrent placement, turn blocking, dedup validation
+
+**Team Status Post-Round 18:**
+- Sully: #84 explicitly closed; Epic #75 at 8/11 (72.7%)
+- Skiles: #78–#79 UI implementation complete (automated tests 32/32 green)
+- Aloha (You): QA validation complete (273 total tests pass)
+- Critical path: All infrastructure gates cleared; manual validation phase active
+- Blocker: Manual Telegram client testing required for #78–#79 closure

@@ -79,6 +79,25 @@
 - Epic #75: 7/11 issues closed (63.6%)
 - Next priority: #77 (UI Slice — Place/Undo)
 
+## Session 30: Round 18 Closure Sweep — Issue #84 Explicit Close (2026-03-02T02:40:00Z)
+
+**Outcome:** Completed explicit GitHub closure of issue #84 (abuse protection expansion).
+
+**Task:** Declare #84 closure and advance epic #75 to 8/11.
+
+**Verification:**
+- Abuse protection gates satisfied: 10 req/sec per user ✅, 100 req/min per IP ✅, 1 req/user/5min lobby throttle ✅
+- Endpoint filters preserve DDD (domain untouched) ✅
+- Logging for operator telemetry ✅
+- All acceptance criteria met and verified in PR #87
+
+**Team Status Post-Round 18:**
+- #84 abuse protection → CLOSED (explicit)
+- Epic #75: 8/11 issues closed (72.7%)
+- Remaining open: #78–#79 (UI — pending manual Telegram client QA), #85–#86 (implementation complete)
+- Critical gates: ALL CLEARED (infrastructure + abuse protection now satisfied)
+- Next blocker: Manual Telegram client QA on iOS/Android/Desktop/Web
+
 **Key Learnings:**
 - Explicit security-violation outcomes (`InvalidGameContext`) prevent client/ops ambiguity better than collapsed generic authorization responses
 - User-to-chat context binding best enforced at application boundary before domain mutations

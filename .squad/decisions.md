@@ -292,3 +292,114 @@ Separate **behavior validation** (tests confirming rehydration + conflict mechan
 ### Consequences
 - Issue #80 is now ready to be marked closed; the critical path advances to #81 (security-context-binding) and #82 (versioning/concurrency) before UI work (#77–#79) can ship.
 - The additive migration ensures future database-backed stores can reuse the same schema without touching the existing JSON persistence flow.
+
+---
+
+## 2026-03-02T07:30:00Z — Issue #84 Final Closure (Sully)
+
+**Timestamp:** 2026-03-02T07:30:00Z  
+**Issue:** https://github.com/glconti/sky-team-bot/issues/84  
+**PR:** https://github.com/glconti/sky-team-bot/pull/87  
+**Requested by:** Gianluigi Conti
+
+### Context
+- Issue #84 demanded abuse/rate limits plus deterministic input validation on every player-facing surface (WebApp, Telegram commands, Mini App callbacks). The residual checklist focused on missing per-user/per-IP throttles, clear 400/429 contracts with retry hints, idempotency keys, payload caps, and safe abuse logging.
+- PR #87 slice 1 already introduced initial throttling and validation; commit `80bf477` (final abuse guardrails) delivers the remaining guardrails, shields, and regression coverage.
+- With this residual slice complete, epic #75 now has 8/11 child issues finished; only #77–#79 (UI slice) remain on the critical path.
+
+### Decision
+- Declare #84 ready to close: PR #87 now enforces the advertised rate limits (per-user, per-IP, lobby create), returns 429 + `Retry-After`/`retryHint` when throttles trigger, and keeps abuse logs scoped to metadata only.
+- Input validation is deterministic: oversized payloads, missing/oversized `X-Idempotency-Key`, replayed keys, or invalid display names/command IDs all surface 400 responses with actionable hints, preventing malformed requests from reaching domain logic.
+- The new residual tests and updated endpoints prove the guardrails work in concert; no further items remain in the residual checklist, so issue #84 should be closed with PR #87 as the reference.
+
+### Delivered Artifacts
+- `SkyTeam.TelegramBot/WebApp/WebAppAbuseProtectionFilter.cs` — payload-size guard, idempotency key validation, replay rejection, and richer 429 responses (`retryAfterSeconds`, `retryHint`).
+- `SkyTeam.TelegramBot/WebApp/WebAppAbuseProtector.cs` — mutation idempotency window plus safe tracking to reject repeated keys before command dispatch.
+- `SkyTeam.TelegramBot/WebApp/WebAppEndpoints.cs` & `SkyTeam.TelegramBot/WebApp/TelegramInitDataFilter.cs` — carry retry hints on 400 responses for oversized initData and display name/key validation failures.
+- `SkyTeam.Application.Tests/Telegram/Issue84AbuseProtectionResidualTests.cs` & `Issue64WebAppPlacementFlowTests.cs` — regression coverage for throttling, idempotency, payload caps, and required headers.
+- `readme.md` — documents the abuse-protection behavior, logging limits, and retry semantics for future auditors.
+
+### Done Scope
+- Residual checklist fully satisfied on PR #87: throttle enforcement (per-user 10 req/s, per-IP 100 req/min, lobby create 1 per user/5 min), deterministic 429/400 payloads with retry hints, idempotency key enforcement, payload-size rejection, and safe abuse logging.
+- Regression suite already passing the targeted filters plus the full solution build/test commands referenced in issue comments.
+
+### Remaining Scope
+- None for the #84 residual slice.
+- Future work (out of scope): distributed rate limiting/telemetry for multi-instance deployments.
+
+### Learnings
+- Endpoint filters are the right place for abuse guardrails because they have access to transport metadata; keeping rate limits and replay detection there guards every downstream path without leaking domain context.
+- Explicit retry hints in 400/429 payloads (retryAfterSeconds, retryHint) let Mini App clients react gracefully without logging sensitive payload details.
+- Maintaining the epic progress comment ensures the whole squad tracks 8/11 closure momentum and keeps #77–#79 as the remaining critical work items.
+
+---
+
+## 2026-03-02T08:20:00Z — Issues #78/#79 Mini App UI Completion (Skiles)
+
+**Issues:**  
+- https://github.com/glconti/sky-team-bot/issues/78  
+- https://github.com/glconti/sky-team-bot/issues/79  
+**PR:** https://github.com/glconti/sky-team-bot/pull/87  
+**Requested by:** Gianluigi Conti
+
+### Context
+- The Mini App shipped backend WebApp endpoints for lobby and in-game flows but still used a raw JSON debug UI.
+- Issue #78 required a lobby UI with seat placeholders, stateful join/start actions, and clear error handling.
+- Issue #79 required an in-game UI with readable cockpit state, active player actions, and concurrency conflict handling.
+
+### Decision
+- Replace the debug-only HTML with a minimal but production-usable lobby/in-game UI that:
+  - renders lobby seats, placeholders, and action buttons with state-aware enablement,
+  - surfaces in-game round/turn/cockpit status in readable panels,
+  - routes roll/place/undo actions with expectedVersion and clear error messaging,
+  - keeps responsive layout for mobile + desktop.
+- Add focused UI source tests to lock placeholder/action labels, display-name truncation, and concurrency/version handling.
+
+### Delivered Artifacts
+- `SkyTeam.TelegramBot/wwwroot/index.html`
+  - lobby + in-game UI panels, responsive layout, versioned action calls, conflict/error messaging.
+- `SkyTeam.Application.Tests/Telegram/Issue78WebAppLobbyUiTests.cs`
+- `SkyTeam.Application.Tests/Telegram/Issue79WebAppInGameUiTests.cs`
+
+### Learnings
+- A thin, readable Mini App UI can deliver all lobby/in-game acceptance criteria without adding a framework.
+- Concurrency conflict messaging is most reliable when the UI immediately refreshes state after a 409.
+
+---
+
+## 2026-03-02T02:14:00Z — Issues #78/#79 Final QA Sweep (Aloha)
+
+**Requested by:** Gianluigi Conti  
+**Issues:**  
+- https://github.com/glconti/sky-team-bot/issues/78  
+- https://github.com/glconti/sky-team-bot/issues/79  
+**PR branch audited:** `feat/issue-76-85-botfather-config-webapp-tests` (PR #87)
+
+### Local Verification Executed
+- `dotnet build skyteam-bot.slnx --nologo` ✅
+- `dotnet test SkyTeam.Application.Tests` (focused #78–#79) ✅ 29 total, 29 passed
+- `dotnet test skyteam-bot.slnx --nologo` ✅ 310 total, 294 passed, 16 pre-existing skipped
+
+### What is Verified in this Environment
+
+#### Issue #78 — Implement Mini App lobby UI
+- Lobby placeholders/status/actions present in `wwwroot/index.html` (`renderLobby`, Pilot/Copilot cards, spectator badge/note).
+- Create flow implemented with structured inputs and POST to `/api/webapp/lobby/new`.
+- Join flow accepts explicit game code and POSTs to `/api/webapp/lobby/join`.
+- Signed context filtering enforced by `ResolveRequestContext` in `WebAppEndpoints.cs`.
+- Invalid input handling verified by endpoint tests and UI-source checks.
+
+#### Issue #79 — Implement Mini App in-game UI
+- In-game state/turn/order rendering present in `renderGame` (`Round`, `Status`, `Current`, seat badges).
+- Action submission wired for `roll`, `place`, and `undo` with `expectedVersion`.
+- Concurrency conflict handling implemented in UI and validated in integration tests.
+- Invalid game-context/action responses surfaced through API error mapping.
+- Responsive foundation exists (`@media (min-width: 720px)`).
+
+### Residual Blockers
+- Real Telegram client manual QA on **iOS**, **Android**, and **Desktop** cannot be executed from CLI-only environment.
+- Cross-platform Telegram manual QA remains blocker for both #78 and #79 closure.
+
+### Final Verdict
+- **#78:** Not close-ready (implementation strong; cross-platform Telegram manual QA still pending).
+- **#79:** Not close-ready (implementation strong; cross-platform Telegram manual QA still pending).

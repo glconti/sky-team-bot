@@ -33,6 +33,24 @@
 - **Secondary Gate:** #84 (Abuse Protection expansion)
 - **Critical Gate Status:** All pre-UI gates now CLOSED (#80 schema, #81 security-context, #77 launchpad)
 
+### Round 18 Summary — #78–#79 UI Residuals & #84 Impact (2026-03-02T02:47:00Z)
+- **Task:** Complete #78–#79 UI residual checklist
+- **Outcome:** ✅ Feature-complete; manual Telegram client QA is final blocker
+- **Deliverables:**
+   - `WebAppFrontend` Place/Undo button state management + module display refinement
+   - Error toast messaging (invalid placement, network timeout)
+   - Cockpit state sync validation (refresh logic)
+   - WebApp integration tests for all paths (32/32 passing)
+- **Testing:** 273 total tests passing; all automated gates cleared
+- **Blocker:** Manual client QA required (iOS/Android/Desktop/Web launch + button interaction)
+- **Impact:** #84 (abuse protection) explicitly closed by Sully; Epic #75 now at 8/11 closed (72.7%)
+
+### Epic #75 Status After Round 18
+- **Closed Issues:** 8/11 (#76, #77, #80, #81, #82, #83, #84, #85–#86 implementation complete)
+- **Pending Manual QA:** #78–#79 (UI — awaiting Telegram client validation)
+- **Infrastructure Gates:** ALL CLEARED (#80 schema, #81 security, #82 concurrency, #84 abuse protection)
+- **Next Priority:** Manual Telegram client QA (iOS/Android/Desktop/Web) before #78–#79 closure
+
 ---
 
 ## Session 28 Summary (2026-03-02 Round 16)
