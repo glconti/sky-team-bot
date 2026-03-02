@@ -7,13 +7,14 @@
 
 **Archive Note:** Full history summarized into `core-context.md`. Sessions 1–11 (2026-02-21 to 2026-03-02) condensed below.
 
-## Cross-Team Status (2026-03-02T01:10:22Z) — Round 10 Scribe Sync
-- **Sully:** Closure audit complete. PR #87 ready for merge. Architecting #81 full scope (identity/role binding). #82 slice 1 (conflict enforcement) unblocks full scope expansion.
-- **Skiles:** Issue #82 Slice 1 COMPLETED (commit 6001682). Optimistic concurrency CAS mutations + 409 responses in WebApp. Tests active; parallel stale write + non-WebApp surface expansion pending.
-- **Aloha (You):** Issue #86 QA matrix COMPLETED (released). Ready to pivot: Run expanded concurrency matrix on #82 slice 1 + #81 final scope. Available for #77 UI launch.
-- **Tenerife:** Standby for #83 turn notifications.
-- **Critical Path:** #80 (done) → #81 (slice 1 done, final scope review + close) → #82 (slice 1 done, conflict expansion testing) → #77/#83/#84 (parallel).
-- **Next:** Aloha activate expanded concurrency QA matrix. Sully finalize #81 scope. Skiles expand #82 parallel tests.
+## Cross-Team Status (2026-03-02T01:22:00Z) — Round 11 Scribe Sync
+- **Sully:** Closure audit (Round 10) complete. Issues #80–#84 remain open (acceptance criteria untouched). PR #87 ready to merge. Priority: #80 → #81 → #82 → #83/#84.
+- **Skiles:** Issue #83 COMPLETED. Async notification hardening (dedup reset + group fallback best-effort). Tests + operator docs. Commit b6239c8. PR #87 ready for merge.
+- **Aloha (You):** Issue #86 QA matrix COMPLETED. Available for #77 UI launch or #82 expanded concurrency QA matrix.
+- **Tenerife:** #83 scope complete (Skiles). Standby for downstream.
+- **Epic #75 Progress:** 3/11 complete (#76, #85, #86). Next gate: #80 persistence validation + #81 full scope before #82 expansion.
+- **Critical Path:** #80 (done) → #81 (slice 1 done, full scope pending) → #82 (slice 1 done, conflict expansion pending) → #83 (complete) → #84 (parallel).
+- **Next:** Merge PR #87. Finalize #81 full scope. Expand #82 parallel tests. Launch #77 UI or #84 rate limits.
 
 ## Archived Core Learnings (Full Summary in core-context.md)
 - Deterministic concurrency testing via shared-gate placement pairs (one succeeds, one blocked)
