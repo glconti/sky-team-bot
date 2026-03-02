@@ -169,9 +169,24 @@ All work consolidated on `feat/issue-76-85-botfather-config-webapp-tests` branch
 - `SkyTeam.Application.Tests\Telegram\Issue64WebAppPlacementFlowTests.cs`
 - `.squad/decisions/inbox/skiles-issue-81-residual.md`
 
+### Session 28: Issue #81 complete - #81 closed by Sully (2026-03-02T02:18:00Z)
+
+**Outcome:** After your Session 27 InvalidGameContext binding completion, Sully validated acceptance criteria and closed #81 in GitHub. Epic #75 advanced to 7/11 closed.
+
+**Team Status:**
+- #81 security-context-binding gate now CLOSED → unblocks #77–#79 (UI) and #84 (abuse protection)
+- Epic #75 progress: 7/11 issues closed
+- Next critical path: #77 (UI Slice — Place/Undo)
+
+**Key Learnings:**
+- Security violation outcomes must remain distinct from authorization failures; `InvalidGameContext` prevents ambiguity at client/ops levels
+- User-to-chat context mapping required whenever multiple sessions coexist for same user
+
 ## Learnings
 - For strict acceptance criteria, an idempotent startup schema migration can close a database-schema gate without forcing a risky rewrite of an already stable JSON persistence runtime.
 - Keeping SQL migration scripts as repository artifacts and embedding them at build time provides both auditability and production-safe runtime loading.
 - SQLite test cleanup should clear pooled connections (`SqliteConnection.ClearAllPools`) before deleting temporary directories, otherwise teardown can fail with locked database files.
 - Cross-chat mutation tampering requires an explicit `InvalidGameContext` contract to keep security telemetry and client behavior deterministic.
 - The safest compatibility path is to emit `InvalidGameContext` only when the user is seated in another active session, while leaving true non-participants on `NotSeated`.
+- Security outcome granularity matters for tamper detection and ops visibility.
+- Aggregates must maintain user-to-chat mappings when multiple coexistent sessions are possible.

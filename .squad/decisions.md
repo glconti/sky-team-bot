@@ -2,6 +2,72 @@
 
 > Append-only ledger of team decisions. Never retroactively edit entries.
 
+## 2026-03-02T05:30:00Z — Issue #81 Final Closure — Security-Context-Binding Completion (Sully)
+
+**Timestamp:** 2026-03-02T05:30:00Z  
+**Issue:** https://github.com/glconti/sky-team-bot/issues/81  
+**PR:** https://github.com/glconti/sky-team-bot/pull/87  
+**Status:** ✅ Closed
+
+### Context
+- #81 required the game-session aggregate to enforce a chat-bound security context and signal a distinct outcome when a seated player tampers with a session in another chat.
+- The residual checklist called for explicit `InvalidGameContext` results instead of folding every unauthorized mutation into `NotSeated`.
+
+### Decision
+- `InMemoryGroupGameSessionStore` now tracks `InvalidGameContext` by checking whether the requester is seated in a different active session before returning an error.
+- `GamePlacementStatus.InvalidGameContext` and `GameUndoStatus.InvalidGameContext` were introduced, and `WebAppEndpoints` surfaces the exact `"InvalidGameContext"` string so the Mini App can react deterministically.
+- Cross-chat regression coverage landed in `InMemoryGroupGameSessionStoreTests` plus `Issue64WebAppPlacementFlowTests` to exercise the new failure path and ensure the WebApp returns 409 with the expected payload.
+- With the residual behavior, PR #87 now meets every acceptance criterion for #81, so the issue can be closed.
+
+### Acceptance Criteria Verified
+- Invalid context is detected at the aggregate level by comparing the requested group chat vs. the caller's active session mapping.
+- The HTTP/WebApp surface returns the `InvalidGameContext` error when a viewer attempts to mutate a different chat's session.
+- The regression suite guards both the store logic and the WebApp contract, covering place and undo paths.
+
+### Tests
+- `dotnet test SkyTeam.Application.Tests\SkyTeam.Application.Tests.csproj` (pass, 16 skipped (pre-existing), 56 warnings)
+
+### Learnings
+- Distinct failure codes keep tampering telemetry clean and let the Mini App signal the right corrective flow.
+- Aggregates must maintain user-to-chat mappings whenever multiple sessions can coexist for the same user.
+
+---
+
+## 2026-03-02T05:05:00Z — Issue #81 Residual — InvalidGameContext Completion (Skiles)
+
+**Timestamp:** 2026-03-02T05:05:00Z  
+**Issue:** https://github.com/glconti/sky-team-bot/issues/81  
+**PR:** https://github.com/glconti/sky-team-bot/pull/87  
+**Requested by:** Gianluigi Conti
+
+### Context
+- #81 residual checklist required an explicit `InvalidGameContext` outcome for cross-chat tampering rather than collapsing all unauthorized mutations into `NotSeated`.
+- Existing context-bound mutations (`PlaceDie`, `UndoLastPlacement`) validated seat membership but did not distinguish between true non-participants and active users mutating the wrong chat.
+
+### Decision
+- Introduce explicit `InvalidGameContext` statuses in application mutation outcomes:
+  - `GamePlacementStatus.InvalidGameContext`
+  - `GameUndoStatus.InvalidGameContext`
+- Keep compatibility-safe behavior:
+  - Return `InvalidGameContext` only when the user is seated in a different active session.
+  - Preserve `NotSeated` when the user is not seated in any active session.
+- Surface the explicit contract through WebApp mutation error mapping with `error = "InvalidGameContext"`.
+- Codify the invariant at aggregate boundary documentation (`GameSession` summary).
+
+### Evidence
+- Application store cross-chat checks now emit explicit invalid-context outcomes for place/undo.
+- Integration coverage asserts WebApp conflict responses return `InvalidGameContext` on out-of-chat mutation attempts.
+- Validation commands run:
+  - `dotnet test SkyTeam.Application.Tests\SkyTeam.Application.Tests.csproj --filter "FullyQualifiedName~PlaceDie_ShouldReturnInvalidGameContext_WhenUserMutatesDifferentChatSession|FullyQualifiedName~UndoLastPlacement_ShouldReturnInvalidGameContext_WhenUserMutatesDifferentChatSession|FullyQualifiedName~PlaceEndpoint_ShouldReturnInvalidGameContext_WhenViewerMutatesDifferentChatSession|FullyQualifiedName~UndoEndpoint_ShouldReturnInvalidGameContext_WhenViewerMutatesDifferentChatSession" --nologo`
+  - `dotnet build skyteam-bot.slnx --nologo`
+  - `dotnet test skyteam-bot.slnx --nologo`
+
+### Learnings
+- Security outcome granularity matters: explicit invalid-context signaling avoids ambiguity in clients and ops.
+- Distinguishing "wrong chat" from "not seated anywhere" can be done safely without changing domain entities, by inspecting active session seating at the application boundary.
+
+---
+
 ## 2026-03-02T02:03:00Z — Sully Round 15 Closure Sweep (Sully)
 
 **Timestamp:** 2026-03-02T02:03:00Z

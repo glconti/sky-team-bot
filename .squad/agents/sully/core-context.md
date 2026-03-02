@@ -7,10 +7,11 @@
 
 ## Current Status (2026-03-02)
 - ✅ Issue closure round 8: Closed #76 (BotFather config), #85 (WebApp tests), #86 (QA matrix)
-- ✅ Epic #75 progress: 4/11 child issues complete (#76, #80, #85, #86); #77 still pending while foundational gates (#81, #82) remain open
+- ✅ Epic #75 progress: 7/11 child issues complete (#76, #80, #81, #82, #83, #85, #86); #77 still pending while #84 (abuse protection) and the UI slices wait for the remaining gates
 - ✅ Issue #80 closure audit: GameSessions schema migration + TTL confirmed; JSON persistence contract validated
-- ⏳ Immediate gate: Begin #81 security-context-binding design review now that #80 is validated
-- ⏳ Next: Review #82 versioning API contract before #78–#79 UI integration
+- ✅ Issue #81 security-context-binding closure: explicit InvalidGameContext invariants surface at the aggregate and WebApp layers, backed by regression coverage
+- ⏳ Immediate gate: #77 Open App launchpad hardening and QA now that the core persistence/security stack is steady
+- ⏳ Next: Ship #84 abuse protection plus #78–#79 Mini App UI once the #77 gate passes
 
 ## Architectural Decisions (Locked)
 
@@ -34,11 +35,11 @@
 
 ## Critical Path (Locked)
 1. **#76** ✅ BotFather config validation (complete)
-2. **#77** ⏳ Open App Launchpad hardening (awaiting merge + QA rerun now that #80 passes)
+2. **#77** ⏳ Open App Launchpad hardening (awaiting merge + QA rerun now that #80–#83 compliance is validated)
 3. **#80** ✅ Game Persistence (schema + TTL audit closed; contract satisfied)
-4. **#81** ⏳ Security-context-binding (design pending)
-5. **#82** ⏳ Versioning/Concurrency APIs (design pending)
-6. **#78–#79** ⏳ Mini App UI (blocked until #80–#82 complete)
+4. **#81** ✅ Security-context-binding (cross-chat InvalidGameContext invariants enforced)
+5. **#82** ✅ Versioning/Concurrency APIs (expectedVersion + ConcurrencyConflict semantics shipped)
+6. **#78–#79** ⏳ Mini App UI (blocked until #77 UI refinements and #84 abuse protection land)
 
 ## Team Coordination Model
 - **Skiles:** Implementation (carries critical path work)
@@ -60,6 +61,6 @@
 - GitHub issues #75–#86 — Epic + child issues with architecture review gates
 
 ## Next Actions
-1. Begin #81 security-context-binding contract review now that the persistence gate is satisfied
-2. Review #82 versioning API shape (expectedVersion parameter, ConcurrencyConflict response)
-3. Approve #82 test suite design (6 required tests: concurrency, persistence, version, conflicts, TTL)
+1. Drive #77 Open App launchpad sign-off (UI hardening + QA rerun) now that the core persistence/security stack is steady
+2. Coordinate #84 abuse protection (rate limits and tamper detection) so the UI slices can ship with guardrails
+3. Approve #78–#79 Mini App UI release plan once #77/#84 completion criteria are met

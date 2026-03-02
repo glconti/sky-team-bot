@@ -1,0 +1,15 @@
+.squad: Round 15 closure sweep + #80 finalization logging
+
+- orchestration-log: Added 2026-03-02T01-59-00Z-sully.md (issue #80 explicit closure)
+- orchestration-log: Added 2026-03-02T02-03-00Z-sully.md (closure sweep #77/#81/#82/#83/#84)
+- log: Added 2026-03-02T02-03-00Z-ralph-round15.md (session documentation)
+- decisions.md: Merged inbox entries (issue #80 closure + round 15 sweep)
+- decisions/inbox: Deleted merged files (sully-issue-80-closed.md, sully-round15-closure-sweep.md)
+- agents/sully/history.md: Updated with round 15 cross-team status
+
+**Summary:**
+Issue #80 now explicitly closed. Epic #75 at 6/11 child issues closed.
+Critical path gate: #81 (security-context-binding) before UI (#77–#79) ships.
+Residual checklists posted on #77, #81, #84 with remaining acceptance criteria.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

@@ -29,7 +29,35 @@
 - **Decisions Logged:** Issue #80 closure finalized. Sully round 15 closure sweep logged.
 - **Next:** Ralph orchestrates #81 security-context-binding expansion on gate unblock.
 
-## Core Context (Summarized from Sessions 1–13)
+## Session 28: Issue #81 closure completion (2026-03-02T02:18:00Z)
+
+**Outcome:** Validated Skiles' Session 27 InvalidGameContext binding completion. All #81 acceptance criteria verified. Closed #81 in GitHub. Epic #75 advanced to 7/11 closed.
+
+**Team Status Post-Round 16:**
+- #81 security-context-binding gate → CLOSED
+- Unblocked: #77–#79 (UI) and #84 (abuse protection)
+- Epic #75: 7/11 issues closed (63.6%)
+- Next priority: #77 (UI Slice — Place/Undo)
+
+**Key Learnings:**
+- Explicit security-violation outcomes (`InvalidGameContext`) prevent client/ops ambiguity better than collapsed generic authorization responses
+- User-to-chat context binding best enforced at application boundary before domain mutations
+- Distinct failure codes enable deterministic tamper telemetry and proper corrective flows
+
+## Learnings
+- Epic chaining requires upfront design of foundational layers (#76, #80) to prevent rework
+- Persistence + concurrency are inseparable; must co-design from day one
+- Telegram API constraints (64-byte callback data) must be factored early in Cockpit design
+- Configuration validation as startup gate prevents silent failures
+- Deterministic integration tests (WebApplicationFactory + in-memory) scale better than UI automation
+- QA matrix as living documentation in readme.md is more maintainable than static spreadsheets
+- Draft PR as collaboration gate enables architecture feedback before merge; reduces rework
+- Audit cadence valuable for validating critical path alignment
+- Shared review gate model (Sully architecture, Skiles implementation, Aloha testing) prevents rework
+- Round 10 closure audit confirmed PR #87 only satisfies #76/#85; #80–#84 still pending, so persistence (#80) is the immediate gate for the epic
+- Persistent storage auditing must keep the DB schema requirement explicit; successful JSON persistence demos do not fulfill acceptance until we either add the GameSessions migration or amend the issue scope.
+- Adding the explicit GameSessions schema migration against the JSON persistence proof point finally satisfied the acceptance gate and allows the critical path to move forward.
+- Security outcome granularity matters for tamper detection and ops visibility; collapse ambiguity early.
 
 ### Foundational Phases (2026-02-20 to 2026-02-22)
 Established GitHub label taxonomy (25 labels), 14-issue vertical-slice backlog, M1 foundation roadmap. Completed base game logic: all 7 modules, landing validation, multi-token command model, DDD architecture (Domain → App → Presentation → Adapter → Host), loss semantics (15 explicit losses). Foundation: GameState refactor, ExecuteCommand dispatcher, test harness. Team coordinated on rules, command shapes, module implementations. PRs #37–#38 draft ready.
