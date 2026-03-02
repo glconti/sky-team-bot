@@ -155,6 +155,33 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+    input,
+    select {
+      border: 1px solid var(--border);
+      background: var(--panel-strong);
+      color: inherit;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+      min-width: 120px;
+    }
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 160px;
+    }
+    .form-field span {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
     .stack {
       display: flex;
       flex-direction: column;
@@ -262,7 +289,12 @@
 
       const initData = tg.initData || '';
       const maxDisplayNameLength = 32;
+      const maxLobbyNameLength = 64;
+      const maxLobbySettingsLength = 120;
+      const requiredLobbyPlayerCount = 2;
       const invalidGameContextMessage = 'This action belongs to a different chat. Open the correct group to continue.';
+      let isCreateLobbyFormOpen = false;
+      let isJoinByCodeFormOpen = false;
 
       function getStartParam() {
         const fromInit = (tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
@@ -298,6 +330,41 @@
         return `${chars.slice(0, maxDisplayNameLength - 1).join('')}…`;
       }
 
+      function validateCreateLobbyInput(payload) {
+        const name = String((payload && payload.name) || '').trim();
+        if (!name) return 'Game name is required.';
+        if (Array.from(name).length > maxLobbyNameLength) return `Game name must be ${maxLobbyNameLength} characters or fewer.`;
+
+        const playerCount = Number(payload && payload.playerCount);
+        if (!Number.isInteger(playerCount) || playerCount !== requiredLobbyPlayerCount) {
+          return `Player count must be ${requiredLobbyPlayerCount} (Pilot + Copilot).`;
+        }
+
+        const settings = String((payload && payload.settings) || '').trim();
+        if (Array.from(settings).length > maxLobbySettingsLength) {
+          return `Lobby settings must be ${maxLobbySettingsLength} characters or fewer.`;
+        }
+
+        return null;
+      }
+
+      function validateJoinCode(rawCode) {
+        const code = String(rawCode || '').trim();
+        if (!code) return 'Game code is required.';
+        if (!/^\d+$/.test(code)) return 'Enter a numeric game code.';
+        return null;
+      }
+
+      function createFormField(labelText, input) {
+        const field = document.createElement('label');
+        field.className = 'form-field';
+        const label = document.createElement('span');
+        label.textContent = labelText;
+        field.appendChild(label);
+        field.appendChild(input);
+        return field;
+      }
+
       function buildUrl(path, expectedVersion) {
         const params = new URLSearchParams();
         if (startParam) params.set('gameId', startParam);
@@ -320,6 +387,12 @@
       function normalizeError(result) {
         if (result.status === 401 || result.status === 403) {
           return 'Unauthorized. Reopen the Mini App from the group cockpit button.';
+        }
+        if (result.json && result.json.error === 'Invalid gameId.') {
+          return 'Invalid game code. Use digits from the shared lobby code.';
+        }
+        if (result.json && typeof result.json.error === 'string' && result.json.error.includes('does not match signed')) {
+          return invalidGameContextMessage;
         }
         if (result.json && result.json.error === 'InvalidGameContext') {
           return invalidGameContextMessage;
@@ -391,10 +464,10 @@
           if (result.status === 409 && result.json && result.json.error === 'ConcurrencyConflict') {
             showMessage(result.json.message || 'Game state changed. Refreshing…', 'warning');
             await loadState();
-            return;
+            return false;
           }
           showMessage(normalizeError(result), result.status === 409 ? 'warning' : 'error');
-          return;
+          return false;
         }
 
         if (result.json) {
@@ -402,6 +475,8 @@
         } else {
           await loadState();
         }
+
+        return true;
       }
 
       function renderLobby(state) {
@@ -422,12 +497,109 @@
         lobbySeatsEl.appendChild(createSeatCard('Pilot', lobby.pilot, 'Waiting for Pilot…'));
         lobbySeatsEl.appendChild(createSeatCard('Copilot', lobby.copilot, 'Waiting for Copilot…'));
 
-        const newButton = createButton('New Lobby', () => runAction(() => postAction('/api/webapp/lobby/new')), { primary: true });
+        const newButton = createButton(
+          isCreateLobbyFormOpen ? 'Cancel New Lobby' : 'New Lobby',
+          () => {
+            isCreateLobbyFormOpen = !isCreateLobbyFormOpen;
+            if (isCreateLobbyFormOpen) isJoinByCodeFormOpen = false;
+            renderLobby(state);
+          },
+          { primary: true }
+        );
         lobbyActionsEl.appendChild(newButton);
 
+        if (isCreateLobbyFormOpen) {
+          const createForm = document.createElement('form');
+          createForm.className = 'form-row';
+
+          const nameInput = document.createElement('input');
+          nameInput.type = 'text';
+          nameInput.maxLength = maxLobbyNameLength;
+          nameInput.value = 'Sky Team Lobby';
+          nameInput.required = true;
+          createForm.appendChild(createFormField('Game name', nameInput));
+
+          const playerCountInput = document.createElement('input');
+          playerCountInput.type = 'number';
+          playerCountInput.min = String(requiredLobbyPlayerCount);
+          playerCountInput.max = String(requiredLobbyPlayerCount);
+          playerCountInput.value = String(requiredLobbyPlayerCount);
+          playerCountInput.required = true;
+          createForm.appendChild(createFormField('Player count', playerCountInput));
+
+          const settingsInput = document.createElement('input');
+          settingsInput.type = 'text';
+          settingsInput.maxLength = maxLobbySettingsLength;
+          settingsInput.placeholder = 'Optional settings';
+          createForm.appendChild(createFormField('Lobby settings', settingsInput));
+
+          const submitCreateButton = createButton('Create lobby', () => null, { primary: true });
+          submitCreateButton.type = 'submit';
+          createForm.appendChild(submitCreateButton);
+
+          createForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const payload = {
+              name: nameInput.value,
+              playerCount: Number(playerCountInput.value),
+              settings: settingsInput.value
+            };
+
+            const validationError = validateCreateLobbyInput(payload);
+            if (validationError) {
+              showMessage(validationError, 'warning');
+              return;
+            }
+
+            const succeeded = await runAction(() => postAction('/api/webapp/lobby/new', payload));
+            if (succeeded) isCreateLobbyFormOpen = false;
+          });
+
+          lobbyActionsEl.appendChild(createForm);
+        }
+
         if (!viewerSeat && !isFull) {
-          const joinButton = createButton('Join Lobby', () => runAction(() => postAction('/api/webapp/lobby/join')));
+          const joinButton = createButton(
+            isJoinByCodeFormOpen ? 'Cancel Join Lobby' : 'Join Lobby',
+            () => {
+              isJoinByCodeFormOpen = !isJoinByCodeFormOpen;
+              if (isJoinByCodeFormOpen) isCreateLobbyFormOpen = false;
+              renderLobby(state);
+            }
+          );
           lobbyActionsEl.appendChild(joinButton);
+
+          if (isJoinByCodeFormOpen) {
+            const joinForm = document.createElement('form');
+            joinForm.className = 'form-row';
+
+            const gameCodeInput = document.createElement('input');
+            gameCodeInput.type = 'text';
+            gameCodeInput.inputMode = 'numeric';
+            gameCodeInput.placeholder = 'Game code';
+            gameCodeInput.value = startParam || '';
+            gameCodeInput.required = true;
+            joinForm.appendChild(createFormField('Game code', gameCodeInput));
+
+            const submitJoinButton = createButton('Join using code', () => null);
+            submitJoinButton.type = 'submit';
+            joinForm.appendChild(submitJoinButton);
+
+            joinForm.addEventListener('submit', async (event) => {
+              event.preventDefault();
+              const gameCode = String(gameCodeInput.value || '').trim();
+              const validationError = validateJoinCode(gameCode);
+              if (validationError) {
+                showMessage(validationError, 'warning');
+                return;
+              }
+
+              const succeeded = await runAction(() => postAction('/api/webapp/lobby/join', { gameCode }));
+              if (succeeded) isJoinByCodeFormOpen = false;
+            });
+
+            lobbyActionsEl.appendChild(joinForm);
+          }
         }
 
         const startButton = createButton(

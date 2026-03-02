@@ -74,6 +74,77 @@ public sealed class Issue61WebAppLobbyEndpointsTests
     }
 
     [Fact]
+    public async Task LobbyNewEndpoint_ShouldReturnBadRequest_WhenCreatePayloadHasInvalidInput()
+    {
+        // Arrange
+        const long groupChatId = 123;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        using var request = CreateAuthenticatedRequest(HttpMethod.Post, $"/api/webapp/lobby/new?gameId={groupChatId}", groupChatId, 111, "Alice");
+        request.Content = JsonContent.Create(new
+        {
+            name = "  ",
+            playerCount = 3,
+            settings = "normal"
+        });
+
+        // Act
+        var response = await client.SendAsync(request);
+        var payload = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        payload.Should().Contain("Game name is required.");
+    }
+
+    [Fact]
+    public async Task LobbyJoinEndpoint_ShouldReturnBadRequest_WhenJoinCodeIsInvalid()
+    {
+        // Arrange
+        const long groupChatId = 123;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var lobbyStore = factory.Services.GetRequiredService<InMemoryGroupLobbyStore>();
+        lobbyStore.CreateNew(groupChatId);
+
+        using var request = CreateAuthenticatedRequest(HttpMethod.Post, $"/api/webapp/lobby/join?gameId={groupChatId}", groupChatId, 111, "Alice");
+        request.Content = JsonContent.Create(new { gameCode = "abc" });
+
+        // Act
+        var response = await client.SendAsync(request);
+        var payload = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        payload.Should().Contain("Invalid gameId.");
+    }
+
+    [Fact]
+    public async Task LobbyJoinEndpoint_ShouldReturnBadRequest_WhenJoinCodeDoesNotMatchSignedContext()
+    {
+        // Arrange
+        const long groupChatId = 123;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var lobbyStore = factory.Services.GetRequiredService<InMemoryGroupLobbyStore>();
+        lobbyStore.CreateNew(groupChatId);
+
+        using var request = CreateAuthenticatedRequest(HttpMethod.Post, $"/api/webapp/lobby/join?gameId={groupChatId}", groupChatId, 111, "Alice");
+        request.Content = JsonContent.Create(new { gameCode = "999" });
+
+        // Act
+        var response = await client.SendAsync(request);
+        var payload = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        payload.Should().Contain("gameId does not match signed start_param.");
+    }
+
+    [Fact]
     public async Task LobbyStartEndpoint_ShouldStartGame_WhenLobbyIsReadyAndViewerIsSeated()
     {
         // Arrange

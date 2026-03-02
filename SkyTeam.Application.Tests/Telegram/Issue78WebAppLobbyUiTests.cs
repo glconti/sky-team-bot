@@ -16,6 +16,10 @@ public sealed class Issue78WebAppLobbyUiTests
         var hasNewLobby = source.Contains("New Lobby", StringComparison.Ordinal);
         var hasJoinLobby = source.Contains("Join Lobby", StringComparison.Ordinal);
         var hasStartGame = source.Contains("Start Game", StringComparison.Ordinal);
+        var hasGameNameInput = source.Contains("Game name", StringComparison.Ordinal);
+        var hasPlayerCountInput = source.Contains("Player count", StringComparison.Ordinal);
+        var hasLobbySettingsInput = source.Contains("Lobby settings", StringComparison.Ordinal);
+        var hasGameCodeInput = source.Contains("Game code", StringComparison.Ordinal);
 
         // Assert
         hasPilotPlaceholder.Should().BeTrue("lobby should show pilot placeholder copy");
@@ -23,6 +27,10 @@ public sealed class Issue78WebAppLobbyUiTests
         hasNewLobby.Should().BeTrue("lobby actions include New Lobby");
         hasJoinLobby.Should().BeTrue("lobby actions include Join Lobby");
         hasStartGame.Should().BeTrue("lobby actions include Start Game");
+        hasGameNameInput.Should().BeTrue("create flow should collect game name");
+        hasPlayerCountInput.Should().BeTrue("create flow should collect player count");
+        hasLobbySettingsInput.Should().BeTrue("create flow should collect optional settings");
+        hasGameCodeInput.Should().BeTrue("join flow should collect a game code");
     }
 
     [Fact]
@@ -38,6 +46,24 @@ public sealed class Issue78WebAppLobbyUiTests
         // Assert
         declaresMaxLength.Should().BeTrue("display names should be truncated to Telegram's 32 char limit");
         usesTruncation.Should().BeTrue("lobby UI should truncate long names");
+    }
+
+    [Fact]
+    public void LobbyView_ShouldExposeValidationMessages_ForInvalidCreateAndJoinInput()
+    {
+        // Arrange
+        var source = File.ReadAllText(ResolveWebAppIndexPath());
+
+        // Act
+        var hasRequiredNameValidation = source.Contains("Game name is required.", StringComparison.Ordinal);
+        var hasPlayerCountValidation = source.Contains("Player count must be ${requiredLobbyPlayerCount} (Pilot + Copilot).", StringComparison.Ordinal)
+            || source.Contains("Player count must be", StringComparison.Ordinal) && source.Contains("Pilot + Copilot", StringComparison.Ordinal);
+        var hasNumericJoinCodeValidation = source.Contains("Enter a numeric game code.", StringComparison.Ordinal);
+
+        // Assert
+        hasRequiredNameValidation.Should().BeTrue("create flow should explain required name validation");
+        hasPlayerCountValidation.Should().BeTrue("create flow should explain valid player count");
+        hasNumericJoinCodeValidation.Should().BeTrue("join flow should explain code validation");
     }
 
     private static string ResolveWebAppIndexPath()

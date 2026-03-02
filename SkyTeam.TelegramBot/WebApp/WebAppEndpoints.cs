@@ -52,6 +52,8 @@ public sealed record WebAppPrivateHandState(
     IReadOnlyList<WebAppHandCommand> AvailableCommands);
 
 public sealed record WebAppPlaceDieRequest(int DieIndex, string CommandId);
+public sealed record WebAppCreateLobbyRequest(string? Name, int? PlayerCount, string? Settings);
+public sealed record WebAppJoinLobbyRequest(string? GameCode);
 
 public sealed record WebAppGameStateResponse(
     long GameId,
@@ -72,6 +74,9 @@ public static class WebAppEndpoints
 {
     private const int MaxDisplayNameLength = 64;
     private const int MaxCommandIdLength = 128;
+    private const int MaxLobbyNameLength = 64;
+    private const int MaxLobbySettingsLength = 120;
+    private const int RequiredLobbyPlayerCount = 2;
 
     public static void MapWebAppEndpoints(this IEndpointRouteBuilder app)
     {
@@ -117,6 +122,7 @@ public static class WebAppEndpoints
 
     private static async Task<IResult> CreateLobby(
         string? gameId,
+        WebAppCreateLobbyRequest? request,
         HttpContext httpContext,
         InMemoryGroupLobbyStore lobbyStore,
         InMemoryGroupGameSessionStore gameSessionStore,
@@ -127,6 +133,10 @@ public static class WebAppEndpoints
         if (result.Error is not null)
             return result.Error;
 
+        var validationError = ValidateCreateLobbyRequest(request);
+        if (validationError is not null)
+            return validationError;
+
         var createResult = lobbyStore.CreateNew(result.GroupChatId!.Value);
         if (createResult.Status == LobbyCreateStatus.Created)
             await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId.Value, cancellationToken);
@@ -136,13 +146,15 @@ public static class WebAppEndpoints
 
     private static async Task<IResult> JoinLobby(
         string? gameId,
+        WebAppJoinLobbyRequest? request,
         HttpContext httpContext,
         InMemoryGroupLobbyStore lobbyStore,
         InMemoryGroupGameSessionStore gameSessionStore,
         TelegramBotService telegramBotService,
         CancellationToken cancellationToken)
     {
-        var result = ResolveRequestContext(gameId, httpContext);
+        var requestedGameId = string.IsNullOrWhiteSpace(request?.GameCode) ? gameId : request!.GameCode;
+        var result = ResolveRequestContext(requestedGameId, httpContext);
         if (result.Error is not null)
             return result.Error;
 
@@ -471,6 +483,44 @@ public static class WebAppEndpoints
             _ => "Cannot undo."
         };
 
+    private static IResult? ValidateCreateLobbyRequest(WebAppCreateLobbyRequest? request)
+    {
+        if (request is null)
+            return null;
+
+        var name = request.Name?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(name))
+            return Results.BadRequest(new
+            {
+                error = "Game name is required.",
+                retryHint = $"Provide a game name up to {MaxLobbyNameLength} characters."
+            });
+
+        if (name.Length > MaxLobbyNameLength)
+            return Results.BadRequest(new
+            {
+                error = "Game name is too long.",
+                retryHint = $"Use a game name with max {MaxLobbyNameLength} characters."
+            });
+
+        if (request.PlayerCount.HasValue && request.PlayerCount.Value != RequiredLobbyPlayerCount)
+            return Results.BadRequest(new
+            {
+                error = $"Player count must be {RequiredLobbyPlayerCount}.",
+                retryHint = "Use 2 players (Pilot + Copilot) and retry."
+            });
+
+        var settings = request.Settings?.Trim();
+        if (!string.IsNullOrWhiteSpace(settings) && settings.Length > MaxLobbySettingsLength)
+            return Results.BadRequest(new
+            {
+                error = "Lobby settings are too long.",
+                retryHint = $"Use settings with max {MaxLobbySettingsLength} characters."
+            });
+
+        return null;
+    }
+
     private static IResult CreateConcurrencyConflictResult(long? currentVersion)
         => Results.Conflict(new WebAppConcurrencyConflictResponse(
             Error: "ConcurrencyConflict",
@@ -485,7 +535,11 @@ public static class WebAppEndpoints
         if (!string.IsNullOrWhiteSpace(gameId))
         {
             if (!long.TryParse(gameId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedGameId))
-                return (null, tg, Results.BadRequest(new { error = "Invalid gameId." }));
+                return (null, tg, Results.BadRequest(new
+                {
+                    error = "Invalid gameId.",
+                    retryHint = "Use a numeric game code from the shared lobby and retry."
+                }));
 
             requestedGameId = parsedGameId;
         }
@@ -493,7 +547,11 @@ public static class WebAppEndpoints
         if (tg.Chat is not null)
         {
             if (requestedGameId is not null && requestedGameId.Value != tg.Chat.ChatId)
-                return (null, tg, Results.BadRequest(new { error = "gameId does not match signed chat context." }));
+                return (null, tg, Results.BadRequest(new
+                {
+                    error = "gameId does not match signed chat context.",
+                    retryHint = "Open the Mini App from the same group cockpit button and retry."
+                }));
 
             return (tg.Chat.ChatId, tg, null);
         }
@@ -501,14 +559,26 @@ public static class WebAppEndpoints
         if (!string.IsNullOrWhiteSpace(tg.StartParam))
         {
             if (!long.TryParse(tg.StartParam, NumberStyles.Integer, CultureInfo.InvariantCulture, out var groupChatId))
-                return (null, tg, Results.BadRequest(new { error = "Invalid gameId." }));
+                return (null, tg, Results.BadRequest(new
+                {
+                    error = "Invalid gameId.",
+                    retryHint = "Use a numeric game code from the shared lobby and retry."
+                }));
 
             if (requestedGameId is not null && requestedGameId.Value != groupChatId)
-                return (null, tg, Results.BadRequest(new { error = "gameId does not match signed start_param." }));
+                return (null, tg, Results.BadRequest(new
+                {
+                    error = "gameId does not match signed start_param.",
+                    retryHint = "Use the code from this chat’s cockpit launch button and retry."
+                }));
 
             return (groupChatId, tg, null);
         }
 
-        return (null, tg, Results.BadRequest(new { error = "Missing chat context and signed start_param." }));
+        return (null, tg, Results.BadRequest(new
+        {
+            error = "Missing chat context and signed start_param.",
+            retryHint = "Open the Mini App from the group cockpit button."
+        }));
     }
 }
