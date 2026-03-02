@@ -78,15 +78,18 @@ Bot commands remain as fallback and will redirect you to the Mini App when secre
 - Starting a fresh game in the same group clears old notification dedup history so first-turn pings are not suppressed across sessions.
 - If both DM and group fallback sends fail, gameplay continues and the failure is logged (best-effort notification safety).
 
-### Abuse guardrails (Issue #84, slice 1)
-- WebApp endpoints apply in-memory throttling with `429 Too Many Requests` + `Retry-After`:
+### Abuse guardrails (Issue #84, residual completion)
+- WebApp endpoints apply in-memory throttling with `429 Too Many Requests` + `Retry-After` (+ `retryAfterSeconds` / `retryHint` payload):
   - per-user: max 10 requests/second
   - per-IP: max 100 requests/minute
   - lobby creation: max 1 request per user per 5 minutes (`POST /api/webapp/lobby/new`)
 - Input validation guardrails:
+  - game mutation endpoints (`POST /api/webapp/game/roll|place|undo`) require `X-Idempotency-Key` (max 64 chars, no whitespace); duplicate keys are rejected with `400 Bad Request`
+  - oversized JSON payloads (> 2 KB) are rejected with `400 Bad Request`
   - `commandId` is required, max 128 chars, no whitespace (`POST /api/webapp/game/place`)
   - viewer display name must be non-empty and at most 64 chars (`POST /api/webapp/lobby/join`)
   - oversized `X-Telegram-Init-Data` headers are rejected with `400 Bad Request`
+- Rejected/throttled requests are logged with safe metadata only (scope/reason/user/ip/path, no payload dumps).
 
 ### Operator verification checklist
 - `SKYTEAM_MINI_APP_URL` resolves directly over HTTPS (no redirect loops, no TLS warnings).

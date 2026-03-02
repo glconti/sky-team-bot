@@ -24,7 +24,11 @@ public sealed class TelegramInitDataFilter(
         if (initData.Length > MaxInitDataHeaderLength)
         {
             logger.LogWarning("Rejected initData header that exceeded max length. Path={Path}", context.HttpContext.Request.Path.Value);
-            return new(Results.BadRequest(new { error = "Invalid initData." }));
+            return new(Results.BadRequest(new
+            {
+                error = "Invalid initData.",
+                retryHint = $"Send X-Telegram-Init-Data with max {MaxInitDataHeaderLength} characters."
+            }));
         }
 
         var maxAgeSeconds = webAppOptions.Value.InitDataMaxAgeSeconds <= 0 ? 300 : webAppOptions.Value.InitDataMaxAgeSeconds;

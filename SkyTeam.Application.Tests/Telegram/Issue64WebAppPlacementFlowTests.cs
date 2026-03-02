@@ -386,6 +386,7 @@ public sealed class Issue64WebAppPlacementFlowTests
 
         var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Headers.Add("X-Telegram-Init-Data", initData);
+        request.Headers.Add("X-Idempotency-Key", Guid.NewGuid().ToString("N"));
         request.Content = JsonContent.Create(new { dieIndex, commandId });
         return request;
     }
@@ -396,6 +397,7 @@ public sealed class Issue64WebAppPlacementFlowTests
 
         var request = new HttpRequestMessage(HttpMethod.Post, $"/api/webapp/game/undo?gameId={groupChatId}");
         request.Headers.Add("X-Telegram-Init-Data", initData);
+        request.Headers.Add("X-Idempotency-Key", Guid.NewGuid().ToString("N"));
         return request;
     }
 
@@ -406,6 +408,13 @@ public sealed class Issue64WebAppPlacementFlowTests
 
         var request = new HttpRequestMessage(method, url);
         request.Headers.Add("X-Telegram-Init-Data", initData);
+        if (method == HttpMethod.Post
+            && (url.Contains("/api/webapp/game/roll", StringComparison.Ordinal)
+                || url.Contains("/api/webapp/game/place", StringComparison.Ordinal)
+                || url.Contains("/api/webapp/game/undo", StringComparison.Ordinal)))
+        {
+            request.Headers.Add("X-Idempotency-Key", Guid.NewGuid().ToString("N"));
+        }
 
         if (content is not null)
             request.Content = JsonContent.Create(content);

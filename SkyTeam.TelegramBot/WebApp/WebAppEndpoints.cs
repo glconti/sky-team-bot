@@ -148,7 +148,11 @@ public static class WebAppEndpoints
 
         var displayName = result.Context!.Viewer.DisplayName.Trim();
         if (string.IsNullOrWhiteSpace(displayName) || displayName.Length > MaxDisplayNameLength)
-            return Results.BadRequest(new { error = "Invalid display name." });
+            return Results.BadRequest(new
+            {
+                error = "Invalid display name.",
+                retryHint = $"Use a non-empty display name up to {MaxDisplayNameLength} characters."
+            });
 
         var player = new LobbyPlayer(result.Context.Viewer.UserId, displayName);
         var joinResult = lobbyStore.Join(result.GroupChatId!.Value, player);
@@ -268,14 +272,26 @@ public static class WebAppEndpoints
             return result.Error;
 
         if (request.DieIndex is < 0 or >= SecretDiceHand.DicePerHand)
-            return Results.BadRequest(new { error = "Invalid die index." });
+            return Results.BadRequest(new
+            {
+                error = "Invalid die index.",
+                retryHint = $"Use a die index between 0 and {SecretDiceHand.DicePerHand - 1}."
+            });
 
         var commandId = request.CommandId?.Trim();
         if (string.IsNullOrWhiteSpace(commandId))
-            return Results.BadRequest(new { error = "Missing commandId." });
+            return Results.BadRequest(new
+            {
+                error = "Missing commandId.",
+                retryHint = "Provide commandId from the latest private hand and retry."
+            });
 
         if (commandId.Length > MaxCommandIdLength || commandId.Any(char.IsWhiteSpace))
-            return Results.BadRequest(new { error = "Invalid commandId." });
+            return Results.BadRequest(new
+            {
+                error = "Invalid commandId.",
+                retryHint = $"Use commandId from the latest private hand (max {MaxCommandIdLength} chars, no whitespace)."
+            });
 
         var placement = expectedVersion.HasValue
             ? gameSessionStore.PlaceDie(result.GroupChatId!.Value, result.Context!.Viewer.UserId, request.DieIndex, commandId, expectedVersion.Value)

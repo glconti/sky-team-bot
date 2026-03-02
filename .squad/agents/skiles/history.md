@@ -259,3 +259,5 @@ All work consolidated on `feat/issue-76-85-botfather-config-webapp-tests` branch
 - Aggregates must maintain user-to-chat mappings when multiple coexistent sessions are possible.
 - Group launchpad fallbacks should always point back to group controls (`/sky app`, `/sky state`) so Mini App-first navigation does not regress into DM-first behavior.
 - Callback payload budget needs explicit regression coverage at the cockpit-button layer, not only at codec decode time, to keep Telegram 64-byte guarantees visible.
+- Abuse guardrails are easiest to enforce consistently when transport filters centralize 429 throttling, idempotency replay checks, and payload-size validation before domain mutation.
+- 400/429 responses should always include action-oriented retry hints so Mini App clients can recover deterministically without exposing sensitive request payloads in logs.
