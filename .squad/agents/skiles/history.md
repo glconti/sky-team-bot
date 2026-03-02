@@ -154,7 +154,24 @@ All work consolidated on `feat/issue-76-85-botfather-config-webapp-tests` branch
 - `SkyTeam.Application.Tests\Telegram\Issue80FileBackedRestartPersistenceTests.cs`
 - `.squad/decisions/inbox/skiles-issue-80-remediation.md`
 
+### Session 27: Issue #81 residual InvalidGameContext completion (2026-03-02T05:05:00Z)
+
+**Outcome:** Completed the residual #81 security checklist by introducing explicit `InvalidGameContext` mutation outcomes for cross-chat attempts, codifying the invariant at the game-session aggregate boundary, and extending regression/integration coverage on place+undo paths in PR #87.
+
+**Key Learnings:**
+- Security violations (`cross-chat mutation attempt`) should not be collapsed into generic authorization outcomes (`NotSeated`), because the API contract needs a distinct signal for tampering scenarios.
+- Detecting invalid context by checking whether the user is seated in a different active session preserves backward-compatible `NotSeated` behavior for users who are simply not participants anywhere.
+
+**Delivered Artifacts:**
+- `SkyTeam.Application\GameSessions\InMemoryGroupGameSessionStore.cs`
+- `SkyTeam.TelegramBot\WebApp\WebAppEndpoints.cs`
+- `SkyTeam.Application.Tests\GameSessions\InMemoryGroupGameSessionStoreTests.cs`
+- `SkyTeam.Application.Tests\Telegram\Issue64WebAppPlacementFlowTests.cs`
+- `.squad/decisions/inbox/skiles-issue-81-residual.md`
+
 ## Learnings
 - For strict acceptance criteria, an idempotent startup schema migration can close a database-schema gate without forcing a risky rewrite of an already stable JSON persistence runtime.
 - Keeping SQL migration scripts as repository artifacts and embedding them at build time provides both auditability and production-safe runtime loading.
 - SQLite test cleanup should clear pooled connections (`SqliteConnection.ClearAllPools`) before deleting temporary directories, otherwise teardown can fail with locked database files.
+- Cross-chat mutation tampering requires an explicit `InvalidGameContext` contract to keep security telemetry and client behavior deterministic.
+- The safest compatibility path is to emit `InvalidGameContext` only when the user is seated in another active session, while leaving true non-participants on `NotSeated`.

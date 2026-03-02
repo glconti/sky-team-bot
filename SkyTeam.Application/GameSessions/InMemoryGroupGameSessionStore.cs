@@ -57,6 +57,7 @@ public enum GamePlacementStatus
     Placed,
     NoActiveSession,
     NotSeated,
+    InvalidGameContext,
     RoundNotRolled,
     RoundNotAcceptingPlacements,
     NotPlayersTurn,
@@ -114,6 +115,7 @@ public enum GameUndoStatus
     Undone,
     NoActiveSession,
     NotSeated,
+    InvalidGameContext,
     RoundNotRolled,
     UndoNotAllowed,
     VersionConflict,
@@ -372,7 +374,12 @@ public sealed class InMemoryGroupGameSessionStore
                 return new(GamePlacementStatus.VersionConflict, PublicInfo: null, ResolutionInfo: null, ErrorMessage: null, CurrentVersion: session.Version);
 
             if (!session.TryGetSeat(requestingUserId, out var seat, out var player))
-                return new(GamePlacementStatus.NotSeated, PublicInfo: null, ResolutionInfo: null, ErrorMessage: null);
+            {
+                var status = HasMismatchedGameContext(requestingUserId, groupChatId)
+                    ? GamePlacementStatus.InvalidGameContext
+                    : GamePlacementStatus.NotSeated;
+                return new(status, PublicInfo: null, ResolutionInfo: null, ErrorMessage: null);
+            }
 
             if (session.TurnState is null)
                 return new(GamePlacementStatus.RoundNotRolled, PublicInfo: null, ResolutionInfo: null, ErrorMessage: null);
@@ -477,7 +484,12 @@ public sealed class InMemoryGroupGameSessionStore
                 return new(GameUndoStatus.VersionConflict, PublicInfo: null, ErrorMessage: null, CurrentVersion: session.Version);
 
             if (!session.TryGetSeat(requestingUserId, out var seat, out var player))
-                return new(GameUndoStatus.NotSeated, PublicInfo: null, ErrorMessage: null);
+            {
+                var status = HasMismatchedGameContext(requestingUserId, groupChatId)
+                    ? GameUndoStatus.InvalidGameContext
+                    : GameUndoStatus.NotSeated;
+                return new(status, PublicInfo: null, ErrorMessage: null);
+            }
 
             if (session.TurnState is null)
                 return new(GameUndoStatus.RoundNotRolled, PublicInfo: null, ErrorMessage: null);
@@ -544,6 +556,20 @@ public sealed class InMemoryGroupGameSessionStore
         return _sessions.TryGetValue(groupChatId, out session!);
     }
 
+    private bool HasMismatchedGameContext(long requestingUserId, long groupChatId)
+    {
+        foreach (var existingSession in _sessions.Values)
+        {
+            if (existingSession.GroupChatId == groupChatId)
+                continue;
+
+            if (existingSession.TryGetSeat(requestingUserId, out _, out _))
+                return true;
+        }
+
+        return false;
+    }
+
     private void Restore(PersistedGameSessionStoreState state)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -571,6 +597,10 @@ public sealed class InMemoryGroupGameSessionStore
                 .Select(pair => new PersistedCockpitMessage(pair.Key, pair.Value))
                 .ToArray()));
 
+    /// <summary>
+    /// Aggregate root for a single group-bound game session.
+    /// Security invariant: a player identity is only valid when it is seated in this session's group chat.
+    /// </summary>
     private sealed class GameSession
     {
         private const int MaxRecentPlacementResults = 256;

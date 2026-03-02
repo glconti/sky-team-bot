@@ -276,7 +276,7 @@ public sealed class InMemoryGroupGameSessionStoreTests
     }
 
     [Fact]
-    public void PlaceDie_ShouldRejectCrossChatMutation_WhenUserIsNotSeatedInRequestedSession()
+    public void PlaceDie_ShouldReturnInvalidGameContext_WhenUserMutatesDifferentChatSession()
     {
         // Arrange
         var store = new InMemoryGroupGameSessionStore();
@@ -298,7 +298,32 @@ public sealed class InMemoryGroupGameSessionStoreTests
         var result = store.PlaceDie(secondGroupChatId, firstPilot.UserId, dieIndex: 0, secondCommand);
 
         // Assert
-        result.Status.Should().Be(GamePlacementStatus.NotSeated);
+        result.Status.Should().Be(GamePlacementStatus.InvalidGameContext);
+    }
+
+    [Fact]
+    public void UndoLastPlacement_ShouldReturnInvalidGameContext_WhenUserMutatesDifferentChatSession()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        const long firstGroupChatId = 123;
+        const long secondGroupChatId = 456;
+        var firstPilot = new LobbyPlayer(1, "Pilot");
+        var firstCopilot = new LobbyPlayer(2, "Copilot A");
+        var secondPilot = new LobbyPlayer(3, "Pilot B");
+        var secondCopilot = new LobbyPlayer(4, "Copilot B");
+
+        store.Start(firstGroupChatId, new LobbySnapshot(firstGroupChatId, firstPilot, firstCopilot), requestingUserId: firstPilot.UserId);
+        store.RegisterRoll(firstGroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        store.Start(secondGroupChatId, new LobbySnapshot(secondGroupChatId, secondPilot, secondCopilot), requestingUserId: secondPilot.UserId);
+        store.RegisterRoll(secondGroupChatId, new([6, 6, 6, 6], [6, 6, 6, 6]));
+
+        // Act
+        var result = store.UndoLastPlacement(secondGroupChatId, firstPilot.UserId);
+
+        // Assert
+        result.Status.Should().Be(GameUndoStatus.InvalidGameContext);
     }
 
     [Fact]

@@ -428,6 +428,7 @@ public static class WebAppEndpoints
         {
             GamePlacementStatus.NoActiveSession => "No active game session found.",
             GamePlacementStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
+            GamePlacementStatus.InvalidGameContext => "InvalidGameContext",
             GamePlacementStatus.RoundNotRolled => "This round has not been rolled yet.",
             GamePlacementStatus.RoundNotAcceptingPlacements => "This round is not accepting placements.",
             GamePlacementStatus.NotPlayersTurn => "It is not your turn.",
@@ -446,6 +447,7 @@ public static class WebAppEndpoints
         {
             GameUndoStatus.NoActiveSession => "No active game session found.",
             GameUndoStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
+            GameUndoStatus.InvalidGameContext => "InvalidGameContext",
             GameUndoStatus.RoundNotRolled => "This round has not been rolled yet.",
             GameUndoStatus.UndoNotAllowed => "Undo not allowed. You can only undo your last placement before the other player places.",
             GameUndoStatus.VersionConflict => "Game state changed. Please refresh and retry.",

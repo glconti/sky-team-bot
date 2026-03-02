@@ -117,6 +117,50 @@ public sealed class Issue64WebAppPlacementFlowTests
     }
 
     [Fact]
+    public async Task PlaceEndpoint_ShouldReturnInvalidGameContext_WhenViewerMutatesDifferentChatSession()
+    {
+        // Arrange
+        const long viewersGroupChatId = 123;
+        const long targetedGroupChatId = 456;
+        const long viewerUserId = 111;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        SeedCrossChatMutationScenario(factory, viewersGroupChatId, targetedGroupChatId, viewerUserId);
+        using var placeRequest = CreatePlaceRequest(targetedGroupChatId, viewerUserId, "Alice", dieIndex: 0, commandId: "Axis.AssignBlue:1");
+
+        // Act
+        var response = await client.SendAsync(placeRequest);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        body.GetProperty("error").GetString().Should().Be("InvalidGameContext");
+    }
+
+    [Fact]
+    public async Task UndoEndpoint_ShouldReturnInvalidGameContext_WhenViewerMutatesDifferentChatSession()
+    {
+        // Arrange
+        const long viewersGroupChatId = 123;
+        const long targetedGroupChatId = 456;
+        const long viewerUserId = 111;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        SeedCrossChatMutationScenario(factory, viewersGroupChatId, targetedGroupChatId, viewerUserId);
+        using var undoRequest = CreateUndoRequest(targetedGroupChatId, viewerUserId, "Alice");
+
+        // Act
+        var response = await client.SendAsync(undoRequest);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        body.GetProperty("error").GetString().Should().Be("InvalidGameContext");
+    }
+
+    [Fact]
     public async Task PlaceEndpoint_ShouldReturnConcurrencyConflict_WhenExpectedVersionIsOutdated()
     {
         // Arrange
@@ -251,6 +295,28 @@ public sealed class Issue64WebAppPlacementFlowTests
         var dieIndex = FindDieIndex(hand.Hand!, command);
 
         return (currentUserId, dieIndex, command);
+    }
+
+    private static void SeedCrossChatMutationScenario(
+        WebApplicationFactory<Program> factory,
+        long viewersGroupChatId,
+        long targetedGroupChatId,
+        long viewerUserId)
+    {
+        var lobbyStore = factory.Services.GetRequiredService<InMemoryGroupLobbyStore>();
+        var gameSessionStore = factory.Services.GetRequiredService<InMemoryGroupGameSessionStore>();
+
+        lobbyStore.CreateNew(viewersGroupChatId);
+        lobbyStore.Join(viewersGroupChatId, new LobbyPlayer(viewerUserId, "Alice"));
+        lobbyStore.Join(viewersGroupChatId, new LobbyPlayer(222, "Bob"));
+        gameSessionStore.Start(viewersGroupChatId, lobbyStore.GetSnapshot(viewersGroupChatId), requestingUserId: viewerUserId);
+        gameSessionStore.RegisterRoll(viewersGroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        lobbyStore.CreateNew(targetedGroupChatId);
+        lobbyStore.Join(targetedGroupChatId, new LobbyPlayer(333, "Charlie"));
+        lobbyStore.Join(targetedGroupChatId, new LobbyPlayer(444, "Dana"));
+        gameSessionStore.Start(targetedGroupChatId, lobbyStore.GetSnapshot(targetedGroupChatId), requestingUserId: 333);
+        gameSessionStore.RegisterRoll(targetedGroupChatId, new SecretDiceRoll([6, 6, 6, 6], [6, 6, 6, 6]));
     }
 
     private static (int DieIndex, string CommandId) SeedPlacementAcrossMultipleGames(
