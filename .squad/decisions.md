@@ -2,6 +2,46 @@
 
 > Append-only ledger of team decisions. Never retroactively edit entries.
 
+## 2026-03-02T02:03:00Z — Sully Round 15 Closure Sweep (Sully)
+
+**Timestamp:** 2026-03-02T02:03:00Z
+
+### Summary
+Audited issues #77, #81, #82, #83, #84 against current implementation. Issues #82 (versioning) and #83 (async turn notifications) are now satisfied.
+
+### Actions
+- ✅ **Closed:** #82 (versioning), #83 (async turn notifications)
+- 📝 **Posted Residual Checklists:** #77 (UI), #81 (chat/game binding), #84 (abuse protection) with remaining acceptance criteria and priority order
+- 📊 **Updated Epic #75:** Reflects 6/11 child issues closed; highlighted #81 as next critical gate
+
+### Learnings
+- Cross-chat error handling requires explicit `InvalidGameContext` signal, not generic `NotSeated` fall-through
+- Open app launchpad depends on per-platform QA evidence and pinned-cockpit guidance before UI slice is releasable
+
+### Critical Path Gate
+#81 (chat/game binding security context) must close before #77–#79 (UI) and #84 (abuse protection) can ship.
+
+---
+
+## 2026-03-02T01:59:00Z — Issue #80 Final Explicit Closure (Sully)
+
+**Issue:** https://github.com/glconti/sky-team-bot/issues/80  
+**PR:** https://github.com/glconti/sky-team-bot/pull/87  
+**Status:** ✅ CLOSED
+
+### Finding
+All acceptance criteria now satisfied: GameSessions schema migration runtime-applied, TTL retention documented, repository contract intact, restart resilience validated.
+
+### Acceptance Criteria Verified
+- ✅ Migration `0001_game_sessions_schema.sql` defines GameSessions table with `Version`, lifecycle timestamps, `ExpiresAtUtc`, and active-session uniqueness
+- ✅ `JsonGameSessionPersistence` orchestrates CRUD/List/CleanupExpired with TTL via `Persistence:CompletedSessionRetentionDays` and `Persistence:AbandonedSessionRetentionDays`
+- ✅ `Issue80FileBackedRestartPersistenceTests` passes, proving restart resilience with version/lock semantics intact
+
+### Consequence
+Critical path now advances to #81 (security-context-binding) and #82 (versioning/concurrency) before UI (#77–#79) ships.
+
+---
+
 ## 2026-03-02T01:35:00Z — Issue #80 Closure Audit (Sully)
 
 **Issue:** https://github.com/glconti/sky-team-bot/issues/80  
