@@ -242,6 +242,9 @@ public sealed class TelegramBotService(
         var lobbySnapshot = lobbyStore.GetSnapshot(groupChatId);
         var result = gameSessionStore.Start(groupChatId, lobbySnapshot, user.Id);
 
+        if (result.Status == GameSessionStartStatus.Started)
+            ForgetTurnNotificationKeysForGroup(groupChatId);
+
         if (result.Status is GameSessionStartStatus.Started or GameSessionStartStatus.AlreadyStarted)
         {
             await RefreshGroupCockpitAsync(botClient, groupChatId, cancellationToken);
@@ -470,6 +473,9 @@ public sealed class TelegramBotService(
             GameSessionStartStatus.Started => "Game started. Round 1 initialized (no placements yet).\n\nNext: /sky roll",
             _ => "Cannot start game."
         };
+
+        if (result.Status == GameSessionStartStatus.Started)
+            ForgetTurnNotificationKeysForGroup(message.Chat.Id);
 
         if (result.Status is GameSessionStartStatus.Started or GameSessionStartStatus.AlreadyStarted)
         {
@@ -731,10 +737,7 @@ public sealed class TelegramBotService(
         if (await TrySendDirectMessageAsync(botClient, recipient.UserId, messageText, cancellationToken))
             return;
 
-        await botClient.SendMessage(
-            groupChatId,
-            $"🔔 {recipient.DisplayName} ({seat}), your turn. Open /sky app and place one die.",
-            cancellationToken: cancellationToken);
+        await TrySendGroupTurnFallbackAsync(botClient, groupChatId, recipient, seat, cancellationToken);
     }
 
     private bool TryRegisterTurnNotification(string key)
@@ -753,6 +756,65 @@ public sealed class TelegramBotService(
             }
 
             return true;
+        }
+    }
+
+    private void ForgetTurnNotificationKeysForGroup(long groupChatId)
+    {
+        var keyPrefix = $"{groupChatId}:";
+
+        lock (_turnNotificationDedupSync)
+        {
+            if (_recentTurnNotificationKeys.Count == 0)
+                return;
+
+            var retainedKeys = new Queue<string>(_recentTurnNotificationKeys.Count);
+
+            while (_recentTurnNotificationKeys.Count > 0)
+            {
+                var existingKey = _recentTurnNotificationKeys.Dequeue();
+                if (existingKey.StartsWith(keyPrefix, StringComparison.Ordinal))
+                    continue;
+
+                retainedKeys.Enqueue(existingKey);
+            }
+
+            _recentTurnNotificationKeySet.Clear();
+
+            while (retainedKeys.Count > 0)
+            {
+                var retainedKey = retainedKeys.Dequeue();
+                _recentTurnNotificationKeys.Enqueue(retainedKey);
+                _recentTurnNotificationKeySet.Add(retainedKey);
+            }
+        }
+    }
+
+    private async Task TrySendGroupTurnFallbackAsync(
+        ITelegramBotClient botClient,
+        long groupChatId,
+        LobbyPlayer recipient,
+        PlayerSeat seat,
+        CancellationToken cancellationToken)
+    {
+        var recipientDisplayName = string.IsNullOrWhiteSpace(recipient.DisplayName)
+            ? seat.ToString()
+            : recipient.DisplayName;
+
+        try
+        {
+            await botClient.SendMessage(
+                groupChatId,
+                $"🔔 {recipientDisplayName} ({seat}), your turn. Open /sky app and place one die.",
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Turn notification fallback failed for chat {GroupChatId} and user {UserId}.",
+                groupChatId,
+                recipient.UserId);
         }
     }
 

@@ -58,6 +58,8 @@ Bot commands remain as fallback and will redirect you to the Mini App when secre
 - On each turn transition (round roll, successful place, undo), the bot attempts one DM notification to the active seated player.
 - Notifications are deduplicated per transition key to avoid duplicate sends on retries.
 - If DM delivery fails, the bot posts a group-chat fallback ping with action-required text only (no secret hand/module details).
+- Starting a fresh game in the same group clears old notification dedup history so first-turn pings are not suppressed across sessions.
+- If both DM and group fallback sends fail, gameplay continues and the failure is logged (best-effort notification safety).
 
 ### Abuse guardrails (Issue #84, slice 1)
 - WebApp endpoints apply in-memory throttling with `429 Too Many Requests` + `Retry-After`:

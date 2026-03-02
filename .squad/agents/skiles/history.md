@@ -92,6 +92,8 @@ All work consolidated on `feat/issue-76-85-botfather-config-webapp-tests` branch
 - Soft-fail callback UX (toast on invalid press) better than blocking button availability
 - In-memory sliding-window abuse protection effective without external infrastructure
 - Input validation safest at endpoint boundaries with explicit 400 errors
+- Turn-notification dedup caches should reset per group when a new game starts, otherwise valid notifications can be suppressed in later sessions
+- Notification fallback delivery should be best-effort (log + continue) so gameplay mutations never fail on Telegram transport issues
 
 ---
 
@@ -112,3 +114,17 @@ All work consolidated on `feat/issue-76-85-botfather-config-webapp-tests` branch
 - `SkyTeam.Application.Tests\GameSessions\InMemoryGroupGameSessionStoreTests.cs`
 - `SkyTeam.Application.Tests\Telegram\Issue64WebAppPlacementFlowTests.cs`
 - `.squad/decisions/inbox/skiles-issue-82.md`
+
+### Session 25: Issue #83 async notification practical completion (2026-03-02T03:15:00Z)
+
+**Outcome:** Completed practical hardening for async turn notifications by preventing stale dedup carry-over between games and making group fallback delivery safe/non-blocking.
+
+**Key Learnings:**
+- Per-group dedup cleanup on game start is a low-cost way to keep idempotency while avoiding cross-session notification drop-offs.
+- Fallback notification send paths must never throw back into command/mutation flows; warning logs are sufficient for operator visibility.
+
+**Delivered Artifacts:**
+- `SkyTeam.TelegramBot\TelegramBotService.cs`
+- `SkyTeam.Application.Tests\Telegram\Issue83AsyncTurnNotificationTests.cs`
+- `readme.md`
+- `.squad/decisions/inbox/skiles-issue-83-complete.md`

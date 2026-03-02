@@ -123,3 +123,9 @@ For first-pass abuse protection without new infrastructure:
   - include `Retry-After` header
   - log scope/key/path for auditing
 - Keep validation in transport boundary (`400`) and avoid domain mutations on reject paths.
+
+## Async turn notification dedup hygiene
+When using in-memory dedup keys for DM/group turn notifications:
+- Scope dedup by transition key + recipient to prevent duplicate sends on retries.
+- Reset stale dedup keys when a **new game starts in the same group**; otherwise first-turn notifications can be suppressed across sessions.
+- Keep fallback sends best-effort (`try/catch` + warning log) so Telegram transport failures do not fail gameplay mutations.
