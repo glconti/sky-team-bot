@@ -5,13 +5,15 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Cross-Team Status (2026-03-02T01:10:22Z) — Round 10 Scribe Sync
-- **Sully (You):** Closure audit (Round 9) complete. PR #87 (BotFather + WebApp tests) merged candidate. Architecting #81 full scope (identity/role context binding + UI state). Ready to design #82 full conflict expansion.
-- **Skiles:** Issue #82 Slice 1 COMPLETED. Optimistic concurrency (CAS mutations + 409 responses) in place. Version exposed in GameSessionSnapshot. Commit 6001682 posted. Tests active; parallel stale write expansion pending.
+## Cross-Team Status (2026-03-02T01:22:00Z) — Round 11 Scribe Sync
+- **Sully (You):** Closure audit (Round 10) complete. Issues #80–#84 remain open (acceptance criteria untouched). PR #87 (BotFather + WebApp tests) ready to merge. Priority order refreshed: #80 → #81 → #82 → #83/#84.
+- **Skiles:** Issue #83 COMPLETED. Transport-driven async turn notifications hardened. DM→group fallback best-effort. Tests + operator docs. Commit b6239c8. PR #87 ready for merge.
 - **Aloha:** Completed #80 QA coverage. Available for #77 UI implementation.
-- **Tenerife:** Standby for #83 turn notifications.
-- **Critical Path:** #80 (persistence done) → #81 (slice 1 done, architecture review + full scope pending) → #82 (slice 1 done, parallel tests + non-WebApp surfaces pending) → #83/#84 (parallel).
-- **Next:** Merge PR #87. Review #81 full scope design. Plan #82 conflict test expansion. Schedule #83/#84 parallel start.
+- **Tenerife:** #83 scope complete (Skiles). Standby for downstream (#84).
+- **Epic #75 Progress:** 3/11 complete (#76, #85, #86). Next gate: Validate #80 persistence + full #81 scope before #82 expansion.
+- **Critical Path:** #80 (persistence done) → #81 (slice 1 done, full scope pending) → #82 (slice 1 done, conflict expansion pending) → #83 (complete) → #84 (parallel).
+- **Blockers Resolved:** Skiles' #83 practical scope complete. Ready to finalize #81 full scope and expand #82 parallel tests.
+- **Next:** Merge PR #87. Finalize #81 full scope. Expand #82 conflict tests. Schedule #84 rate limits.
 
 ## Core Context (Summarized from Sessions 1–13)
 
@@ -71,6 +73,7 @@ Architected Telegram Mini App as primary UI (from cockpit-centric design). Desig
 - Draft PR as collaboration gate enables architecture feedback before merge; reduces rework
 - Audit cadence valuable for validating critical path alignment
 - Shared review gate model (Sully architecture, Skiles implementation, Aloha testing) prevents rework
+- Round 10 closure audit confirmed PR #87 only satisfies #76/#85; #80–#84 still pending, so persistence (#80) is the immediate gate for the epic
 
 ---
 

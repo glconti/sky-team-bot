@@ -7,8 +7,9 @@
 
 ## Current Status (2026-03-02)
 - ✅ Issue closure round 8: Closed #76 (BotFather config), #85 (WebApp tests), #86 (QA matrix)
-- ✅ Epic #75 progress: 4/11 child issues complete; critical path gates established
-- ⏳ Next: Begin #81 security-context-binding design review
+- ✅ Epic #75 progress: 3/11 child issues complete (#76, #85, #86); #77 still pending while foundational gates (#80, #81, #82) remain open
+- ⏳ Immediate gate: Validate Skiles #80 persistence implementation (Version field + TTL) so the domain can anchor #81/#82
+- ⏳ Next: Begin #81 security-context-binding design review after #80 verification
 - ⏳ Pending: Review #82 versioning API contract before #78–#79 UI integration
 
 ## Architectural Decisions (Locked)
@@ -33,7 +34,7 @@
 
 ## Critical Path (Locked)
 1. **#76** ✅ BotFather config validation (complete)
-2. **#77** ✅ Open App Launchpad hardening (merged in PR #87)
+2. **#77** ⏳ Open App Launchpad hardening (awaiting merge + QA rerun once #80 passes)
 3. **#80** ⏳ Game Persistence (in progress; architecture contract delivered)
 4. **#81** ⏳ Security-context-binding (design pending)
 5. **#82** ⏳ Versioning/Concurrency APIs (design pending)
@@ -59,7 +60,7 @@
 - GitHub issues #75–#86 — Epic + child issues with architecture review gates
 
 ## Next Actions
-1. Begin #81 security-context-binding contract (before Skiles implements)
-2. Review #82 versioning API shape (expectedVersion parameter, ConcurrencyConflict response)
-3. Validate Skiles #80 persistence implementation (Version field, TTL, repository interface)
+1. Validate Skiles #80 persistence implementation (Version field, TTL, repository interface)
+2. Begin #81 security-context-binding contract (before Skiles implements)
+3. Review #82 versioning API shape (expectedVersion parameter, ConcurrencyConflict response)
 4. Approve #82 test suite design (6 required tests: concurrency, persistence, version, conflicts, TTL)
