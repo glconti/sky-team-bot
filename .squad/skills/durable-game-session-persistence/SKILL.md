@@ -26,3 +26,10 @@ Before marking a durability issue close-ready, validate both:
 2. **Contract evidence:** implementation artifacts match issue scope (storage contract, lifecycle policy like TTL, and documented operational behavior).
 
 If behavior tests pass but contract artifacts are missing, issue a **not close-ready** verdict with an explicit remaining checklist.
+
+## Contract closure add-on (Issue #80 remediation)
+When QA requires explicit repository completeness without a storage-engine rewrite:
+1. Extend the persistence port with repository-style operations (`Create`, `Update(expectedVersion)`, `GetById`, `List`, `CleanupExpired`).
+2. Add per-session lifecycle timestamps (`CreatedAtUtc`, `UpdatedAtUtc`) plus computed `ExpiresAtUtc`.
+3. Enforce cleanup on load/save so restart and steady-state paths apply the same retention policy.
+4. Add one host-level file-backed restart integration test (same persistence file, new host instance) to prove real rehydration behavior.

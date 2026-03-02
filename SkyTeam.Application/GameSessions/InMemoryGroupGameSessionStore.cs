@@ -612,6 +612,9 @@ public sealed class InMemoryGroupGameSessionStore
             GroupChatId = groupChatId;
             Pilot = pilot;
             Copilot = copilot;
+            var nowUtc = DateTimeOffset.UtcNow;
+            CreatedAtUtc = nowUtc;
+            UpdatedAtUtc = nowUtc;
 
             InitializeNewDomainGame();
         }
@@ -622,6 +625,8 @@ public sealed class InMemoryGroupGameSessionStore
 
         public Game DomainGame { get; private set; } = null!;
         public long Version { get; private set; } = 1;
+        public DateTimeOffset CreatedAtUtc { get; private set; }
+        public DateTimeOffset UpdatedAtUtc { get; private set; }
 
         public GameRoundSnapshot Round { get; set; } = GameRoundSnapshot.StartNew(roundNumber: 1);
         public RoundTurnState? TurnState { get; set; }
@@ -630,12 +635,12 @@ public sealed class InMemoryGroupGameSessionStore
 
         public PersistedGameSession ToPersisted()
             => new(
-                GroupChatId,
-                Pilot,
-                Copilot,
-                Round,
-                Version,
-                _roundLogs
+                GroupChatId: GroupChatId,
+                Pilot: Pilot,
+                Copilot: Copilot,
+                Round: Round,
+                Version: Version,
+                RoundLogs: _roundLogs
                     .Select(log => new PersistedRoundLog(
                         log.RoundNumber,
                         log.PilotDice,
@@ -646,16 +651,23 @@ public sealed class InMemoryGroupGameSessionStore
                             placement.Player,
                             placement.DieIndex)).ToArray(),
                         log.IsCompleted))
-                    .ToArray());
+                    .ToArray(),
+                CreatedAtUtc: CreatedAtUtc,
+                UpdatedAtUtc: UpdatedAtUtc);
 
         public static GameSession Restore(PersistedGameSession persisted)
         {
             ArgumentNullException.ThrowIfNull(persisted);
 
+            var nowUtc = DateTimeOffset.UtcNow;
+            var createdAtUtc = persisted.CreatedAtUtc == default ? nowUtc : persisted.CreatedAtUtc;
+            var updatedAtUtc = persisted.UpdatedAtUtc == default ? createdAtUtc : persisted.UpdatedAtUtc;
             var restored = new GameSession(persisted.GroupChatId, persisted.Pilot, persisted.Copilot)
             {
                 Round = persisted.Round,
-                Version = Math.Max(1, persisted.Version)
+                Version = Math.Max(1, persisted.Version),
+                CreatedAtUtc = createdAtUtc,
+                UpdatedAtUtc = updatedAtUtc
             };
 
             restored._roundLogs.Clear();
@@ -724,7 +736,11 @@ public sealed class InMemoryGroupGameSessionStore
             return actualStartingPlayer;
         }
 
-        public void IncrementVersion() => Version++;
+        public void IncrementVersion()
+        {
+            Version++;
+            UpdatedAtUtc = DateTimeOffset.UtcNow;
+        }
 
         public bool TryGetPlacementResult(string idempotencyKey, out GamePlacementResult result)
             => _recentPlacementResults.TryGetValue(idempotencyKey, out result);

@@ -129,3 +129,20 @@ All work consolidated on `feat/issue-76-85-botfather-config-webapp-tests` branch
 - `SkyTeam.Application.Tests\Telegram\Issue83AsyncTurnNotificationTests.cs`
 - `readme.md`
 - `.squad/decisions/inbox/skiles-issue-83-complete.md`
+
+### Session 26: Issue #80 close-readiness remediation (2026-03-02T04:20:00Z)
+
+**Outcome:** Added explicit repository CRUD/list/query contract operations on persistence port, introduced persisted lifecycle metadata + cleanup policy, and delivered a file-backed restart-path integration test tied to PR #87 scope.
+
+**Key Learnings:**
+- Persisted session timestamps (`CreatedAtUtc`, `UpdatedAtUtc`) are the minimum contract needed to implement deterministic retention cleanup without touching domain entities.
+- Repository contract completeness can be added incrementally by extending the persistence port with `Create/Update/GetById/List` while preserving existing replay-based store behavior.
+- Restart durability claims are stronger when validated through a host-level restart integration path using the real JSON adapter, not only in-memory test doubles.
+
+**Delivered Artifacts:**
+- `SkyTeam.Application\GameSessions\GameSessionPersistence.cs`
+- `SkyTeam.Application\GameSessions\InMemoryGroupGameSessionStore.cs`
+- `SkyTeam.TelegramBot\Persistence\JsonGameSessionPersistence.cs`
+- `SkyTeam.Application.Tests\GameSessions\JsonGameSessionPersistenceTests.cs`
+- `SkyTeam.Application.Tests\Telegram\Issue80FileBackedRestartPersistenceTests.cs`
+- `.squad/decisions/inbox/skiles-issue-80-remediation.md`

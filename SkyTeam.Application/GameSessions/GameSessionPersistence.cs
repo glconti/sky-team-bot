@@ -3,10 +3,19 @@ namespace SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
 using SkyTeam.Application.Round;
 
-public interface IGameSessionPersistence
+public interface IGameSessionRepository
+{
+    void Create(PersistedGameSession session);
+    bool Update(PersistedGameSession session, long expectedVersion);
+    PersistedGameSession? GetById(long groupChatId);
+    IReadOnlyList<PersistedGameSession> List();
+}
+
+public interface IGameSessionPersistence : IGameSessionRepository
 {
     PersistedGameSessionStoreState Load();
     void Save(PersistedGameSessionStoreState state);
+    int CleanupExpired(DateTimeOffset utcNow);
 }
 
 public sealed record PersistedGameSessionStoreState(
@@ -26,7 +35,10 @@ public sealed record PersistedGameSession(
     LobbyPlayer Copilot,
     GameRoundSnapshot Round,
     long Version,
-    IReadOnlyList<PersistedRoundLog> RoundLogs);
+    IReadOnlyList<PersistedRoundLog> RoundLogs,
+    DateTimeOffset CreatedAtUtc = default,
+    DateTimeOffset UpdatedAtUtc = default,
+    DateTimeOffset? ExpiresAtUtc = null);
 
 public sealed record PersistedRoundLog(
     int RoundNumber,
@@ -57,4 +69,21 @@ public sealed class NullGameSessionPersistence : IGameSessionPersistence
     {
         ArgumentNullException.ThrowIfNull(state);
     }
+
+    public void Create(PersistedGameSession session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+    }
+
+    public bool Update(PersistedGameSession session, long expectedVersion)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        return false;
+    }
+
+    public PersistedGameSession? GetById(long groupChatId) => null;
+
+    public IReadOnlyList<PersistedGameSession> List() => [];
+
+    public int CleanupExpired(DateTimeOffset utcNow) => 0;
 }

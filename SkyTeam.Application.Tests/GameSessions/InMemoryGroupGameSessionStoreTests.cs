@@ -768,5 +768,44 @@ public sealed class InMemoryGroupGameSessionStoreTests
         public PersistedGameSessionStoreState Load() => State;
 
         public void Save(PersistedGameSessionStoreState state) => State = state;
+
+        public void Create(PersistedGameSession session)
+        {
+            if (State.Sessions.Any(existing => existing.GroupChatId == session.GroupChatId))
+                throw new InvalidOperationException($"A game session already exists for group chat {session.GroupChatId}.");
+
+            State = State with { Sessions = [.. State.Sessions, session] };
+        }
+
+        public bool Update(PersistedGameSession session, long expectedVersion)
+        {
+            var sessions = State.Sessions.ToArray();
+            var existingIndex = Array.FindIndex(sessions, existing => existing.GroupChatId == session.GroupChatId);
+            if (existingIndex < 0)
+                return false;
+
+            if (sessions[existingIndex].Version != expectedVersion)
+                return false;
+
+            sessions[existingIndex] = session;
+            State = State with { Sessions = sessions };
+            return true;
+        }
+
+        public PersistedGameSession? GetById(long groupChatId)
+            => State.Sessions.SingleOrDefault(session => session.GroupChatId == groupChatId);
+
+        public IReadOnlyList<PersistedGameSession> List() => State.Sessions;
+
+        public int CleanupExpired(DateTimeOffset utcNow)
+        {
+            var retained = State.Sessions
+                .Where(session => !session.ExpiresAtUtc.HasValue || session.ExpiresAtUtc.Value > utcNow)
+                .ToArray();
+
+            var removedCount = State.Sessions.Count - retained.Length;
+            State = State with { Sessions = retained };
+            return removedCount;
+        }
     }
 }

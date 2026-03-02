@@ -33,8 +33,15 @@ The bot uses long polling, keeps lobby state in-memory, and persists active game
 Set a public HTTPS URL for the Mini App shell (served by this host):
 - `SKYTEAM_MINI_APP_URL` (or `WebApp:MiniAppUrl`)
 - Optional persistence file override: `Persistence:GameSessionsFilePath`
+- Optional completed-session retention override (days): `Persistence:CompletedSessionRetentionDays` (default `30`)
+- Optional abandoned-session retention override (days): `Persistence:AbandonedSessionRetentionDays` (default `30`)
 
 Bot commands remain as fallback and will redirect you to the Mini App when secret info is required.
+
+### Game session persistence contract (Issue #80)
+- The application persistence port now exposes repository operations: `Create`, `Update(expectedVersion)`, `GetById`, and `List`.
+- Lifecycle policy: sessions are persisted with `CreatedAtUtc`/`UpdatedAtUtc` metadata and an `ExpiresAtUtc` cutoff.
+- Cleanup runs during persistence load/save and can be triggered explicitly via `CleanupExpired(utcNow)`.
 
 ### BotFather Main Mini App setup (Issue #76)
 1. Deploy the Mini App host on a public HTTPS domain (valid CA cert, no self-signed certs).
