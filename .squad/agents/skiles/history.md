@@ -145,3 +145,8 @@ All work consolidated on `feat/issue-76-85-botfather-config-webapp-tests` branch
 - `SkyTeam.Application.Tests\GameSessions\JsonGameSessionPersistenceTests.cs`
 - `SkyTeam.Application.Tests\Telegram\Issue80FileBackedRestartPersistenceTests.cs`
 - `.squad/decisions/inbox/skiles-issue-80-remediation.md`
+
+## Learnings
+- For strict acceptance criteria, an idempotent startup schema migration can close a database-schema gate without forcing a risky rewrite of an already stable JSON persistence runtime.
+- Keeping SQL migration scripts as repository artifacts and embedding them at build time provides both auditability and production-safe runtime loading.
+- SQLite test cleanup should clear pooled connections (`SqliteConnection.ClearAllPools`) before deleting temporary directories, otherwise teardown can fail with locked database files.

@@ -33,3 +33,10 @@ When QA requires explicit repository completeness without a storage-engine rewri
 2. Add per-session lifecycle timestamps (`CreatedAtUtc`, `UpdatedAtUtc`) plus computed `ExpiresAtUtc`.
 3. Enforce cleanup on load/save so restart and steady-state paths apply the same retention policy.
 4. Add one host-level file-backed restart integration test (same persistence file, new host instance) to prove real rehydration behavior.
+
+## Schema migration gate add-on (Issue #80 closure)
+When acceptance criteria explicitly require a database schema/migration but runtime persistence is already stable:
+1. Add a concrete SQL migration artifact with required columns and indexes (for SkyTeam: `Version`, lifecycle timestamps, active-session uniqueness).
+2. Embed the SQL artifact and run it idempotently at startup through a tiny migration runner.
+3. Keep the existing runtime persistence path unchanged to minimize production risk.
+4. Add a runtime evidence test that verifies migration row + table shape + required indexes; clear SQLite pools in fixture teardown to avoid locked-file cleanup failures.

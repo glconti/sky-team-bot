@@ -1,6 +1,7 @@
 namespace SkyTeam.Application.Tests.GameSessions;
 
 using FluentAssertions;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
@@ -78,6 +79,44 @@ public sealed class JsonGameSessionPersistenceTests
         }
     }
 
+    [Fact]
+    public void Load_ShouldApplyGameSessionsSchemaMigration_WhenPersistenceIsInitialized()
+    {
+        // Arrange
+        var fixture = CreateFixture();
+
+        try
+        {
+            // Act
+            _ = fixture.Persistence.Load();
+            using var connection = new SqliteConnection($"Data Source={fixture.DatabasePath}");
+            connection.Open();
+
+            var migrationCount = GetMigrationCount(connection, "0001_game_sessions_schema");
+            var columns = GetGameSessionsColumns(connection);
+            var hasActiveGroupChatIndex = HasIndex(connection, "UX_GameSessions_Active_GroupChatId");
+
+            // Assert
+            migrationCount.Should().Be(1);
+            columns.Should().Contain([
+                "GameId",
+                "GroupChatId",
+                "PilotUserId",
+                "CopilotUserId",
+                "StateJson",
+                "Status",
+                "Version",
+                "CreatedAtUtc",
+                "UpdatedAtUtc",
+                "ExpiresAtUtc"]);
+            hasActiveGroupChatIndex.Should().BeTrue();
+        }
+        finally
+        {
+            fixture.Dispose();
+        }
+    }
+
     private static PersistedGameSession CreatePersistedSession(
         long groupChatId,
         long version,
@@ -98,23 +137,76 @@ public sealed class JsonGameSessionPersistenceTests
         var rootPath = Path.Combine(Path.GetTempPath(), $"skyteam-json-persistence-{Guid.NewGuid():N}");
         Directory.CreateDirectory(rootPath);
         var filePath = Path.Combine(rootPath, "game-sessions.json");
+        var databasePath = Path.Combine(rootPath, "game-sessions.db");
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Persistence:GameSessionsFilePath"] = filePath,
+                ["Persistence:GameSessionsDatabasePath"] = databasePath,
                 ["Persistence:CompletedSessionRetentionDays"] = completedRetentionDays.ToString(),
                 ["Persistence:AbandonedSessionRetentionDays"] = abandonedRetentionDays.ToString()
             })
             .Build();
 
         var hostEnvironment = new TestHostEnvironment(rootPath);
-        return new(new JsonGameSessionPersistence(configuration, hostEnvironment), rootPath);
+        return new(new JsonGameSessionPersistence(configuration, hostEnvironment), rootPath, databasePath);
     }
 
-    private sealed record PersistenceFixture(JsonGameSessionPersistence Persistence, string RootPath) : IDisposable
+    private static long GetMigrationCount(SqliteConnection connection, string migrationId)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT COUNT(1)
+            FROM SchemaMigrations
+            WHERE Id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", migrationId);
+        return command.ExecuteScalar() switch
+        {
+            long count => count,
+            int count => count,
+            _ => 0
+        };
+    }
+
+    private static string[] GetGameSessionsColumns(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info(GameSessions);";
+        using var reader = command.ExecuteReader();
+
+        var columns = new List<string>();
+        while (reader.Read())
+            columns.Add(reader.GetString(1));
+
+        return [.. columns];
+    }
+
+    private static bool HasIndex(SqliteConnection connection, string indexName)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT COUNT(1)
+            FROM sqlite_master
+            WHERE type = 'index'
+              AND name = $indexName;
+            """;
+        command.Parameters.AddWithValue("$indexName", indexName);
+
+        return command.ExecuteScalar() switch
+        {
+            long count => count > 0,
+            int count => count > 0,
+            _ => false
+        };
+    }
+
+    private sealed record PersistenceFixture(JsonGameSessionPersistence Persistence, string RootPath, string DatabasePath) : IDisposable
     {
         public void Dispose()
         {
+            SqliteConnection.ClearAllPools();
+
             if (Directory.Exists(RootPath))
                 Directory.Delete(RootPath, recursive: true);
         }

@@ -16,8 +16,12 @@ public sealed class JsonGameSessionPersistence(
     };
 
     private readonly object _sync = new();
+    private readonly object _migrationSync = new();
     private readonly string _filePath = ResolveFilePath(
         configuration["Persistence:GameSessionsFilePath"],
+        hostEnvironment.ContentRootPath);
+    private readonly string _databasePath = ResolveDatabasePath(
+        configuration["Persistence:GameSessionsDatabasePath"],
         hostEnvironment.ContentRootPath);
     private readonly TimeSpan _completedRetention = TimeSpan.FromDays(ResolveRetentionDays(
         configuration["Persistence:CompletedSessionRetentionDays"],
@@ -25,9 +29,12 @@ public sealed class JsonGameSessionPersistence(
     private readonly TimeSpan _abandonedRetention = TimeSpan.FromDays(ResolveRetentionDays(
         configuration["Persistence:AbandonedSessionRetentionDays"],
         DefaultAbandonedRetentionDays));
+    private bool _schemaMigrated;
 
     public PersistedGameSessionStoreState Load()
     {
+        EnsureSchemaMigrated();
+
         lock (_sync)
         {
             var nowUtc = DateTimeOffset.UtcNow;
@@ -38,6 +45,7 @@ public sealed class JsonGameSessionPersistence(
     public void Save(PersistedGameSessionStoreState state)
     {
         ArgumentNullException.ThrowIfNull(state);
+        EnsureSchemaMigrated();
 
         lock (_sync)
         {
@@ -49,6 +57,7 @@ public sealed class JsonGameSessionPersistence(
     public void Create(PersistedGameSession session)
     {
         ArgumentNullException.ThrowIfNull(session);
+        EnsureSchemaMigrated();
 
         lock (_sync)
         {
@@ -67,6 +76,7 @@ public sealed class JsonGameSessionPersistence(
     public bool Update(PersistedGameSession session, long expectedVersion)
     {
         ArgumentNullException.ThrowIfNull(session);
+        EnsureSchemaMigrated();
 
         lock (_sync)
         {
@@ -91,6 +101,8 @@ public sealed class JsonGameSessionPersistence(
 
     public PersistedGameSession? GetById(long groupChatId)
     {
+        EnsureSchemaMigrated();
+
         lock (_sync)
             return ReadState(DateTimeOffset.UtcNow, persistChanges: true)
                 .Sessions
@@ -99,6 +111,8 @@ public sealed class JsonGameSessionPersistence(
 
     public IReadOnlyList<PersistedGameSession> List()
     {
+        EnsureSchemaMigrated();
+
         lock (_sync)
             return ReadState(DateTimeOffset.UtcNow, persistChanges: true)
                 .Sessions
@@ -108,6 +122,8 @@ public sealed class JsonGameSessionPersistence(
 
     public int CleanupExpired(DateTimeOffset utcNow)
     {
+        EnsureSchemaMigrated();
+
         lock (_sync)
         {
             var state = ReadStateRaw();
@@ -227,11 +243,36 @@ public sealed class JsonGameSessionPersistence(
             : Path.GetFullPath(Path.Combine(contentRootPath, configuredPath));
     }
 
+    private static string ResolveDatabasePath(string? configuredPath, string contentRootPath)
+    {
+        if (string.IsNullOrWhiteSpace(configuredPath))
+            return Path.GetFullPath(Path.Combine(contentRootPath, "data", "game-sessions.db"));
+
+        return Path.IsPathRooted(configuredPath)
+            ? configuredPath
+            : Path.GetFullPath(Path.Combine(contentRootPath, configuredPath));
+    }
+
     private static int ResolveRetentionDays(string? configuredDays, int defaultValue)
     {
         if (!int.TryParse(configuredDays, out var parsedDays) || parsedDays < 1)
             return defaultValue;
 
         return parsedDays;
+    }
+
+    private void EnsureSchemaMigrated()
+    {
+        if (_schemaMigrated)
+            return;
+
+        lock (_migrationSync)
+        {
+            if (_schemaMigrated)
+                return;
+
+            GameSessionsSchemaMigrator.EnsureMigrated(_databasePath);
+            _schemaMigrated = true;
+        }
     }
 }
