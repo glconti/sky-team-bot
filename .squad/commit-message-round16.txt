@@ -1,0 +1,11 @@
+.squad: orchestration logs round 16 + decisions merge + cross-agent history sync
+
+- Orchestration logs: Skiles (2026-03-02T02-11-00Z) Issue #81 InvalidGameContext binding completion; Sully (2026-03-02T02-18-00Z) Issue #81 closure verification
+- Session log: ralph-round16.md documenting Skiles round 16 task 1 + Sully round 16 task 2
+- Decisions merge: skiles-issue-81-residual.md + sully-issue-81-final-closure.md → decisions.md (append-only ledger); deleted inbox files
+- Cross-agent history: Updated Skiles + Sully history.md with Session 28 summaries, team learnings, gate closure outcome
+- Scribe history: Session 2026-03-02 Ralph Round 16 logged
+- Epic #75 Status: 7/11 closed; #81 gate closed; #77–#79 (UI) + #84 (abuse protection) unblocked
+- Next: Ralph prioritizes #77 (UI Slice — Place/Undo)
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

@@ -247,6 +247,86 @@ public sealed class InMemoryGroupGameSessionStoreTests
     }
 
     [Fact]
+    public void PlaceDie_ShouldBindToRequestedGroupChat_WhenUserHasMultipleActiveSessions()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        const long firstGroupChatId = 123;
+        const long secondGroupChatId = 456;
+        var sharedPilot = new LobbyPlayer(1, "Pilot");
+        var firstCopilot = new LobbyPlayer(2, "Copilot A");
+        var secondCopilot = new LobbyPlayer(3, "Copilot B");
+
+        store.Start(firstGroupChatId, new LobbySnapshot(firstGroupChatId, sharedPilot, firstCopilot), requestingUserId: sharedPilot.UserId);
+        store.RegisterRoll(firstGroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+        var commandId = GetCommandIdForDie(store, sharedPilot.UserId, dieIndex: 0);
+
+        store.Start(secondGroupChatId, new LobbySnapshot(secondGroupChatId, sharedPilot, secondCopilot), requestingUserId: sharedPilot.UserId);
+        store.RegisterRoll(secondGroupChatId, new([6, 6, 6, 6], [6, 6, 6, 6]));
+
+        // Act
+        var result = store.PlaceDie(firstGroupChatId, sharedPilot.UserId, dieIndex: 0, commandId);
+        var firstState = store.GetPublicState(firstGroupChatId);
+        var secondState = store.GetPublicState(secondGroupChatId);
+
+        // Assert
+        result.Status.Should().Be(GamePlacementStatus.Placed);
+        firstState!.PlacementsMade.Should().Be(1);
+        secondState!.PlacementsMade.Should().Be(0);
+    }
+
+    [Fact]
+    public void PlaceDie_ShouldReturnInvalidGameContext_WhenUserMutatesDifferentChatSession()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        const long firstGroupChatId = 123;
+        const long secondGroupChatId = 456;
+        var firstPilot = new LobbyPlayer(1, "Pilot");
+        var firstCopilot = new LobbyPlayer(2, "Copilot A");
+        var secondPilot = new LobbyPlayer(3, "Pilot B");
+        var secondCopilot = new LobbyPlayer(4, "Copilot B");
+
+        store.Start(firstGroupChatId, new LobbySnapshot(firstGroupChatId, firstPilot, firstCopilot), requestingUserId: firstPilot.UserId);
+        store.RegisterRoll(firstGroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        store.Start(secondGroupChatId, new LobbySnapshot(secondGroupChatId, secondPilot, secondCopilot), requestingUserId: secondPilot.UserId);
+        store.RegisterRoll(secondGroupChatId, new([6, 6, 6, 6], [6, 6, 6, 6]));
+        var secondCommand = GetCommandIdForDie(store, secondPilot.UserId, dieIndex: 0);
+
+        // Act
+        var result = store.PlaceDie(secondGroupChatId, firstPilot.UserId, dieIndex: 0, secondCommand);
+
+        // Assert
+        result.Status.Should().Be(GamePlacementStatus.InvalidGameContext);
+    }
+
+    [Fact]
+    public void UndoLastPlacement_ShouldReturnInvalidGameContext_WhenUserMutatesDifferentChatSession()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        const long firstGroupChatId = 123;
+        const long secondGroupChatId = 456;
+        var firstPilot = new LobbyPlayer(1, "Pilot");
+        var firstCopilot = new LobbyPlayer(2, "Copilot A");
+        var secondPilot = new LobbyPlayer(3, "Pilot B");
+        var secondCopilot = new LobbyPlayer(4, "Copilot B");
+
+        store.Start(firstGroupChatId, new LobbySnapshot(firstGroupChatId, firstPilot, firstCopilot), requestingUserId: firstPilot.UserId);
+        store.RegisterRoll(firstGroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        store.Start(secondGroupChatId, new LobbySnapshot(secondGroupChatId, secondPilot, secondCopilot), requestingUserId: secondPilot.UserId);
+        store.RegisterRoll(secondGroupChatId, new([6, 6, 6, 6], [6, 6, 6, 6]));
+
+        // Act
+        var result = store.UndoLastPlacement(secondGroupChatId, firstPilot.UserId);
+
+        // Assert
+        result.Status.Should().Be(GameUndoStatus.InvalidGameContext);
+    }
+
+    [Fact]
     public void PlaceDie_ShouldMarkOnlyRequestingPlayersDieUsed_WhenPlacementIsAccepted()
     {
         // Arrange
@@ -593,8 +673,164 @@ public sealed class InMemoryGroupGameSessionStoreTests
         spectatorHand.Status.Should().Be(GameHandStatus.NoActiveSession);
     }
 
+    [Fact]
+    public async Task PlaceDie_ShouldAcceptSinglePlacement_WhenConcurrentSubmissionsTargetSameDie()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        var (pilot, copilot, lobby) = CreateReadyLobby();
+        store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        var currentUser = roll.StartingPlayer == PlayerSeat.Pilot ? pilot.UserId : copilot.UserId;
+        var commandId = GetCommandIdForDie(store, currentUser, dieIndex: 0);
+
+        using var gate = new ManualResetEventSlim(false);
+        var firstRequest = Task.Run(() =>
+        {
+            gate.Wait();
+            return store.PlaceDie(currentUser, dieIndex: 0, commandId);
+        });
+
+        var secondRequest = Task.Run(() =>
+        {
+            gate.Wait();
+            return store.PlaceDie(currentUser, dieIndex: 0, commandId);
+        });
+
+        // Act
+        gate.Set();
+        var results = await Task.WhenAll(firstRequest, secondRequest);
+        var state = store.GetPublicState(GroupChatId);
+
+        // Assert
+        new
+        {
+            Statuses = results.Select(result => result.Status).OrderBy(status => status.ToString()).ToArray(),
+            PlacementsMade = state!.PlacementsMade
+        }
+        .Should()
+        .BeEquivalentTo(new
+        {
+            Statuses = (new[] { GamePlacementStatus.NotPlayersTurn, GamePlacementStatus.Placed }).OrderBy(status => status.ToString()).ToArray(),
+            PlacementsMade = 1
+        });
+    }
+
+    [Fact]
+    public void PersistenceRoundTrip_ShouldRestoreSessionState_WhenStoreIsRehydrated()
+    {
+        // Arrange
+        var persistence = new InMemoryGameSessionPersistence();
+        var store = new InMemoryGroupGameSessionStore(persistence);
+        var (pilot, copilot, lobby) = CreateReadyLobby();
+
+        store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
+        store.SetCockpitMessageId(GroupChatId, cockpitMessageId: 77);
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        var currentUser = roll.StartingPlayer == PlayerSeat.Pilot ? pilot.UserId : copilot.UserId;
+        var commandId = GetCommandIdForDie(store, currentUser, dieIndex: 0);
+        store.PlaceDie(currentUser, dieIndex: 0, commandId).Status.Should().Be(GamePlacementStatus.Placed);
+
+        // Act
+        var restored = new InMemoryGroupGameSessionStore(persistence);
+        var restoredState = restored.GetPublicState(GroupChatId);
+        var restoredHand = restored.GetHand(currentUser);
+        var hasCockpit = restored.TryGetCockpitMessageId(GroupChatId, out var cockpitMessageId);
+
+        // Assert
+        restoredState.Should().NotBeNull();
+        restoredState!.Session.Round.Status.Should().Be(GameRoundStatus.AwaitingPlacements);
+        restoredState.PlacementsMade.Should().Be(1);
+
+        restoredHand.Status.Should().Be(GameHandStatus.Ok);
+        restoredHand.Hand!.Dice[0].IsUsed.Should().BeTrue();
+
+        hasCockpit.Should().BeTrue();
+        cockpitMessageId.Should().Be(77);
+
+        persistence.State.Sessions.Single().Version.Should().Be(3);
+    }
+
+    [Fact]
+    public void Update_ShouldReturnVersionConflict_WhenExpectedVersionIsOutdated()
+    {
+        // Arrange
+        var store = new InMemoryGroupGameSessionStore();
+        var (pilot, copilot, lobby) = CreateReadyLobby();
+        store.Start(GroupChatId, lobby, requestingUserId: pilot.UserId);
+        var roll = store.RegisterRoll(GroupChatId, new([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        var staleVersion = store.GetSnapshot(GroupChatId)!.Version;
+        var currentUser = roll.StartingPlayer == PlayerSeat.Pilot ? pilot.UserId : copilot.UserId;
+        var nextUser = currentUser == pilot.UserId ? copilot.UserId : pilot.UserId;
+
+        var currentCommandId = GetCommandIdForDie(store, currentUser, dieIndex: 0);
+        store.PlaceDie(GroupChatId, currentUser, dieIndex: 0, currentCommandId, staleVersion).Status.Should().Be(GamePlacementStatus.Placed);
+
+        var nextCommandId = GetCommandIdForDie(store, nextUser, dieIndex: 0);
+
+        // Act
+        var staleUpdate = store.PlaceDie(GroupChatId, nextUser, dieIndex: 0, nextCommandId, staleVersion);
+        var state = store.GetPublicState(GroupChatId);
+
+        // Assert
+        staleUpdate.Status.Should().Be(GamePlacementStatus.VersionConflict);
+        staleUpdate.CurrentVersion.Should().Be(state!.Session.Version);
+        state.PlacementsMade.Should().Be(1);
+    }
+
     [Fact(Skip = "Auth expiry UX is implemented in Telegram/WebApp transport layer, not in application store.")]
     public void AuthExpiryUx_ShouldPromptReopenFlow_WhenSessionTokenIsExpired()
     {
+    }
+
+    private sealed class InMemoryGameSessionPersistence : IGameSessionPersistence
+    {
+        public PersistedGameSessionStoreState State { get; private set; } = PersistedGameSessionStoreState.Empty;
+
+        public PersistedGameSessionStoreState Load() => State;
+
+        public void Save(PersistedGameSessionStoreState state) => State = state;
+
+        public void Create(PersistedGameSession session)
+        {
+            if (State.Sessions.Any(existing => existing.GroupChatId == session.GroupChatId))
+                throw new InvalidOperationException($"A game session already exists for group chat {session.GroupChatId}.");
+
+            State = State with { Sessions = [.. State.Sessions, session] };
+        }
+
+        public bool Update(PersistedGameSession session, long expectedVersion)
+        {
+            var sessions = State.Sessions.ToArray();
+            var existingIndex = Array.FindIndex(sessions, existing => existing.GroupChatId == session.GroupChatId);
+            if (existingIndex < 0)
+                return false;
+
+            if (sessions[existingIndex].Version != expectedVersion)
+                return false;
+
+            sessions[existingIndex] = session;
+            State = State with { Sessions = sessions };
+            return true;
+        }
+
+        public PersistedGameSession? GetById(long groupChatId)
+            => State.Sessions.SingleOrDefault(session => session.GroupChatId == groupChatId);
+
+        public IReadOnlyList<PersistedGameSession> List() => State.Sessions;
+
+        public int CleanupExpired(DateTimeOffset utcNow)
+        {
+            var retained = State.Sessions
+                .Where(session => !session.ExpiresAtUtc.HasValue || session.ExpiresAtUtc.Value > utcNow)
+                .ToArray();
+
+            var removedCount = State.Sessions.Count - retained.Length;
+            State = State with { Sessions = retained };
+            return removedCount;
+        }
     }
 }

@@ -5,6 +5,27 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
+**Archive Note:** Full history summarized into `core-context.md`. Sessions 1–11 (2026-02-21 to 2026-03-02) condensed below.
+
+## Cross-Team Status (2026-03-02T01:26:00Z) — Round 12 Scribe Sync (Aloha QA Verdict)
+- **Aloha (You):** Issue #80 QA COMPLETED. Verdict: Not close-ready. Posted explicit gap list on GitHub; awaiting implementation alignment to contract (DB schema + migration + repository CRUD + TTL policy + restart test).
+- **Sully, Skiles, Tenerife:** Standby. Epic #75 gates on #80 closure. #81 full scope + #82 expansion pending #80 completion.
+- **Critical Path:** #80 (QA verdict posted) → contract alignment → close → #81 full scope → #82 expansion.
+- **Next:** Implement #80 gaps. Revalidate. Close PR #87.
+
+## Archived Core Learnings (Full Summary in core-context.md)
+- Deterministic concurrency testing via shared-gate placement pairs (one succeeds, one blocked)
+- Persistence round-trip QA using `IGameSessionPersistence` seam with in-memory double
+- Manual QA matrix (client × surface × feature) most effective when scoped, deterministic, integrated with release
+- Version-conflict tests blocked until expectedVersion APIs land (Skiles completed in #82 Slice 1)
+- WebApp integration pattern: `WebApplicationFactory<Program>` + disabled polling for hermetic tests
+- Token pool + die value boundaries validated via comprehensive domain test matrix (7 modules, win/loss criteria)
+- **Sully:** Issue #80/#82 architecture contract designed. Persistence contract stabilized; versioning scope deferred to #82. Next: #81 design + #82 API review.
+- **Skiles:** Issue #80 vertical slice COMPLETED. Persistence + version tracking + tests passing. #82 versioning APIs pending design review.
+- **Aloha (You):** Issue #80 QA coverage COMPLETED. Round-trip + deterministic concurrency validated. Version-conflict test skipped (blocked on #82 API).
+- **Critical Path:** #80→#81 (security-context-binding) → #82 (versioning/concurrency) before UI integration.
+- **Next:** Await #82 versioning API implementation; activate skipped version-conflict test; expand concurrency test suite.
+
 ## Learnings
 
 ### Session 1: Telegram Architecture + MVP Backlog Sprint (2026-02-21)
@@ -247,3 +268,61 @@
 **Artifacts:**
 - Orchestration log: 2026-03-01T21-55-06Z-aloha-miniapp-tests.md
 - Test cases for launch flow, callback state, static serving
+
+### Session 9: Issue #85 — WebApp API integration expansion (2026-03-01)
+**Outcome:** Extended WebApp lobby integration coverage with a full create/join/start API flow and a negative-path start validation aligned with current endpoint behavior.
+
+**Learnings:**
+- **Architecture decision:** WebApp lobby endpoints remain thin transport adapters over `InMemoryGroupLobbyStore` + `InMemoryGroupGameSessionStore`, with conflict status mapping for non-ready start attempts.
+- **Pattern:** Deterministic integration tests use `WebApplicationFactory<Program>` + in-memory bot token config and hosted-service removal to keep Telegram polling disabled.
+- **User preference:** Keep diffs surgical and validate via direct `dotnet test` runs in `SkyTeam.Application.Tests`.
+- **Key file paths:** `SkyTeam.Application.Tests\Telegram\Issue61WebAppLobbyEndpointsTests.cs`, `SkyTeam.TelegramBot\WebApp\WebAppEndpoints.cs`.
+
+### Session 10: Issue #80 — Persistence contracts + concurrency guard (2026-03-02)
+**Outcome:** Added deterministic concurrency guard coverage in `InMemoryGroupGameSessionStoreTests` and captured durable persistence/version expectations as explicit issue #80 contract tests.
+
+**Learnings:**
+- Deterministic concurrency coverage can be achieved by releasing two same-die placement requests behind a shared gate and asserting one `Placed` + one `NotPlayersTurn`.
+- Persistence round-trip QA became testable after the `IGameSessionPersistence` seam; rehydration behavior is now covered with an in-memory persistence double.
+- Version-conflict QA is blocked until write APIs accept an expected version token and return a dedicated stale-write conflict status.
+- When hooks are missing, keep momentum with skipped contract tests plus a concrete blocker handoff in `.squad/decisions/inbox/aloha-issue-80.md`.
+
+### Session 11: Issue #86 — Manual QA Matrix for Mini App (2026-03-02)
+**Outcome:** Completed issue #86 by adding practical manual QA matrix to readme.md covering all Telegram client variants and launch surfaces.
+
+**Deliverables:**
+- **QA Matrix Table:** 8 rows (iOS/Android/Desktop/Web × cockpit button/deep link) with pass/fail columns for lobby load, create, join, play, error recovery
+- **Happy Path Tests:** 5 test cases covering create/join flow, game play (roll/place/undo/refresh), token spending
+- **Error Cases:** 8 test scenarios—tampered signature, expired auth, network loss, concurrent placement, stale game ref, empty/long names, special chars, rapid clicks
+- **Concurrency & Resilience:** 7 multi-player sync tests—simultaneous rolls/placements, turn blocking, message polling, reconnection
+- **Device & UI Checks:** Responsive design (320px–1920px), dark mode toggle, accessibility (keyboard nav, screen readers), touch targets ≥ 48px
+- **Performance Baselines:** Lobby load < 2s, game fetch < 1s, die roll response < 500ms, cockpit updates < 1s
+- **Release Checklist:** 9-point pre-merge verification including multi-client testing, error scenarios, dark mode, accessibility, performance
+
+**Artifacts:**
+- **File:** `readme.md` (added "Manual QA Matrix" section with 5 subsections)
+- **Commit:** b5e67d6 — "docs: Add comprehensive manual QA matrix for Mini App testing"
+- **Issue Comment:** Posted progress update linking PR #87, all acceptance criteria marked complete
+
+**Process Decision:**
+- QA matrix lives in readme.md (developer-facing, always versioned with code)
+- Matrix format: **client × surface × feature** with explicit pass/fail/warning/NA status
+- Test environment setup included (bot token, Mini App URL, test group)
+- Release checklist ensures manual testing occurs before each Mini App update
+- Practical focus: happy path, 2–3 error scenarios per client, boundary cases, multi-player sync
+
+**Key Insight:**
+Manual QA matrix is most effective when:
+1. **Scoped tightly:** Telegram clients + Mini App surfaces (not entire bot)
+2. **Deterministic:** Reproducible test cases (not vague "check things")
+3. **Integrated with release:** Release checklist ties matrix to merge gates
+4. **Developer-friendly:** Lives in readme alongside setup instructions
+5. **Incrementally testable:** Tester can validate one row (e.g., iOS) before full suite
+
+### Session 12: Issue #80 — Durable persistence QA validation (2026-03-02)
+**Outcome:** Validated issue #80 on PR #87 branch and posted QA verdict on the issue thread.
+
+**Learnings:**
+- Separate **behavior validation** (rehydration + stale-write conflict tests) from **contract validation** (issue-specified persistence architecture) when issuing close-ready decisions.
+- Focused persistence checks plus a full-suite sanity run provide high confidence quickly: 3/3 focused tests green and full suite remained green.
+- Passing tests alone are insufficient for close-ready if acceptance criteria still require missing artifacts (DB migration/repository contract/TTL policy).

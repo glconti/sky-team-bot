@@ -1,0 +1,12 @@
+Squad: Scribe post-Skiles #82 Slice 1 sync (Round 10)
+
+- Merged skiles-issue-82 decision to decisions.md
+- Deleted inbox/skiles-issue-82.md  
+- Updated cross-team status in skiles/sully/aloha histories
+  - #82 Slice 1 (CAS mutations + 409 responses) completed
+  - #81 architecture review + full scope finalization
+  - Critical path: #80 (done) → #81 (final scope) → #82 (parallel tests)
+- Created Round 10 orchestration log + session log
+- Squad state synchronized for next phase
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

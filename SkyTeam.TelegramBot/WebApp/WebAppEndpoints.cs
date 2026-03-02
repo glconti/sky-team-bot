@@ -52,6 +52,8 @@ public sealed record WebAppPrivateHandState(
     IReadOnlyList<WebAppHandCommand> AvailableCommands);
 
 public sealed record WebAppPlaceDieRequest(int DieIndex, string CommandId);
+public sealed record WebAppCreateLobbyRequest(string? Name, int? PlayerCount, string? Settings);
+public sealed record WebAppJoinLobbyRequest(string? GameCode);
 
 public sealed record WebAppGameStateResponse(
     long GameId,
@@ -60,14 +62,27 @@ public sealed record WebAppGameStateResponse(
     WebAppCockpitState? Cockpit,
     string GameStatus,
     WebAppViewer Viewer,
+    long? Version = null,
     WebAppPrivateHandState? PrivateHand = null);
+
+public sealed record WebAppConcurrencyConflictResponse(
+    string Error,
+    long? CurrentVersion,
+    string Message);
 
 public static class WebAppEndpoints
 {
+    private const int MaxDisplayNameLength = 64;
+    private const int MaxCommandIdLength = 128;
+    private const int MaxLobbyNameLength = 64;
+    private const int MaxLobbySettingsLength = 120;
+    private const int RequiredLobbyPlayerCount = 2;
+
     public static void MapWebAppEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/webapp")
-            .AddEndpointFilter<TelegramInitDataFilter>();
+            .AddEndpointFilter<TelegramInitDataFilter>()
+            .AddEndpointFilter<WebAppAbuseProtectionFilter>();
 
         group.MapGet("/game-state", GetGameState);
         group.MapPost("/lobby/new", CreateLobby);
@@ -107,6 +122,7 @@ public static class WebAppEndpoints
 
     private static async Task<IResult> CreateLobby(
         string? gameId,
+        WebAppCreateLobbyRequest? request,
         HttpContext httpContext,
         InMemoryGroupLobbyStore lobbyStore,
         InMemoryGroupGameSessionStore gameSessionStore,
@@ -116,6 +132,10 @@ public static class WebAppEndpoints
         var result = ResolveRequestContext(gameId, httpContext);
         if (result.Error is not null)
             return result.Error;
+
+        var validationError = ValidateCreateLobbyRequest(request);
+        if (validationError is not null)
+            return validationError;
 
         var createResult = lobbyStore.CreateNew(result.GroupChatId!.Value);
         if (createResult.Status == LobbyCreateStatus.Created)
@@ -126,17 +146,27 @@ public static class WebAppEndpoints
 
     private static async Task<IResult> JoinLobby(
         string? gameId,
+        WebAppJoinLobbyRequest? request,
         HttpContext httpContext,
         InMemoryGroupLobbyStore lobbyStore,
         InMemoryGroupGameSessionStore gameSessionStore,
         TelegramBotService telegramBotService,
         CancellationToken cancellationToken)
     {
-        var result = ResolveRequestContext(gameId, httpContext);
+        var requestedGameId = string.IsNullOrWhiteSpace(request?.GameCode) ? gameId : request!.GameCode;
+        var result = ResolveRequestContext(requestedGameId, httpContext);
         if (result.Error is not null)
             return result.Error;
 
-        var player = new LobbyPlayer(result.Context!.Viewer.UserId, result.Context.Viewer.DisplayName);
+        var displayName = result.Context!.Viewer.DisplayName.Trim();
+        if (string.IsNullOrWhiteSpace(displayName) || displayName.Length > MaxDisplayNameLength)
+            return Results.BadRequest(new
+            {
+                error = "Invalid display name.",
+                retryHint = $"Use a non-empty display name up to {MaxDisplayNameLength} characters."
+            });
+
+        var player = new LobbyPlayer(result.Context.Viewer.UserId, displayName);
         var joinResult = lobbyStore.Join(result.GroupChatId!.Value, player);
 
         if (joinResult.Status is LobbyJoinStatus.JoinedAsPilot or LobbyJoinStatus.JoinedAsCopilot)
@@ -189,6 +219,7 @@ public static class WebAppEndpoints
 
     private static async Task<IResult> RollGame(
         string? gameId,
+        long? expectedVersion,
         HttpContext httpContext,
         InMemoryGroupLobbyStore lobbyStore,
         InMemoryGroupGameSessionStore gameSessionStore,
@@ -199,17 +230,26 @@ public static class WebAppEndpoints
         if (result.Error is not null)
             return result.Error;
 
-        var lobby = lobbyStore.GetSnapshot(result.GroupChatId!.Value);
-        if (lobby is null)
-            return Results.Conflict(new { error = "No lobby yet. Press New first." });
+        if (gameSessionStore.GetSnapshot(result.GroupChatId!.Value) is null)
+        {
+            var lobby = lobbyStore.GetSnapshot(result.GroupChatId.Value);
+            if (lobby is null)
+                return Results.Conflict(new { error = "No lobby yet. Press New first." });
 
-        if (!lobby.IsReady)
-            return Results.Conflict(new { error = "Lobby needs two players before roll." });
+            if (!lobby.IsReady)
+                return Results.Conflict(new { error = "Lobby needs two players before roll." });
 
-        if (gameSessionStore.GetSnapshot(result.GroupChatId.Value) is null)
             return Results.Conflict(new { error = "Game is not started yet. Press Start first." });
+        }
 
-        var rollResult = gameSessionStore.RegisterRoll(result.GroupChatId.Value, SecretDiceRoller.Roll(() => Random.Shared.Next(1, 7)));
+        var roll = SecretDiceRoller.Roll(() => Random.Shared.Next(1, 7));
+        var rollResult = expectedVersion.HasValue
+            ? gameSessionStore.RegisterRoll(result.GroupChatId.Value, roll, expectedVersion.Value)
+            : gameSessionStore.RegisterRoll(result.GroupChatId.Value, roll);
+
+        if (rollResult.Status == GameSessionRollStatus.VersionConflict)
+            return CreateConcurrencyConflictResult(rollResult.CurrentVersion);
+
         if (rollResult.Status == GameSessionRollStatus.RoundNotAwaitingRoll)
             return Results.Conflict(new { error = "This round has already been rolled." });
 
@@ -217,6 +257,10 @@ public static class WebAppEndpoints
             return Results.Conflict(new { error = "Game is not started yet. Press Start first." });
 
         await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId.Value, cancellationToken);
+        await telegramBotService.NotifyCurrentTurnFromWebAppAsync(
+            result.GroupChatId.Value,
+            transitionKey: $"roll:{rollResult.Snapshot?.Round.RoundNumber ?? 0}",
+            cancellationToken: cancellationToken);
         var state = gameSessionStore.GetPublicState(result.GroupChatId.Value)!;
 
         return Results.Ok(MapStateResponse(
@@ -229,6 +273,7 @@ public static class WebAppEndpoints
     private static async Task<IResult> PlaceDie(
         string? gameId,
         WebAppPlaceDieRequest request,
+        long? expectedVersion,
         HttpContext httpContext,
         InMemoryGroupGameSessionStore gameSessionStore,
         TelegramBotService telegramBotService,
@@ -239,18 +284,44 @@ public static class WebAppEndpoints
             return result.Error;
 
         if (request.DieIndex is < 0 or >= SecretDiceHand.DicePerHand)
-            return Results.BadRequest(new { error = "Invalid die index." });
+            return Results.BadRequest(new
+            {
+                error = "Invalid die index.",
+                retryHint = $"Use a die index between 0 and {SecretDiceHand.DicePerHand - 1}."
+            });
 
-        if (string.IsNullOrWhiteSpace(request.CommandId))
-            return Results.BadRequest(new { error = "Missing commandId." });
+        var commandId = request.CommandId?.Trim();
+        if (string.IsNullOrWhiteSpace(commandId))
+            return Results.BadRequest(new
+            {
+                error = "Missing commandId.",
+                retryHint = "Provide commandId from the latest private hand and retry."
+            });
 
-        var placement = gameSessionStore.PlaceDie(result.Context!.Viewer.UserId, request.DieIndex, request.CommandId);
+        if (commandId.Length > MaxCommandIdLength || commandId.Any(char.IsWhiteSpace))
+            return Results.BadRequest(new
+            {
+                error = "Invalid commandId.",
+                retryHint = $"Use commandId from the latest private hand (max {MaxCommandIdLength} chars, no whitespace)."
+            });
+
+        var placement = expectedVersion.HasValue
+            ? gameSessionStore.PlaceDie(result.GroupChatId!.Value, result.Context!.Viewer.UserId, request.DieIndex, commandId, expectedVersion.Value)
+            : gameSessionStore.PlaceDie(result.GroupChatId!.Value, result.Context!.Viewer.UserId, request.DieIndex, commandId);
+
+        if (placement.Status == GamePlacementStatus.VersionConflict)
+            return CreateConcurrencyConflictResult(placement.CurrentVersion);
+
         if (placement.Status != GamePlacementStatus.Placed)
             return Results.Conflict(new { error = MapPlacementError(placement) });
 
         await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId!.Value, cancellationToken);
 
         var state = gameSessionStore.GetPublicState(result.GroupChatId.Value)!;
+        await telegramBotService.NotifyCurrentTurnFromWebAppAsync(
+            result.GroupChatId.Value,
+            transitionKey: $"place:{state.Session.Round.RoundNumber}:{placement.PublicInfo!.PlacementIndex}",
+            cancellationToken: cancellationToken);
         return Results.Ok(MapStateResponse(
             state,
             result.GroupChatId.Value,
@@ -260,6 +331,7 @@ public static class WebAppEndpoints
 
     private static async Task<IResult> UndoLastPlacement(
         string? gameId,
+        long? expectedVersion,
         HttpContext httpContext,
         InMemoryGroupGameSessionStore gameSessionStore,
         TelegramBotService telegramBotService,
@@ -269,13 +341,23 @@ public static class WebAppEndpoints
         if (result.Error is not null)
             return result.Error;
 
-        var undo = gameSessionStore.UndoLastPlacement(result.Context!.Viewer.UserId);
+        var undo = expectedVersion.HasValue
+            ? gameSessionStore.UndoLastPlacement(result.GroupChatId!.Value, result.Context!.Viewer.UserId, expectedVersion.Value)
+            : gameSessionStore.UndoLastPlacement(result.GroupChatId!.Value, result.Context!.Viewer.UserId);
+
+        if (undo.Status == GameUndoStatus.VersionConflict)
+            return CreateConcurrencyConflictResult(undo.CurrentVersion);
+
         if (undo.Status != GameUndoStatus.Undone)
             return Results.Conflict(new { error = MapUndoError(undo) });
 
         await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId!.Value, cancellationToken);
 
         var state = gameSessionStore.GetPublicState(result.GroupChatId.Value)!;
+        await telegramBotService.NotifyCurrentTurnFromWebAppAsync(
+            result.GroupChatId.Value,
+            transitionKey: $"undo:{state.Session.Round.RoundNumber}:{undo.PublicInfo!.UndonePlacementIndex}",
+            cancellationToken: cancellationToken);
         return Results.Ok(MapStateResponse(
             state,
             result.GroupChatId.Value,
@@ -334,6 +416,7 @@ public static class WebAppEndpoints
             Cockpit: MapCockpit(sessionState),
             GameStatus: sessionState.GameStatus,
             Viewer: new WebAppViewer(viewerUserId, MapViewerSeat(sessionState.Session, viewerUserId)),
+            Version: sessionState.Session.Version,
             PrivateHand: MapPrivateHand(handResult));
     }
 
@@ -351,6 +434,7 @@ public static class WebAppEndpoints
             Cockpit: null,
             GameStatus: "InProgress",
             Viewer: new WebAppViewer(viewerUserId, MapViewerSeat(lobby, viewerUserId)),
+            Version: null,
             PrivateHand: null);
     }
 
@@ -372,6 +456,7 @@ public static class WebAppEndpoints
         {
             GamePlacementStatus.NoActiveSession => "No active game session found.",
             GamePlacementStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
+            GamePlacementStatus.InvalidGameContext => "InvalidGameContext",
             GamePlacementStatus.RoundNotRolled => "This round has not been rolled yet.",
             GamePlacementStatus.RoundNotAcceptingPlacements => "This round is not accepting placements.",
             GamePlacementStatus.NotPlayersTurn => "It is not your turn.",
@@ -380,6 +465,7 @@ public static class WebAppEndpoints
             GamePlacementStatus.InvalidTarget => "A command id is required.",
             GamePlacementStatus.CommandDoesNotMatchDie => "That command does not match the selected die.",
             GamePlacementStatus.CommandNotAvailable => "That command is not currently available.",
+            GamePlacementStatus.VersionConflict => "Game state changed. Please refresh and retry.",
             GamePlacementStatus.DomainError => result.ErrorMessage ?? "Cannot place die (domain error).",
             _ => "Cannot place die."
         };
@@ -389,11 +475,57 @@ public static class WebAppEndpoints
         {
             GameUndoStatus.NoActiveSession => "No active game session found.",
             GameUndoStatus.NotSeated => "You are not seated as Pilot/Copilot in the active game.",
+            GameUndoStatus.InvalidGameContext => "InvalidGameContext",
             GameUndoStatus.RoundNotRolled => "This round has not been rolled yet.",
             GameUndoStatus.UndoNotAllowed => "Undo not allowed. You can only undo your last placement before the other player places.",
+            GameUndoStatus.VersionConflict => "Game state changed. Please refresh and retry.",
             GameUndoStatus.DomainError => result.ErrorMessage ?? "Cannot undo (domain error).",
             _ => "Cannot undo."
         };
+
+    private static IResult? ValidateCreateLobbyRequest(WebAppCreateLobbyRequest? request)
+    {
+        if (request is null)
+            return null;
+
+        var name = request.Name?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(name))
+            return Results.BadRequest(new
+            {
+                error = "Game name is required.",
+                retryHint = $"Provide a game name up to {MaxLobbyNameLength} characters."
+            });
+
+        if (name.Length > MaxLobbyNameLength)
+            return Results.BadRequest(new
+            {
+                error = "Game name is too long.",
+                retryHint = $"Use a game name with max {MaxLobbyNameLength} characters."
+            });
+
+        if (request.PlayerCount.HasValue && request.PlayerCount.Value != RequiredLobbyPlayerCount)
+            return Results.BadRequest(new
+            {
+                error = $"Player count must be {RequiredLobbyPlayerCount}.",
+                retryHint = "Use 2 players (Pilot + Copilot) and retry."
+            });
+
+        var settings = request.Settings?.Trim();
+        if (!string.IsNullOrWhiteSpace(settings) && settings.Length > MaxLobbySettingsLength)
+            return Results.BadRequest(new
+            {
+                error = "Lobby settings are too long.",
+                retryHint = $"Use settings with max {MaxLobbySettingsLength} characters."
+            });
+
+        return null;
+    }
+
+    private static IResult CreateConcurrencyConflictResult(long? currentVersion)
+        => Results.Conflict(new WebAppConcurrencyConflictResponse(
+            Error: "ConcurrencyConflict",
+            CurrentVersion: currentVersion,
+            Message: "Game state changed. Please refresh and retry."));
 
     private static (long? GroupChatId, TelegramInitDataContext? Context, IResult? Error) ResolveRequestContext(string? gameId, HttpContext httpContext)
     {
@@ -403,7 +535,11 @@ public static class WebAppEndpoints
         if (!string.IsNullOrWhiteSpace(gameId))
         {
             if (!long.TryParse(gameId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedGameId))
-                return (null, tg, Results.BadRequest(new { error = "Invalid gameId." }));
+                return (null, tg, Results.BadRequest(new
+                {
+                    error = "Invalid gameId.",
+                    retryHint = "Use a numeric game code from the shared lobby and retry."
+                }));
 
             requestedGameId = parsedGameId;
         }
@@ -411,7 +547,11 @@ public static class WebAppEndpoints
         if (tg.Chat is not null)
         {
             if (requestedGameId is not null && requestedGameId.Value != tg.Chat.ChatId)
-                return (null, tg, Results.BadRequest(new { error = "gameId does not match signed chat context." }));
+                return (null, tg, Results.BadRequest(new
+                {
+                    error = "gameId does not match signed chat context.",
+                    retryHint = "Open the Mini App from the same group cockpit button and retry."
+                }));
 
             return (tg.Chat.ChatId, tg, null);
         }
@@ -419,14 +559,26 @@ public static class WebAppEndpoints
         if (!string.IsNullOrWhiteSpace(tg.StartParam))
         {
             if (!long.TryParse(tg.StartParam, NumberStyles.Integer, CultureInfo.InvariantCulture, out var groupChatId))
-                return (null, tg, Results.BadRequest(new { error = "Invalid gameId." }));
+                return (null, tg, Results.BadRequest(new
+                {
+                    error = "Invalid gameId.",
+                    retryHint = "Use a numeric game code from the shared lobby and retry."
+                }));
 
             if (requestedGameId is not null && requestedGameId.Value != groupChatId)
-                return (null, tg, Results.BadRequest(new { error = "gameId does not match signed start_param." }));
+                return (null, tg, Results.BadRequest(new
+                {
+                    error = "gameId does not match signed start_param.",
+                    retryHint = "Use the code from this chat’s cockpit launch button and retry."
+                }));
 
             return (groupChatId, tg, null);
         }
 
-        return (null, tg, Results.BadRequest(new { error = "Missing chat context and signed start_param." }));
+        return (null, tg, Results.BadRequest(new
+        {
+            error = "Missing chat context and signed start_param.",
+            retryHint = "Open the Mini App from the group cockpit button."
+        }));
     }
 }

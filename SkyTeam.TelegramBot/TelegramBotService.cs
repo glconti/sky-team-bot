@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using Microsoft.Extensions.Options;
 using SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
@@ -20,6 +21,7 @@ public sealed class TelegramBotService(
     ILogger<TelegramBotService> logger) : BackgroundService
 {
     private const int MaxRecentUpdateIds = 1_000;
+    private const int MaxRecentTurnNotificationKeys = 2_000;
     private const string NewCallbackAction = "new";
     private const string JoinCallbackAction = "join";
     private const string StartCallbackAction = "start";
@@ -45,6 +47,9 @@ public sealed class TelegramBotService(
     private readonly Lock _updateDedupSync = new();
     private readonly Queue<int> _recentUpdateIds = new();
     private readonly HashSet<int> _recentUpdateIdSet = [];
+    private readonly Lock _turnNotificationDedupSync = new();
+    private readonly Queue<string> _recentTurnNotificationKeys = new();
+    private readonly HashSet<string> _recentTurnNotificationKeySet = new(StringComparer.Ordinal);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -237,6 +242,9 @@ public sealed class TelegramBotService(
         var lobbySnapshot = lobbyStore.GetSnapshot(groupChatId);
         var result = gameSessionStore.Start(groupChatId, lobbySnapshot, user.Id);
 
+        if (result.Status == GameSessionStartStatus.Started)
+            ForgetTurnNotificationKeysForGroup(groupChatId);
+
         if (result.Status is GameSessionStartStatus.Started or GameSessionStartStatus.AlreadyStarted)
         {
             await RefreshGroupCockpitAsync(botClient, groupChatId, cancellationToken);
@@ -416,11 +424,19 @@ public sealed class TelegramBotService(
         }
 
         var groupChatId = message.Chat.Id;
+        if (!TryBuildStartAppUrl(botUsername, groupChatId, out var startAppUrl))
+        {
+            await botClient.SendMessage(
+                groupChatId,
+                "Open app link is temporarily unavailable. Run /sky state in this group and try again.",
+                cancellationToken: cancellationToken);
+            return;
+        }
 
         await botClient.SendMessage(
             groupChatId,
             "Open the Sky Team Mini App:",
-            replyMarkup: BuildOpenAppKeyboardForGroup(groupChatId, botUsername, webAppOptions.Value.MiniAppUrl),
+            replyMarkup: BuildOpenAppKeyboard(startAppUrl),
             cancellationToken: cancellationToken);
     }
 
@@ -458,6 +474,9 @@ public sealed class TelegramBotService(
             _ => "Cannot start game."
         };
 
+        if (result.Status == GameSessionStartStatus.Started)
+            ForgetTurnNotificationKeysForGroup(message.Chat.Id);
+
         if (result.Status is GameSessionStartStatus.Started or GameSessionStartStatus.AlreadyStarted)
         {
             await RefreshGroupCockpitAsync(botClient, message.Chat.Id, cancellationToken);
@@ -478,21 +497,21 @@ public sealed class TelegramBotService(
         long groupChatId,
         CancellationToken cancellationToken)
     {
-        var snapshot = lobbyStore.GetSnapshot(groupChatId);
-        if (snapshot is null)
-        {
-            await botClient.SendMessage(groupChatId, "No lobby yet. Create one with /sky new", cancellationToken: cancellationToken);
-            return;
-        }
-
-        if (!snapshot.IsReady)
-        {
-            await botClient.SendMessage(groupChatId, "Lobby is not ready yet. Two players must /sky join before rolling dice.", cancellationToken: cancellationToken);
-            return;
-        }
-
         if (gameSessionStore.GetSnapshot(groupChatId) is null)
         {
+            var snapshot = lobbyStore.GetSnapshot(groupChatId);
+            if (snapshot is null)
+            {
+                await botClient.SendMessage(groupChatId, "No lobby yet. Create one with /sky new", cancellationToken: cancellationToken);
+                return;
+            }
+
+            if (!snapshot.IsReady)
+            {
+                await botClient.SendMessage(groupChatId, "Lobby is not ready yet. Two players must /sky join before rolling dice.", cancellationToken: cancellationToken);
+                return;
+            }
+
             await botClient.SendMessage(groupChatId, "Game is not started yet. Run /sky start first.", cancellationToken: cancellationToken);
             return;
         }
@@ -507,6 +526,11 @@ public sealed class TelegramBotService(
         }
 
         await RefreshGroupCockpitAsync(botClient, groupChatId, cancellationToken);
+        await NotifyCurrentTurnAsync(
+            botClient,
+            groupChatId,
+            transitionKey: $"roll:{rollResult.Snapshot?.Round.RoundNumber ?? 0}",
+            cancellationToken: cancellationToken);
         await botClient.SendMessage(groupChatId, "Dice rolled. Open /sky app to view your private hand and continue.", cancellationToken: cancellationToken);
     }
 
@@ -565,12 +589,19 @@ public sealed class TelegramBotService(
             return;
         }
 
+        if (!TryBuildStartAppUrl(botUsername, groupChatId, out var startAppUrl))
+        {
+            await botClient.SendMessage(
+                message.Chat.Id,
+                "Secret hand/place/undo actions are Mini App-only. Open app link is temporarily unavailable; run /sky state in your group chat and retry.",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
         await botClient.SendMessage(
             message.Chat.Id,
             "Secret hand/place/undo actions are Mini App-only. Open the Sky Team Mini App:",
-            replyMarkup: message.Chat.Type is ChatType.Private
-                ? BuildOpenAppKeyboardForPrivate(groupChatId, botUsername)
-                : BuildOpenAppKeyboardForGroup(groupChatId, botUsername, webAppOptions.Value.MiniAppUrl),
+            replyMarkup: BuildOpenAppKeyboard(startAppUrl),
             cancellationToken: cancellationToken);
     }
 
@@ -623,6 +654,14 @@ public sealed class TelegramBotService(
         await RefreshGroupCockpitAsync(_botClient, groupChatId, cancellationToken);
     }
 
+    internal async Task NotifyCurrentTurnFromWebAppAsync(long groupChatId, string transitionKey, CancellationToken cancellationToken)
+    {
+        if (_botClient is null)
+            return;
+
+        await NotifyCurrentTurnAsync(_botClient, groupChatId, transitionKey, cancellationToken);
+    }
+
     private static async Task<bool> TryEditCockpitAsync(
         ITelegramBotClient botClient,
         long groupChatId,
@@ -661,6 +700,121 @@ public sealed class TelegramBotService(
         catch
         {
             // best effort
+        }
+    }
+
+    private async Task NotifyCurrentTurnAsync(
+        ITelegramBotClient botClient,
+        long groupChatId,
+        string transitionKey,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(transitionKey))
+            return;
+
+        var session = gameSessionStore.GetSnapshot(groupChatId);
+        var state = gameSessionStore.GetPublicState(groupChatId);
+
+        if (session is null || state?.CurrentPlayer is null || state.Session.Round.Status != GameRoundStatus.AwaitingPlacements)
+            return;
+
+        var seat = state.CurrentPlayer.Value;
+        var recipient = seat == PlayerSeat.Pilot ? session.Pilot : session.Copilot;
+
+        var dedupKey = $"{groupChatId}:{transitionKey}:{recipient.UserId}:{seat}";
+        if (!TryRegisterTurnNotification(dedupKey))
+            return;
+
+        var placementsRemaining = state.PlacementsRemaining ?? 0;
+        var placementLabel = placementsRemaining == 1 ? "placement" : "placements";
+
+        var messageText =
+            $"🔔 Your turn in Sky Team ({seat}).\n" +
+            $"Round {state.Session.Round.RoundNumber}, {placementsRemaining} {placementLabel} remaining.\n" +
+            $"Game status: {state.GameStatus}\n" +
+            "Action required: open /sky app and place one die.";
+
+        if (await TrySendDirectMessageAsync(botClient, recipient.UserId, messageText, cancellationToken))
+            return;
+
+        await TrySendGroupTurnFallbackAsync(botClient, groupChatId, recipient, seat, cancellationToken);
+    }
+
+    private bool TryRegisterTurnNotification(string key)
+    {
+        lock (_turnNotificationDedupSync)
+        {
+            if (!_recentTurnNotificationKeySet.Add(key))
+                return false;
+
+            _recentTurnNotificationKeys.Enqueue(key);
+
+            while (_recentTurnNotificationKeys.Count > MaxRecentTurnNotificationKeys)
+            {
+                var oldest = _recentTurnNotificationKeys.Dequeue();
+                _recentTurnNotificationKeySet.Remove(oldest);
+            }
+
+            return true;
+        }
+    }
+
+    private void ForgetTurnNotificationKeysForGroup(long groupChatId)
+    {
+        var keyPrefix = $"{groupChatId}:";
+
+        lock (_turnNotificationDedupSync)
+        {
+            if (_recentTurnNotificationKeys.Count == 0)
+                return;
+
+            var retainedKeys = new Queue<string>(_recentTurnNotificationKeys.Count);
+
+            while (_recentTurnNotificationKeys.Count > 0)
+            {
+                var existingKey = _recentTurnNotificationKeys.Dequeue();
+                if (existingKey.StartsWith(keyPrefix, StringComparison.Ordinal))
+                    continue;
+
+                retainedKeys.Enqueue(existingKey);
+            }
+
+            _recentTurnNotificationKeySet.Clear();
+
+            while (retainedKeys.Count > 0)
+            {
+                var retainedKey = retainedKeys.Dequeue();
+                _recentTurnNotificationKeys.Enqueue(retainedKey);
+                _recentTurnNotificationKeySet.Add(retainedKey);
+            }
+        }
+    }
+
+    private async Task TrySendGroupTurnFallbackAsync(
+        ITelegramBotClient botClient,
+        long groupChatId,
+        LobbyPlayer recipient,
+        PlayerSeat seat,
+        CancellationToken cancellationToken)
+    {
+        var recipientDisplayName = string.IsNullOrWhiteSpace(recipient.DisplayName)
+            ? seat.ToString()
+            : recipient.DisplayName;
+
+        try
+        {
+            await botClient.SendMessage(
+                groupChatId,
+                $"🔔 {recipientDisplayName} ({seat}), your turn. Open /sky app and place one die.",
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Turn notification fallback failed for chat {GroupChatId} and user {UserId}.",
+                groupChatId,
+                recipient.UserId);
         }
     }
 
@@ -734,13 +888,10 @@ public sealed class TelegramBotService(
 
     private static InlineKeyboardMarkup BuildGroupStateKeyboard(long groupChatId, string? botUsername, string? miniAppUrl)
     {
-        InlineKeyboardButton[] secondRow = string.IsNullOrWhiteSpace(botUsername)
-            ? [InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)]
-            :
-            [
-                BuildOpenAppButtonForGroup(groupChatId, botUsername, miniAppUrl),
-                InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)
-            ];
+        _ = miniAppUrl;
+        InlineKeyboardButton[] secondRow = TryBuildStartAppUrl(botUsername, groupChatId, out var startAppUrl)
+            ? [InlineKeyboardButton.WithUrl("Open app", startAppUrl), InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)]
+            : [InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)];
 
         return new([
             [
@@ -752,24 +903,34 @@ public sealed class TelegramBotService(
         ]);
     }
 
-    private static InlineKeyboardMarkup BuildOpenAppKeyboardForGroup(long groupChatId, string botUsername, string? miniAppUrl)
-        => new([[BuildOpenAppButtonForGroup(groupChatId, botUsername, miniAppUrl)]]);
+    private static InlineKeyboardMarkup BuildOpenAppKeyboard(string startAppUrl)
+        => new([[InlineKeyboardButton.WithUrl("Open app", startAppUrl)]]);
 
-    private static InlineKeyboardMarkup BuildOpenAppKeyboardForPrivate(long groupChatId, string botUsername)
-        => new([[InlineKeyboardButton.WithUrl("Open app", BuildStartAppUrl(botUsername, groupChatId))]]);
-
-    private static InlineKeyboardButton BuildOpenAppButtonForGroup(long groupChatId, string botUsername, string? miniAppUrl)
+    private static bool TryBuildStartAppUrl(string? botUsername, long groupChatId, out string startAppUrl)
     {
-        if (!string.IsNullOrWhiteSpace(miniAppUrl))
-            return new("Open app") { WebApp = new() { Url = miniAppUrl } };
+        startAppUrl = string.Empty;
+        if (groupChatId == 0 || string.IsNullOrWhiteSpace(botUsername))
+            return false;
 
-        return InlineKeyboardButton.WithUrl("Open app", BuildStartAppUrl(botUsername, groupChatId));
+        var username = botUsername.Trim().TrimStart('@');
+        if (!IsValidBotUsername(username))
+            return false;
+
+        startAppUrl = BuildStartAppUrl(username, groupChatId);
+        return true;
+    }
+
+    private static bool IsValidBotUsername(string username)
+    {
+        if (username.Length is < 5 or > 32)
+            return false;
+
+        return username.All(ch => char.IsLetterOrDigit(ch) || ch == '_');
     }
 
     private static string BuildStartAppUrl(string botUsername, long groupChatId)
     {
-        var username = botUsername.TrimStart('@');
-        return $"https://t.me/{username}?startapp={Uri.EscapeDataString(groupChatId.ToString())}";
+        return $"https://t.me/{botUsername}?startapp={Uri.EscapeDataString(groupChatId.ToString(CultureInfo.InvariantCulture))}";
     }
 
     private bool TryResolveSecretFlowGroupChatId(Message message, out long groupChatId)

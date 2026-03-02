@@ -1,12 +1,20 @@
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Options;
 using SkyTeam.Application.GameSessions;
 using SkyTeam.Application.Lobby;
 using SkyTeam.TelegramBot;
+using SkyTeam.TelegramBot.Persistence;
 using SkyTeam.TelegramBot.WebApp;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<InMemoryGroupLobbyStore>();
+
+if (builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddSingleton<IGameSessionPersistence>(NullGameSessionPersistence.Instance);
+else
+    builder.Services.AddSingleton<IGameSessionPersistence, JsonGameSessionPersistence>();
+
 builder.Services.AddSingleton<InMemoryGroupGameSessionStore>();
 
 builder.Services.Configure<TelegramBotOptions>(options =>
@@ -20,8 +28,11 @@ builder.Services.Configure<WebAppOptions>(options =>
     builder.Configuration.GetSection("WebApp").Bind(options);
     options.MiniAppUrl ??= builder.Configuration["SKYTEAM_MINI_APP_URL"];
 });
+builder.Services.AddSingleton<IValidateOptions<WebAppOptions>, WebAppOptionsValidator>();
+builder.Services.AddOptions<WebAppOptions>().ValidateOnStart();
 
 builder.Services.AddSingleton<TelegramInitDataValidator>();
+builder.Services.AddSingleton<WebAppAbuseProtector>();
 builder.Services.AddSingleton<TelegramBotService>();
 builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<TelegramBotService>());
 

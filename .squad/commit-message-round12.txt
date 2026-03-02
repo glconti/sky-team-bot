@@ -1,0 +1,9 @@
+scribe: log aloha round 12 (issue #80 qa verdict), merge decisions inbox, sync team history
+
+- Aloha validation complete: issue #80 not close-ready (6 acceptance criteria gaps identified)
+- QA verdict posted to GitHub with explicit contract alignment checklist
+- Decisions merged (aloha-issue-80-validation.md → decisions.md); inbox deleted
+- Team history updated: Aloha QA verdict + cross-team sync (epic #75 gates on #80 closure)
+- Orchestration logs recorded; no archive trigger (decisions.md < 20KB)
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

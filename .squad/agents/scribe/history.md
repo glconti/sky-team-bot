@@ -7,11 +7,12 @@
 
 ## Learnings
 
-### Session 2026-02-21 — PR #37 Unblock
-- **Sully & Tenerife & Aloha deployment:** Fixed token pool wiring, codified loss semantics, added ExecuteCommand smoke tests.
-- **Key Decision:** Token pool owned by `ConcentrationModule`; `Game.SpendCoffeeTokens(k)` delegates to module.
-- **Rules Alignment:** Separated loss conditions (throw `GameRuleLossException`) from invalid moves (prevent via command validation).
-- **Bugs Captured:** Axis landing check too strict (== 0 vs. ∈[-2,2]); speed comparison edge case; altitude exhaustion not explicit.
-- **Next Phase:** Skiles integration testing + altitude/reroll redesign.
+### Session 2026-03-02 — Ralph Round 16: Issue #81 Gate Closure & Decisions Merge (Scribe)
+- **Orchestration Logs:** Created `2026-03-02T02-11-00Z-skiles.md` (Skiles #81 InvalidGameContext completion, commit d02541c) and `2026-03-02T02-18-00Z-sully.md` (Sully #81 closure verification, issue closed).
+- **Session Log:** Created `2026-03-02T02-18-00Z-ralph-round16.md` documenting Skiles round 16 task 1 + Sully round 16 task 2.
+- **Decisions Merge:** Merged `decisions/inbox/skiles-issue-81-residual.md` (InvalidGameContext binding decision) and `sully-issue-81-final-closure.md` (#81 closure verification) into `decisions.md` (append-only ledger). Deleted inbox files after merge.
+- **Cross-Agent Updates:** Updated Skiles history.md with Session 28 summary (Sully's #81 closure). Updated Sully history.md with Session 28 summary (Skiles' completion + gate closure outcome). Appended team learnings to both.
+- **Key Decisions:** #81 security-context-binding gate now CLOSED. Epic #75 unblocked #77–#79 (UI) and #84 (abuse protection). Next: #77 (UI Slice — Place/Undo).
+- **State:** .squad/ state fully synchronized; ready for git commit.
 
 <!-- Append learnings below. -->
