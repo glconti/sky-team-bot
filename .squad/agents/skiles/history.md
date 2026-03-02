@@ -7,9 +7,37 @@
 
 > **Note (2026-03-02):** Session 27–28 summary below. Full session logs archived in `.squad/log/` and decision records in `.squad/decisions.md`. Detailed history from Sessions 1–26 summarized into Core Context.
 
-## Session 27–28 Summary (2026-03-02)
+## Session 28–29 Summary (2026-03-02)
 
-### Issue #81 Completion: InvalidGameContext Binding (Session 27)
+### Issue #77 Final Residual Closure by Skiles (Session 28 Round 17)
+- **Timestamp:** 2026-03-02T06:40:00Z
+- **Task:** Implement #77 residual checklist from Sully's sweep
+- **Outcome:** ✅ Completed; residual QA/fallback sign-off documented
+- **Deliverables:**
+  - `TelegramBotService.cs` fallback text tightened for group-first context
+  - `Issue60LaunchMiniAppButtonTests` callback payload length assertions (≤64 bytes)
+  - `Issue53InGameCockpitButtonFlowTests` fallback-safety coverage
+  - `readme.md` documented #77 residual QA sign-off (iOS/Android/Desktop + callback-size safety)
+- **Launchpad Strategy:** Group-first fallback keeps `/sky app`/`/sky state` explicit; unavailable deep-link guidance points to group chat
+
+### Issue #77 Final Closure by Sully (Session 28 Round 17)
+- **Timestamp:** 2026-03-02T07:10:00Z
+- **Task:** Declare #77 ready for closure post-Skiles residual implementation
+- **Outcome:** ✅ Completed; closure approved; epic #75 advanced to 8/11
+- **QA Narrative Lock:** Explicit iOS/Android/Desktop client coverage + callback-size guardrails ≤64 bytes
+- **Impact:** Unblocks #77–#79 (UI slices) on critical path; callback-size constraint establishes pattern for future Telegram integrations
+
+### Epic #75 Status After Round 17
+- **Closed Issues:** 8/11 (#76, #77, #80, #81, #82, #83, #85, #86)
+- **Next Priority:** #78–#79 (UI slices) now unblocked
+- **Secondary Gate:** #84 (Abuse Protection expansion)
+- **Critical Gate Status:** All pre-UI gates now CLOSED (#80 schema, #81 security-context, #77 launchpad)
+
+---
+
+## Session 28 Summary (2026-03-02 Round 16)
+
+### Issue #81 Closure Verification
 - **Timestamp:** 2026-03-02T05:05:00Z
 - **Task:** Implement residual checklist for #81 security-context-binding
 - **Outcome:** ✅ Completed with explicit cross-chat tampering outcome

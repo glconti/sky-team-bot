@@ -7,7 +7,19 @@
 
 > **Note (2026-03-02 Round 16):** Session 28 summary below. Full session logs archived in `.squad/log/` and decision records in `.squad/decisions.md`. Detailed history from Sessions 1–25 summarized into Core Context.
 
-## Session 28 Summary (2026-03-02 Round 16)
+## Session 28–29 Summary (2026-03-02)
+
+### Issue #77 Final Closure Workflow (Session 29 Round 17)
+- **Timestamp:** 2026-03-02T06:40–07:10:00Z
+- **Task:** #77 residual implementation (Skiles) + closure verification (Sully)
+- **Outcome:** ✅ Completed; #77 ready for merge; epic #75 advanced to 8/11
+- **Residual Checklist:** Cross-platform QA proof (iOS/Android/Desktop), callback-data 64-byte safety, group-first fallback guidance
+- **Key Artifacts:**
+  - `Issue60LaunchMiniAppButtonTests`: callback payload assertions (≤64 bytes)
+  - `TelegramBotService` fallback refinement: keeps launchpad retries in group context
+  - `readme.md`: explicit #77 residual sign-off bullets + callback-size guardrails
+- **QA Narrative:** Locked with iOS/Android/Desktop client coverage + callback constraint pattern
+- **Critical Impact:** All pre-UI gates now CLOSED; #77–#79 (UI slices) unblocked on critical path
 
 ### Issue #81 Closure Verification
 - **Timestamp:** 2026-03-02T02:18:00Z
