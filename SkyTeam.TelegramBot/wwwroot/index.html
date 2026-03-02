@@ -6,36 +6,263 @@
   <title>Sky Team</title>
   <script src="https://telegram.org/js/telegram-web-app.js?59"></script>
   <style>
-    :root { color-scheme: light dark; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; }
-    #meta { opacity: 0.8; font-size: 12px; margin-bottom: 12px; }
-    pre { white-space: pre-wrap; word-break: break-word; padding: 12px; border: 1px solid rgba(127,127,127,.35); border-radius: 8px; }
+    :root {
+      color-scheme: light dark;
+      --border: rgba(127, 127, 127, 0.35);
+      --panel: rgba(127, 127, 127, 0.08);
+      --panel-strong: rgba(127, 127, 127, 0.16);
+      --text-muted: rgba(127, 127, 127, 0.8);
+    }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      margin: 0;
+      background: var(--tg-theme-bg-color, #111);
+      color: var(--tg-theme-text-color, #f5f5f5);
+    }
+    .app {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 16px;
+      padding-bottom: calc(16px + var(--safe-bottom, 0px));
+    }
+    .app-header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+    .app-title {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    .meta {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .message {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    .message.info {
+      background: rgba(78, 158, 255, 0.12);
+      border-color: rgba(78, 158, 255, 0.3);
+    }
+    .message.error {
+      background: rgba(255, 107, 107, 0.14);
+      border-color: rgba(255, 107, 107, 0.4);
+    }
+    .message.warning {
+      background: rgba(255, 200, 87, 0.14);
+      border-color: rgba(255, 200, 87, 0.4);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .panel-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+    .grid.two {
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 720px) {
+      .grid.two {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    .seat-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px dashed var(--border);
+    }
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(78, 158, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+    }
+    .seat-details {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .seat-name {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+    }
+    .seat-role {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .status-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--panel-strong);
+      font-size: 12px;
+    }
+    .badge.active {
+      background: rgba(78, 158, 255, 0.22);
+    }
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--panel-strong);
+      color: inherit;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.primary {
+      background: rgba(78, 158, 255, 0.25);
+      border-color: rgba(78, 158, 255, 0.5);
+    }
+    button[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .stat:last-child {
+      border-bottom: none;
+    }
+    .card {
+      background: var(--panel-strong);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 10px;
+    }
+    .card-title {
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    .muted {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    details {
+      margin-top: 12px;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.2);
+      font-size: 12px;
+    }
   </style>
 </head>
 <body>
-  <div id="meta"></div>
-  <div id="actions"></div>
-  <pre id="app">Loading…</pre>
+  <div class="app">
+    <header class="app-header">
+      <div class="app-title">Sky Team Mini App</div>
+      <div id="meta" class="meta"></div>
+    </header>
+
+    <div id="message" class="message info" hidden></div>
+
+    <section id="lobby" class="panel" hidden>
+      <div class="panel-title">Lobby</div>
+      <div id="lobby-status" class="status-line"></div>
+      <div id="lobby-seats" class="grid two"></div>
+      <div id="lobby-actions" class="button-row" style="margin-top: 12px;"></div>
+      <div id="lobby-note" class="muted" style="margin-top: 8px;"></div>
+    </section>
+
+    <section id="game" class="panel" hidden>
+      <div class="panel-title">In Game</div>
+      <div id="game-status" class="status-line"></div>
+      <div id="game-overview" class="grid two" style="margin-top: 8px;"></div>
+      <div id="turn-order" class="button-row" style="margin-top: 8px;"></div>
+      <div id="game-actions" class="button-row" style="margin-top: 12px;"></div>
+      <div id="placement" class="panel" style="margin-top: 12px;" hidden></div>
+    </section>
+
+    <details>
+      <summary class="muted">Debug payload</summary>
+      <pre id="debug-payload">Loading…</pre>
+    </details>
+  </div>
 
   <script>
     (function () {
       const metaEl = document.getElementById('meta');
-      const actionsEl = document.getElementById('actions');
-      const appEl = document.getElementById('app');
-
-      function setText(text) {
-        appEl.textContent = text;
-      }
+      const messageEl = document.getElementById('message');
+      const lobbySection = document.getElementById('lobby');
+      const lobbyStatusEl = document.getElementById('lobby-status');
+      const lobbySeatsEl = document.getElementById('lobby-seats');
+      const lobbyActionsEl = document.getElementById('lobby-actions');
+      const lobbyNoteEl = document.getElementById('lobby-note');
+      const gameSection = document.getElementById('game');
+      const gameStatusEl = document.getElementById('game-status');
+      const gameOverviewEl = document.getElementById('game-overview');
+      const turnOrderEl = document.getElementById('turn-order');
+      const gameActionsEl = document.getElementById('game-actions');
+      const placementEl = document.getElementById('placement');
+      const debugPayloadEl = document.getElementById('debug-payload');
 
       const tg = window.Telegram && window.Telegram.WebApp;
       if (!tg) {
-        setText('Not running inside Telegram. Open this page via the bot WebApp button.');
+        showMessage('Not running inside Telegram. Open this page via the bot WebApp button.', 'error');
         return;
       }
 
       tg.ready();
+      if (typeof tg.expand === 'function') tg.expand();
+
+      const safeBottom = (tg.safeAreaInset && tg.safeAreaInset.bottom) || (tg.contentSafeAreaInset && tg.contentSafeAreaInset.bottom) || 0;
+      document.documentElement.style.setProperty('--safe-bottom', `${safeBottom}px`);
 
       const initData = tg.initData || '';
+      const maxDisplayNameLength = 32;
+      const invalidGameContextMessage = 'This action belongs to a different chat. Open the correct group to continue.';
 
       function getStartParam() {
         const fromInit = (tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
@@ -48,181 +275,287 @@
       }
 
       const startParam = getStartParam();
-
-      metaEl.textContent = `start_param: ${startParam || '(empty)'} • initData length: ${initData.length}`;
-
-      if (!startParam) {
-        setText('Missing start_param. Open the Mini App from the group cockpit button so Telegram provides the gameId.\n\nCalling backend anyway for diagnostics…');
-      } else {
-        setText('Calling backend…');
-      }
+      metaEl.textContent = `group: ${startParam || '(missing)'} • initData length: ${initData.length}`;
 
       function withInitDataHeaders() {
         return { 'X-Telegram-Init-Data': initData };
       }
 
-      async function parseResponse(r) {
-        const bodyText = await r.text();
-        const json = bodyText ? JSON.parse(bodyText) : null;
-        return { ok: r.ok, status: r.status, json };
+      function showMessage(text, variant) {
+        messageEl.textContent = text;
+        messageEl.className = `message ${variant || 'info'}`;
+        messageEl.hidden = false;
       }
 
-      function renderLobbyActions(gameId) {
-        actionsEl.innerHTML = '';
+      function clearMessage() {
+        messageEl.hidden = true;
+        messageEl.textContent = '';
+      }
 
-        const labels = [
-          ['New', '/api/webapp/lobby/new'],
-          ['Join', '/api/webapp/lobby/join'],
-          ['Start', '/api/webapp/lobby/start']
-        ];
+      function truncateDisplayName(name) {
+        const chars = Array.from(name || '');
+        if (chars.length <= maxDisplayNameLength) return name;
+        return `${chars.slice(0, maxDisplayNameLength - 1).join('')}…`;
+      }
 
-        labels.forEach(([label, path]) => {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.textContent = label;
-          btn.style.marginRight = '8px';
-          btn.onclick = async () => {
-            btn.disabled = true;
-            try {
-              const r = await fetch(`${path}?gameId=${encodeURIComponent(gameId)}`, {
-                method: 'POST',
-                headers: withInitDataHeaders(),
-                cache: 'no-store'
-              });
-              const result = await parseResponse(r);
-              if (!result.ok) {
-                throw new Error((result.json && result.json.error) || `${result.status} action failed`);
-              }
+      function buildUrl(path, expectedVersion) {
+        const params = new URLSearchParams();
+        if (startParam) params.set('gameId', startParam);
+        if (expectedVersion !== null && expectedVersion !== undefined) params.set('expectedVersion', String(expectedVersion));
+        const query = params.toString();
+        return query ? `${path}?${query}` : path;
+      }
 
-              await loadState();
-            } catch (err) {
-              setText('Action failed:\n\n' + (err && err.message ? err.message : String(err)));
-            } finally {
-              btn.disabled = false;
-            }
-          };
-          actionsEl.appendChild(btn);
+      async function parseResponse(response) {
+        const bodyText = await response.text();
+        let json = null;
+        try {
+          json = bodyText ? JSON.parse(bodyText) : null;
+        } catch {
+          json = null;
+        }
+        return { ok: response.ok, status: response.status, json, bodyText };
+      }
+
+      function normalizeError(result) {
+        if (result.status === 401 || result.status === 403) {
+          return 'Unauthorized. Reopen the Mini App from the group cockpit button.';
+        }
+        if (result.json && result.json.error === 'InvalidGameContext') {
+          return invalidGameContextMessage;
+        }
+        if (result.json && result.json.message) return result.json.message;
+        if (result.json && result.json.error) return result.json.error;
+        if (result.bodyText) return result.bodyText;
+        return `${result.status} request failed.`;
+      }
+
+      function setDebugPayload(state) {
+        debugPayloadEl.textContent = JSON.stringify(state, null, 2);
+      }
+
+      function createButton(label, onClick, options) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = label;
+        if (options && options.primary) btn.classList.add('primary');
+        if (options && options.disabled) btn.disabled = true;
+        btn.onclick = onClick;
+        return btn;
+      }
+
+      let currentState = null;
+
+      async function loadState() {
+        clearMessage();
+
+        if (!startParam) {
+          showMessage('Missing start_param. Open the Mini App from the group cockpit button.', 'warning');
+        }
+
+        const response = await fetch(buildUrl('/api/webapp/game-state'), {
+          method: 'GET',
+          headers: withInitDataHeaders(),
+          cache: 'no-store'
         });
+        const result = await parseResponse(response);
+
+        if (!result.ok && result.status !== 404) {
+          showMessage(normalizeError(result), 'error');
+          return;
+        }
+
+        const fallbackState = {
+          gameId: Number(startParam || 0),
+          phase: 'Lobby',
+          lobby: { pilot: null, copilot: null, isReady: false },
+          cockpit: null,
+          gameStatus: 'InProgress',
+          viewer: { userId: (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || 0, seat: null }
+        };
+
+        const state = result.status === 404 ? fallbackState : result.json;
+        applyState(state);
       }
 
-      function renderInGameActions(gameId, state) {
-        actionsEl.innerHTML = '';
+      function applyState(state) {
+        currentState = state;
+        setDebugPayload(state);
+        renderState(state);
+      }
 
-        const refreshBtn = document.createElement('button');
-        refreshBtn.type = 'button';
-        refreshBtn.textContent = 'Refresh';
-        refreshBtn.onclick = loadState;
-        actionsEl.appendChild(refreshBtn);
-
-        const canUndo = !!(state.privateHand && state.viewer && state.viewer.seat);
-        if (canUndo) {
-          const undoBtn = document.createElement('button');
-          undoBtn.type = 'button';
-          undoBtn.textContent = 'Undo';
-          undoBtn.style.marginLeft = '8px';
-          undoBtn.onclick = async () => {
-            undoBtn.disabled = true;
-            try {
-              const r = await fetch(`/api/webapp/game/undo?gameId=${encodeURIComponent(gameId)}`, {
-                method: 'POST',
-                headers: withInitDataHeaders(),
-                cache: 'no-store'
-              });
-
-              const result = await parseResponse(r);
-              if (!result.ok) {
-                throw new Error((result.json && result.json.error) || `${result.status} action failed`);
-              }
-
-              await loadState();
-            } catch (err) {
-              setText('Action failed:\n\n' + (err && err.message ? err.message : String(err)));
-            } finally {
-              undoBtn.disabled = false;
-            }
-          };
-
-          actionsEl.appendChild(undoBtn);
+      async function runAction(action) {
+        clearMessage();
+        const result = await action();
+        if (!result.ok) {
+          if (result.status === 409 && result.json && result.json.error === 'ConcurrencyConflict') {
+            showMessage(result.json.message || 'Game state changed. Refreshing…', 'warning');
+            await loadState();
+            return;
+          }
+          showMessage(normalizeError(result), result.status === 409 ? 'warning' : 'error');
+          return;
         }
 
-        const canRoll = String(state.cockpit && state.cockpit.roundStatus).toLowerCase() === 'awaitingroll'
-          && !!(state.viewer && state.viewer.seat);
-        if (canRoll) {
-          const rollBtn = document.createElement('button');
-          rollBtn.type = 'button';
-          rollBtn.textContent = 'Roll';
-          rollBtn.style.marginLeft = '8px';
-          rollBtn.onclick = async () => {
-            rollBtn.disabled = true;
-            try {
-              const r = await fetch(`/api/webapp/game/roll?gameId=${encodeURIComponent(gameId)}`, {
-                method: 'POST',
-                headers: withInitDataHeaders(),
-                cache: 'no-store'
-              });
+        if (result.json) {
+          applyState(result.json);
+        } else {
+          await loadState();
+        }
+      }
 
-              const result = await parseResponse(r);
-              if (!result.ok) {
-                throw new Error((result.json && result.json.error) || `${result.status} action failed`);
-              }
+      function renderLobby(state) {
+        lobbySection.hidden = false;
+        gameSection.hidden = true;
+        lobbySeatsEl.innerHTML = '';
+        lobbyActionsEl.innerHTML = '';
+        lobbyNoteEl.textContent = '';
 
-              await loadState();
-            } catch (err) {
-              setText('Action failed:\n\n' + (err && err.message ? err.message : String(err)));
-            } finally {
-              rollBtn.disabled = false;
-            }
-          };
+        const lobby = state.lobby || { pilot: null, copilot: null, isReady: false };
+        const viewerSeat = state.viewer && state.viewer.seat;
+        const isFull = !!(lobby.pilot && lobby.copilot);
 
-          actionsEl.appendChild(rollBtn);
+        lobbyStatusEl.innerHTML = '';
+        lobbyStatusEl.appendChild(createBadge(lobby.isReady ? 'Ready to start' : 'Waiting for players', lobby.isReady));
+        lobbyStatusEl.appendChild(createBadge(viewerSeat ? `You: ${viewerSeat}` : 'Spectator', !!viewerSeat));
+
+        lobbySeatsEl.appendChild(createSeatCard('Pilot', lobby.pilot, 'Waiting for Pilot…'));
+        lobbySeatsEl.appendChild(createSeatCard('Copilot', lobby.copilot, 'Waiting for Copilot…'));
+
+        const newButton = createButton('New Lobby', () => runAction(() => postAction('/api/webapp/lobby/new')), { primary: true });
+        lobbyActionsEl.appendChild(newButton);
+
+        if (!viewerSeat && !isFull) {
+          const joinButton = createButton('Join Lobby', () => runAction(() => postAction('/api/webapp/lobby/join')));
+          lobbyActionsEl.appendChild(joinButton);
         }
 
-        if (!state.privateHand || !state.privateHand.availableCommands || !state.viewer || !state.viewer.seat) return;
-        if (String(state.privateHand.currentPlayer).toLowerCase() !== String(state.privateHand.seat).toLowerCase()) return;
+        const startButton = createButton(
+          'Start Game',
+          () => runAction(() => postAction('/api/webapp/lobby/start')),
+          { disabled: !viewerSeat || !lobby.isReady }
+        );
+        lobbyActionsEl.appendChild(startButton);
 
-        const availableDice = state.privateHand.dice.filter(d => !d.isUsed);
+        if (!viewerSeat && isFull) {
+          lobbyNoteEl.textContent = 'Lobby is full. Spectators can view, but cannot join.';
+        }
+      }
+
+      function renderGame(state) {
+        lobbySection.hidden = true;
+        gameSection.hidden = false;
+        gameActionsEl.innerHTML = '';
+        gameOverviewEl.innerHTML = '';
+        turnOrderEl.innerHTML = '';
+        placementEl.innerHTML = '';
+        placementEl.hidden = true;
+
+        const cockpit = state.cockpit || {};
+        const viewerSeat = state.viewer && state.viewer.seat;
+
+        gameStatusEl.innerHTML = '';
+        gameStatusEl.appendChild(createBadge(`Round ${cockpit.roundNumber ?? '-'}`, true));
+        gameStatusEl.appendChild(createBadge(`Status: ${cockpit.roundStatus ?? '-'}`));
+        if (cockpit.currentPlayer) {
+          gameStatusEl.appendChild(createBadge(`Current: ${cockpit.currentPlayer}`, true));
+        }
+        gameStatusEl.appendChild(createBadge(`Viewer: ${viewerSeat || 'Spectator'}`));
+
+        gameOverviewEl.appendChild(createCard('Round & Turn', [
+          { label: 'Placements made', value: cockpit.placementsMade ?? '-' },
+          { label: 'Placements remaining', value: cockpit.placementsRemaining ?? '-' },
+          { label: 'Game status', value: state.gameStatus || 'InProgress' }
+        ]));
+        gameOverviewEl.appendChild(createCard('Cockpit', [
+          { label: 'Axis position', value: cockpit.axisPosition ?? '-' },
+          { label: 'Engines speed', value: cockpit.enginesSpeed ?? '-' },
+          { label: 'Approach', value: `${cockpit.approachPosition ?? '-'} / ${cockpit.approachSegments ?? '-'}` }
+        ]));
+        gameOverviewEl.appendChild(createCard('Systems', [
+          { label: 'Brakes', value: `${cockpit.brakesActivated ?? 0} / ${cockpit.brakesCapability ?? 0}` },
+          { label: 'Flaps', value: cockpit.flapsValue ?? '-' },
+          { label: 'Landing gear', value: cockpit.landingGearValue ?? '-' }
+        ]));
+        gameOverviewEl.appendChild(createCard('Flight', [
+          { label: 'Planes remaining', value: cockpit.planesRemaining ?? '-' },
+          { label: 'Coffee tokens', value: cockpit.coffeeTokens ?? '-' },
+          { label: 'Aero thresholds', value: `${cockpit.blueAerodynamicsThreshold ?? '-'} / ${cockpit.orangeAerodynamicsThreshold ?? '-'}` }
+        ]));
+
+        const currentPlayer = (cockpit.currentPlayer || '').toString();
+        turnOrderEl.appendChild(createBadge('Pilot', currentPlayer.toLowerCase() === 'pilot'));
+        turnOrderEl.appendChild(createBadge('Copilot', currentPlayer.toLowerCase() === 'copilot'));
+
+        const refreshBtn = createButton('Refresh', () => loadState());
+        gameActionsEl.appendChild(refreshBtn);
+
+        const canUndo = !!(state.privateHand && viewerSeat);
+        const undoBtn = createButton(
+          'Undo',
+          () => runAction(() => postAction('/api/webapp/game/undo', null, state.version)),
+          { disabled: !canUndo }
+        );
+        gameActionsEl.appendChild(undoBtn);
+
+        const canRoll = !!viewerSeat && String(cockpit.roundStatus || '').toLowerCase() === 'awaitingroll';
+        const rollBtn = createButton(
+          'Roll',
+          () => runAction(() => postAction('/api/webapp/game/roll', null, state.version)),
+          { primary: true, disabled: !canRoll }
+        );
+        gameActionsEl.appendChild(rollBtn);
+
+        renderPlacement(state, viewerSeat, currentPlayer);
+      }
+
+      function renderPlacement(state, viewerSeat, currentPlayer) {
+        const hand = state.privateHand;
+        if (!hand || !viewerSeat) return;
+        if (String(hand.currentPlayer).toLowerCase() !== String(hand.seat).toLowerCase()) return;
+        if (String(currentPlayer).toLowerCase() !== String(viewerSeat || '').toLowerCase()) return;
+
+        const availableDice = (hand.dice || []).filter(d => !d.isUsed);
         if (availableDice.length === 0) return;
 
-        const placementBox = document.createElement('div');
-        placementBox.style.marginTop = '12px';
-        placementBox.style.paddingTop = '8px';
-        placementBox.style.borderTop = '1px solid rgba(127,127,127,.35)';
-        actionsEl.appendChild(placementBox);
+        placementEl.hidden = false;
+        placementEl.innerHTML = '';
 
-        const heading = document.createElement('div');
-        heading.textContent = 'Placement flow: die → target → option';
-        heading.style.marginBottom = '8px';
-        placementBox.appendChild(heading);
+        const title = document.createElement('div');
+        title.className = 'panel-title';
+        title.textContent = 'Place a die';
+        placementEl.appendChild(title);
 
-        let selectedDieIndex = availableDice[0].index;
-        let selectedTarget = '';
-        let selectedCommandId = '';
+        const subtitle = document.createElement('div');
+        subtitle.className = 'muted';
+        subtitle.textContent = 'Select a die, then a target + option.';
+        placementEl.appendChild(subtitle);
 
         const dieRow = document.createElement('div');
         const targetRow = document.createElement('div');
         const optionRow = document.createElement('div');
         const actionRow = document.createElement('div');
-        dieRow.style.marginBottom = '8px';
-        targetRow.style.marginBottom = '8px';
-        optionRow.style.marginBottom = '8px';
+        dieRow.className = 'button-row';
+        targetRow.className = 'button-row';
+        optionRow.className = 'button-row';
+        actionRow.className = 'button-row';
+        dieRow.style.marginTop = '10px';
+        targetRow.style.marginTop = '8px';
+        optionRow.style.marginTop = '8px';
+        actionRow.style.marginTop = '8px';
+        placementEl.appendChild(dieRow);
+        placementEl.appendChild(targetRow);
+        placementEl.appendChild(optionRow);
+        placementEl.appendChild(actionRow);
 
-        placementBox.appendChild(dieRow);
-        placementBox.appendChild(targetRow);
-        placementBox.appendChild(optionRow);
-        placementBox.appendChild(actionRow);
+        let selectedDieIndex = availableDice[0].index;
+        let selectedCommandId = '';
 
         const getCommandsForDie = (dieIndex) => {
-          const die = state.privateHand.dice.find(d => d.index === dieIndex);
+          const die = hand.dice.find(d => d.index === dieIndex);
           if (!die) return [];
           const marker = `:${die.value}`;
-          return state.privateHand.availableCommands.filter(c => String(c.commandId).includes(marker));
-        };
-
-        const parseOptionLabel = (command) => {
-          const commandId = String(command.commandId);
-          const displayName = String(command.displayName || commandId);
-          const tokenPart = commandId.includes('>') ? ' • token adjust' : '';
-          return `${displayName}${tokenPart}`;
+          return hand.availableCommands.filter(c => String(c.commandId).includes(marker));
         };
 
         const renderTargetsAndOptions = () => {
@@ -236,169 +569,141 @@
 
           targetRow.innerHTML = '';
           optionRow.innerHTML = '';
-          selectedTarget = Object.keys(groups)[0] || '';
+
+          const targets = Object.keys(groups);
+          const selectedTarget = targets[0] || '';
           const targetCommands = groups[selectedTarget] || [];
           selectedCommandId = targetCommands[0] ? targetCommands[0].commandId : '';
 
-          Object.keys(groups).forEach(target => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.textContent = target;
-            btn.style.marginRight = '6px';
-            btn.style.marginBottom = '6px';
-            if (target === selectedTarget) btn.disabled = true;
-            btn.onclick = () => {
-              selectedTarget = target;
-              renderOptions(groups[selectedTarget] || []);
-              Array.from(targetRow.querySelectorAll('button')).forEach(b => { b.disabled = b.textContent === selectedTarget; });
-            };
+          targets.forEach(target => {
+            const btn = createButton(target, () => {
+              selectedCommandId = groups[target][0]?.commandId || '';
+              renderOptions(groups[target] || []);
+              Array.from(targetRow.querySelectorAll('button')).forEach(b => { b.disabled = b.textContent === target; });
+            }, { disabled: target === selectedTarget });
             targetRow.appendChild(btn);
           });
-
-          function renderOptions(targetOptions) {
-            optionRow.innerHTML = '';
-            selectedCommandId = targetOptions[0] ? targetOptions[0].commandId : '';
-
-            targetOptions.forEach(option => {
-              const btn = document.createElement('button');
-              btn.type = 'button';
-              btn.textContent = parseOptionLabel(option);
-              btn.style.marginRight = '6px';
-              btn.style.marginBottom = '6px';
-              if (option.commandId === selectedCommandId) btn.disabled = true;
-              btn.onclick = () => {
-                selectedCommandId = option.commandId;
-                Array.from(optionRow.querySelectorAll('button')).forEach(b => { b.disabled = b.dataset.commandId === selectedCommandId; });
-              };
-              btn.dataset.commandId = option.commandId;
-              optionRow.appendChild(btn);
-            });
-          }
 
           renderOptions(targetCommands);
         };
 
-        dieRow.innerHTML = '';
+        let placeBtn = null;
+
+        const renderOptions = (options) => {
+          optionRow.innerHTML = '';
+          selectedCommandId = options[0] ? options[0].commandId : '';
+          options.forEach(option => {
+            const label = option.displayName || option.commandId;
+            const btn = createButton(label, () => {
+              selectedCommandId = option.commandId;
+              Array.from(optionRow.querySelectorAll('button')).forEach(b => { b.disabled = b.dataset.commandId === selectedCommandId; });
+              if (placeBtn) placeBtn.disabled = !selectedCommandId;
+            }, { disabled: option.commandId === selectedCommandId });
+            btn.dataset.commandId = option.commandId;
+            optionRow.appendChild(btn);
+          });
+          if (placeBtn) placeBtn.disabled = !selectedCommandId;
+        };
+
         availableDice.forEach(die => {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.textContent = `Die ${die.index}: ${die.value}`;
-          btn.style.marginRight = '6px';
-          btn.style.marginBottom = '6px';
-          if (die.index === selectedDieIndex) btn.disabled = true;
-          btn.onclick = () => {
+          const btn = createButton(`Die ${die.index}: ${die.value}`, () => {
             selectedDieIndex = die.index;
             Array.from(dieRow.querySelectorAll('button')).forEach(b => { b.disabled = b.dataset.dieIndex === String(selectedDieIndex); });
             renderTargetsAndOptions();
-          };
+          }, { disabled: die.index === selectedDieIndex });
           btn.dataset.dieIndex = String(die.index);
           dieRow.appendChild(btn);
         });
 
         renderTargetsAndOptions();
 
-        const placeBtn = document.createElement('button');
-        placeBtn.type = 'button';
-        placeBtn.textContent = 'Place selected die';
-        placeBtn.onclick = async () => {
-          placeBtn.disabled = true;
-          try {
-            if (!selectedCommandId) throw new Error('No command option available for selected die.');
-
-            const r = await fetch(`/api/webapp/game/place?gameId=${encodeURIComponent(gameId)}`, {
-              method: 'POST',
-              headers: { ...withInitDataHeaders(), 'Content-Type': 'application/json' },
-              body: JSON.stringify({ dieIndex: selectedDieIndex, commandId: selectedCommandId }),
-              cache: 'no-store'
-            });
-
-            const result = await parseResponse(r);
-            if (!result.ok) {
-              throw new Error((result.json && result.json.error) || `${result.status} action failed`);
-            }
-
-            await loadState();
-          } catch (err) {
-            setText('Action failed:\n\n' + (err && err.message ? err.message : String(err)));
-          } finally {
-            placeBtn.disabled = false;
-          }
-        };
-
+        placeBtn = createButton('Place selected die', () => runAction(() => postAction(
+          '/api/webapp/game/place',
+          { dieIndex: selectedDieIndex, commandId: selectedCommandId },
+          state.version
+        )), { primary: true, disabled: !selectedCommandId });
         actionRow.appendChild(placeBtn);
       }
 
       function renderState(state) {
         if (String(state.phase).toLowerCase() === 'lobby') {
-          setText(JSON.stringify(state, null, 2));
-          return;
-        }
-
-        const lines = [];
-        lines.push(`Phase: ${state.phase}`);
-        lines.push(`Viewer seat: ${(state.viewer && state.viewer.seat) || 'Spectator'}`);
-        lines.push('');
-
-        if (state.cockpit) {
-          lines.push('Public cockpit');
-          lines.push(`- Round: ${state.cockpit.roundNumber} (${state.cockpit.roundStatus})`);
-          lines.push(`- Axis: ${state.cockpit.axisPosition}`);
-          lines.push(`- Engines speed: ${state.cockpit.enginesSpeed ?? 'n/a'}`);
-          lines.push(`- Approach: ${state.cockpit.approachPosition}/${state.cockpit.approachSegments}`);
-          lines.push(`- Planes remaining: ${state.cockpit.planesRemaining}`);
-          lines.push(`- Coffee tokens: ${state.cockpit.coffeeTokens}`);
-          lines.push('');
-        }
-
-        if (state.privateHand) {
-          lines.push('Private hand (only you)');
-          lines.push(`- Seat: ${state.privateHand.seat}`);
-          lines.push(`- Current player: ${state.privateHand.currentPlayer}`);
-          lines.push(`- Placements remaining: ${state.privateHand.placementsRemaining}`);
-          lines.push(`- Dice: ${state.privateHand.dice.map(d => `${d.index}:${d.value}${d.isUsed ? '✓' : ''}`).join(', ')}`);
-          lines.push(`- Commands: ${state.privateHand.availableCommands.length}`);
+          renderLobby(state);
         } else {
-          lines.push('Private hand unavailable (not seated or round not rolled).');
+          renderGame(state);
         }
-
-        lines.push('');
-        lines.push('Raw payload:');
-        lines.push(JSON.stringify(state, null, 2));
-        setText(lines.join('\n'));
       }
 
-      async function loadState() {
-        const gameId = startParam;
-        const r = await fetch(`/api/webapp/game-state?gameId=${encodeURIComponent(gameId)}`, {
-          method: 'GET',
-          headers: withInitDataHeaders(),
+      function createBadge(text, isActive) {
+        const badge = document.createElement('div');
+        badge.className = `badge${isActive ? ' active' : ''}`;
+        badge.textContent = text;
+        return badge;
+      }
+
+      function createSeatCard(label, seat, placeholder) {
+        const card = document.createElement('div');
+        card.className = 'seat-card';
+
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar';
+
+        const name = seat ? truncateDisplayName(seat.displayName) : placeholder;
+        const initials = seat
+          ? (truncateDisplayName(seat.displayName).split(/\s+/).map(seg => seg[0]).join('').slice(0, 2) || label[0])
+          : label[0];
+        avatar.textContent = initials.toUpperCase();
+
+        const details = document.createElement('div');
+        details.className = 'seat-details';
+        const nameEl = document.createElement('div');
+        nameEl.className = 'seat-name';
+        nameEl.textContent = name;
+        const roleEl = document.createElement('div');
+        roleEl.className = 'seat-role';
+        roleEl.textContent = label;
+        details.appendChild(nameEl);
+        details.appendChild(roleEl);
+
+        card.appendChild(avatar);
+        card.appendChild(details);
+        return card;
+      }
+
+      function createCard(title, stats) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        const titleEl = document.createElement('div');
+        titleEl.className = 'card-title';
+        titleEl.textContent = title;
+        card.appendChild(titleEl);
+        stats.forEach(stat => {
+          const row = document.createElement('div');
+          row.className = 'stat';
+          const label = document.createElement('span');
+          label.textContent = stat.label;
+          const value = document.createElement('span');
+          value.textContent = stat.value;
+          row.appendChild(label);
+          row.appendChild(value);
+          card.appendChild(row);
+        });
+        return card;
+      }
+
+      async function postAction(path, body, expectedVersion) {
+        const response = await fetch(buildUrl(path, expectedVersion), {
+          method: 'POST',
+          headers: body
+            ? { ...withInitDataHeaders(), 'Content-Type': 'application/json' }
+            : withInitDataHeaders(),
+          body: body ? JSON.stringify(body) : null,
           cache: 'no-store'
         });
-
-        const result = await parseResponse(r);
-        if (!result.ok && result.status !== 404) {
-          throw new Error((result.json && result.json.error) || `${result.status} game-state failed`);
-        }
-
-        const state = result.status === 404 ? {
-          gameId: Number(gameId),
-          phase: 'Lobby',
-          lobby: { pilot: null, copilot: null, isReady: false },
-          cockpit: null,
-          gameStatus: 'InProgress',
-          viewer: { userId: (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || 0, seat: null }
-        } : result.json;
-
-        if (String(state.phase).toLowerCase() === 'lobby')
-          renderLobbyActions(gameId);
-        else
-          renderInGameActions(gameId, state);
-
-        renderState(state);
+        return parseResponse(response);
       }
 
       loadState().catch((err) => {
-        setText('Error calling backend:\n\n' + (err && err.message ? err.message : String(err)));
+        showMessage(`Error calling backend: ${err && err.message ? err.message : String(err)}`, 'error');
       });
     })();
   </script>
