@@ -7,13 +7,13 @@
 
 ## Current Status (2026-03-02)
 - ✅ Issue #80: Durable persistence slice (Game state survives restart + version field + migration)
-- ✅ Issue #77: Open App Launchpad hardening (startapp deep links + safe fallback)
+- ✅ Issue #77: Open App Launchpad hardening + residual closure (startapp deep links + safe fallback + QA sign-off)
+- ✅ Issue #81: Security-context-binding completion (InvalidGameContext explicit + tests)
 - ✅ Issue #83: Async turn notifications (DM-first + group fallback, idempotency guard)
 - ✅ Issue #84: Abuse protection slice 1 (rate limiting + input validation)
-- ✅ Issue #81: Security-context-binding completion (InvalidGameContext explicit + tests)
 - ✅ PR #87: Consolidated deliverables; all tests passing
-- ✅ Epic #75: 7/11 closed; critical path gate #81 closed
-- **Next Priority:** #77 (UI Slice — Place/Undo)
+- ✅ Epic #75: 8/11 closed; all pre-UI gates CLOSED (#77, #80, #81)
+- **Next Priority:** #78–#79 (UI Slices) — unblocked; #84 expansion deferred
 
 ## Implementation Patterns (Locked)
 
