@@ -6,6 +6,30 @@
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
 > **Note (2026-03-02 Round 16):** Session 28 summary below. Full session logs archived in `.squad/log/` and decision records in `.squad/decisions.md`. Detailed history from Sessions 1–25 summarized into Core Context.
+## Session 32: PR #89 Review — Solo Testing Mode (2026-04-17)
+
+**Outcome:** ✅ APPROVED and MERGED
+
+**Task:** Review PR #89 (branch `squad/88-solo-testing-mode`) against architecture spec
+
+**Architecture Verification:**
+1. ✅ GameMode enum in `SkyTeam.Domain/GameMode.cs` with `TwoPlayer` and `Solo`
+2. ✅ `Game.Mode` property with default `GameMode.TwoPlayer`
+3. ✅ `InMemoryGroupLobbyStore.CreateSoloLobby` seats same user in both roles
+4. ✅ `WebAppLobbyState.IsSoloMode` derived from `Pilot.UserId == Copilot.UserId`
+5. ✅ `POST /api/webapp/lobby/new-solo` endpoint with guard clauses
+6. ✅ UI: Solo Mode button, badge, warning
+7. ✅ All 13 Issue88 tests pass
+8. ✅ DDD correctness: domain pure, application layer handles user mapping
+
+**Merge Actions:**
+- ✅ Merged PR #89 (2026-04-17T23:08:57Z)
+- ✅ Closed issue #88 (2026-04-17T23:08:58Z)
+
+**Key Win:** Seat-based domain enabled solo mode with **zero turn-flow changes**.
+
+---
+
 ## Cross-Team Status (2026-03-01T23:01:49Z)
 - **Skiles:** Issue #76 config validation + operator runbook (COMPLETED) → Next: Issue #77 (Open App Launchpad, depends on #76)
 - **Aloha:** Issue #85 integration tests completed (lobby API flows + error paths; all 123 tests passing)
