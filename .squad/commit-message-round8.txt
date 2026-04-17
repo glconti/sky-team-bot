@@ -1,0 +1,17 @@
+docs(.squad): Round 8 team coordination + issue closures
+
+- Created orchestration logs for Sully (issue closure review) + Skiles (issue #84)
+- Created session log for ralph round 8
+- Merged 2 inbox decisions into decisions.md:
+  * sully-issue-closure-round7: Closed #76, #85, #86; updated Epic #75
+  * skiles-issue-84: Abuse protection slice (rate limiting + input validation)
+- Updated Sully + Skiles history.md with round 8 context
+- Deleted processed inbox files
+
+Team Status:
+- Sully: Issue closure review complete; #76 #85 #86 ready
+- Skiles: Issue #84 abuse guardrails complete; commit 02293fe
+- Critical path locked: #76→#77→#80→#81→#82
+- Epic #75: IN_PROGRESS (4/11 issues complete)
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

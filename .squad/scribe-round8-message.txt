@@ -1,0 +1,11 @@
+squad: scribe round 8 — merge skiles issue #83 completion & orchestration logs
+
+- Scribe: Orchestration log for Skiles background task (issue #83 async notifications, commit d91925f)
+- Scribe: Session log (Ralph round 7) for post-spawn manifest processing
+- Decisions: Merged inbox entry (skiles-issue-83.md) → decisions.md (append-only ledger)
+- Decisions: Deleted processed inbox file after merge
+- Agents: Updated Skiles history with Issue #83 completion notes (session 20)
+- Scope: Async turn notification slice, DM-first + group fallback, idempotency guard
+- Impact: Issue #83 slice 1 complete; formal event infrastructure deferred to future slices
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

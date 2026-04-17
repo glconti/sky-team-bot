@@ -28,7 +28,7 @@ public readonly record struct LobbyJoinResult(LobbyJoinStatus Status, LobbySnaps
 
 public sealed class InMemoryGroupLobbyStore
 {
-    private readonly object _sync = new();
+    private readonly Lock _sync = new();
     private readonly Dictionary<long, LobbySession> _sessions = new();
 
     public LobbyCreateResult CreateNew(long groupChatId)
@@ -39,6 +39,26 @@ public sealed class InMemoryGroupLobbyStore
                 return new(LobbyCreateStatus.AlreadyExists, existing.ToSnapshot());
 
             var created = new LobbySession(groupChatId);
+            _sessions.Add(groupChatId, created);
+
+            return new(LobbyCreateStatus.Created, created.ToSnapshot());
+        }
+    }
+
+    public LobbyCreateResult CreateSoloLobby(long groupChatId, LobbyPlayer player)
+    {
+        ArgumentNullException.ThrowIfNull(player);
+
+        lock (_sync)
+        {
+            if (_sessions.TryGetValue(groupChatId, out var existing))
+                return new(LobbyCreateStatus.AlreadyExists, existing.ToSnapshot());
+
+            var created = new LobbySession(groupChatId)
+            {
+                Pilot = player,
+                Copilot = player
+            };
             _sessions.Add(groupChatId, created);
 
             return new(LobbyCreateStatus.Created, created.ToSnapshot());

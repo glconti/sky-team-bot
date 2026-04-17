@@ -146,7 +146,8 @@ public sealed class Issue59WebAppGameStateEndpointTests
             Lobby: new WebAppLobbyState(
                 Pilot: new WebAppLobbySeat(111, "Alice"),
                 Copilot: new WebAppLobbySeat(222, "Bob"),
-                IsReady: true),
+                IsReady: true,
+                IsSoloMode: false),
             Cockpit: null,
             GameStatus: "InProgress",
             Viewer: new WebAppViewer(111, "Pilot")));

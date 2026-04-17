@@ -100,3 +100,32 @@ static bool ValidateInitData(string initData, string botToken, TimeSpan maxAge, 
 - **Only available** when launched via a **KeyboardButton** Mini App.
 
 For real-time gameplay, prefer calling your backend APIs directly (Mini App stays open).
+
+## Config guardrail pattern (BotFather Main Mini App URL)
+When Mini App launch depends on operator-managed BotFather settings, add local runtime guardrails:
+- Validate `WebApp:MiniAppUrl` / env override with `IValidateOptions<T>`:
+  - absolute URL required
+  - `https` scheme required
+  - no query/fragment (keep URL as stable app shell base)
+- Register `ValidateOnStart()` so misconfiguration fails fast at startup.
+- Cover with focused tests for valid HTTPS and invalid http/relative/query/fragment cases.
+
+## Abuse guardrail slice pattern (WebApp transport)
+For first-pass abuse protection without new infrastructure:
+- Add a singleton in-memory sliding-window guard service.
+- Enforce it in a dedicated `IEndpointFilter` after auth/initData validation.
+- Start with pragmatic defaults:
+  - per-user request rate
+  - per-IP request rate
+  - strict limit on create/start mutating endpoints
+- On rejection:
+  - return `429 Too Many Requests`
+  - include `Retry-After` header
+  - log scope/key/path for auditing
+- Keep validation in transport boundary (`400`) and avoid domain mutations on reject paths.
+
+## Async turn notification dedup hygiene
+When using in-memory dedup keys for DM/group turn notifications:
+- Scope dedup by transition key + recipient to prevent duplicate sends on retries.
+- Reset stale dedup keys when a **new game starts in the same group**; otherwise first-turn notifications can be suppressed across sessions.
+- Keep fallback sends best-effort (`try/catch` + warning log) so Telegram transport failures do not fail gameplay mutations.

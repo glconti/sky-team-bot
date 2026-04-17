@@ -90,6 +90,106 @@ public sealed class Issue64WebAppPlacementFlowTests
     }
 
     [Fact]
+    public async Task PlaceEndpoint_ShouldBindPlacementToRequestedGame_WhenViewerHasAnotherActiveSession()
+    {
+        // Arrange
+        const long primaryGroupChatId = 123;
+        const long secondaryGroupChatId = 456;
+        const long sharedUserId = 111;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var (dieIndex, commandId) = SeedPlacementAcrossMultipleGames(factory, primaryGroupChatId, secondaryGroupChatId, sharedUserId);
+        using var placeRequest = CreatePlaceRequest(primaryGroupChatId, sharedUserId, "Alice", dieIndex, commandId);
+
+        // Act
+        var response = await client.SendAsync(placeRequest);
+        var state = await response.Content.ReadFromJsonAsync<WebAppGameStateResponse>(JsonOptions);
+        var gameSessionStore = factory.Services.GetRequiredService<InMemoryGroupGameSessionStore>();
+        var primaryState = gameSessionStore.GetPublicState(primaryGroupChatId);
+        var secondaryState = gameSessionStore.GetPublicState(secondaryGroupChatId);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        state!.Phase.Should().Be(WebAppGamePhase.InGame);
+        primaryState!.PlacementsMade.Should().Be(1);
+        secondaryState!.PlacementsMade.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task PlaceEndpoint_ShouldReturnInvalidGameContext_WhenViewerMutatesDifferentChatSession()
+    {
+        // Arrange
+        const long viewersGroupChatId = 123;
+        const long targetedGroupChatId = 456;
+        const long viewerUserId = 111;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        SeedCrossChatMutationScenario(factory, viewersGroupChatId, targetedGroupChatId, viewerUserId);
+        using var placeRequest = CreatePlaceRequest(targetedGroupChatId, viewerUserId, "Alice", dieIndex: 0, commandId: "Axis.AssignBlue:1");
+
+        // Act
+        var response = await client.SendAsync(placeRequest);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        body.GetProperty("error").GetString().Should().Be("InvalidGameContext");
+    }
+
+    [Fact]
+    public async Task UndoEndpoint_ShouldReturnInvalidGameContext_WhenViewerMutatesDifferentChatSession()
+    {
+        // Arrange
+        const long viewersGroupChatId = 123;
+        const long targetedGroupChatId = 456;
+        const long viewerUserId = 111;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        SeedCrossChatMutationScenario(factory, viewersGroupChatId, targetedGroupChatId, viewerUserId);
+        using var undoRequest = CreateUndoRequest(targetedGroupChatId, viewerUserId, "Alice");
+
+        // Act
+        var response = await client.SendAsync(undoRequest);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        body.GetProperty("error").GetString().Should().Be("InvalidGameContext");
+    }
+
+    [Fact]
+    public async Task PlaceEndpoint_ShouldReturnConcurrencyConflict_WhenExpectedVersionIsOutdated()
+    {
+        // Arrange
+        const long groupChatId = 123;
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var (userId, dieIndex, commandId) = SeedTurnForPlacement(factory, groupChatId);
+        var gameSessionStore = factory.Services.GetRequiredService<InMemoryGroupGameSessionStore>();
+        var staleVersion = gameSessionStore.GetSnapshot(groupChatId)!.Version;
+
+        using var firstRequest = CreatePlaceRequest(groupChatId, userId, "Player", dieIndex, commandId, staleVersion);
+        using var staleRequest = CreatePlaceRequest(groupChatId, userId, "Player", dieIndex, commandId, staleVersion);
+
+        // Act
+        var firstResponse = await client.SendAsync(firstRequest);
+        var staleResponse = await client.SendAsync(staleRequest);
+        var conflict = await staleResponse.Content.ReadFromJsonAsync<WebAppConcurrencyConflictResponse>(JsonOptions);
+        var state = gameSessionStore.GetPublicState(groupChatId);
+
+        // Assert
+        firstResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        staleResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        conflict!.Error.Should().Be("ConcurrencyConflict");
+        conflict.CurrentVersion.Should().Be(state!.Session.Version);
+        state.PlacementsMade.Should().Be(1);
+    }
+
+    [Fact]
     public async Task WebAppTransportFlow_ShouldCoverOpenLobbyStartRollPlaceUndo()
     {
         // Arrange
@@ -197,6 +297,56 @@ public sealed class Issue64WebAppPlacementFlowTests
         return (currentUserId, dieIndex, command);
     }
 
+    private static void SeedCrossChatMutationScenario(
+        WebApplicationFactory<Program> factory,
+        long viewersGroupChatId,
+        long targetedGroupChatId,
+        long viewerUserId)
+    {
+        var lobbyStore = factory.Services.GetRequiredService<InMemoryGroupLobbyStore>();
+        var gameSessionStore = factory.Services.GetRequiredService<InMemoryGroupGameSessionStore>();
+
+        lobbyStore.CreateNew(viewersGroupChatId);
+        lobbyStore.Join(viewersGroupChatId, new LobbyPlayer(viewerUserId, "Alice"));
+        lobbyStore.Join(viewersGroupChatId, new LobbyPlayer(222, "Bob"));
+        gameSessionStore.Start(viewersGroupChatId, lobbyStore.GetSnapshot(viewersGroupChatId), requestingUserId: viewerUserId);
+        gameSessionStore.RegisterRoll(viewersGroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        lobbyStore.CreateNew(targetedGroupChatId);
+        lobbyStore.Join(targetedGroupChatId, new LobbyPlayer(333, "Charlie"));
+        lobbyStore.Join(targetedGroupChatId, new LobbyPlayer(444, "Dana"));
+        gameSessionStore.Start(targetedGroupChatId, lobbyStore.GetSnapshot(targetedGroupChatId), requestingUserId: 333);
+        gameSessionStore.RegisterRoll(targetedGroupChatId, new SecretDiceRoll([6, 6, 6, 6], [6, 6, 6, 6]));
+    }
+
+    private static (int DieIndex, string CommandId) SeedPlacementAcrossMultipleGames(
+        WebApplicationFactory<Program> factory,
+        long primaryGroupChatId,
+        long secondaryGroupChatId,
+        long sharedUserId)
+    {
+        var lobbyStore = factory.Services.GetRequiredService<InMemoryGroupLobbyStore>();
+        var gameSessionStore = factory.Services.GetRequiredService<InMemoryGroupGameSessionStore>();
+
+        lobbyStore.CreateNew(primaryGroupChatId);
+        lobbyStore.Join(primaryGroupChatId, new LobbyPlayer(sharedUserId, "Alice"));
+        lobbyStore.Join(primaryGroupChatId, new LobbyPlayer(222, "Bob"));
+        gameSessionStore.Start(primaryGroupChatId, lobbyStore.GetSnapshot(primaryGroupChatId), requestingUserId: sharedUserId);
+        gameSessionStore.RegisterRoll(primaryGroupChatId, new SecretDiceRoll([1, 2, 3, 4], [1, 2, 3, 4]));
+
+        var primaryHand = gameSessionStore.GetHand(primaryGroupChatId, sharedUserId);
+        var commandId = primaryHand.AvailableCommands!.First().CommandId;
+        var dieIndex = FindDieIndex(primaryHand.Hand!, commandId);
+
+        lobbyStore.CreateNew(secondaryGroupChatId);
+        lobbyStore.Join(secondaryGroupChatId, new LobbyPlayer(sharedUserId, "Alice"));
+        lobbyStore.Join(secondaryGroupChatId, new LobbyPlayer(333, "Charlie"));
+        gameSessionStore.Start(secondaryGroupChatId, lobbyStore.GetSnapshot(secondaryGroupChatId), requestingUserId: sharedUserId);
+        gameSessionStore.RegisterRoll(secondaryGroupChatId, new SecretDiceRoll([6, 6, 6, 6], [6, 6, 6, 6]));
+
+        return (dieIndex, commandId);
+    }
+
     private static int FindDieIndex(SecretDiceHand hand, string commandId)
     {
         var markerStart = commandId.LastIndexOf(':');
@@ -227,12 +377,16 @@ public sealed class Issue64WebAppPlacementFlowTests
         return dice.First(d => !d.IsUsed && d.Value == rolledValue).Index;
     }
 
-    private static HttpRequestMessage CreatePlaceRequest(long groupChatId, long viewerUserId, string viewerDisplayName, int dieIndex, string commandId)
+    private static HttpRequestMessage CreatePlaceRequest(long groupChatId, long viewerUserId, string viewerDisplayName, int dieIndex, string commandId, long? expectedVersion = null)
     {
         var initData = BuildInitData(TestBotToken, DateTimeOffset.UtcNow, viewerUserId, viewerDisplayName, groupChatId.ToString());
+        var url = expectedVersion.HasValue
+            ? $"/api/webapp/game/place?gameId={groupChatId}&expectedVersion={expectedVersion.Value}"
+            : $"/api/webapp/game/place?gameId={groupChatId}";
 
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/webapp/game/place?gameId={groupChatId}");
+        var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Headers.Add("X-Telegram-Init-Data", initData);
+        request.Headers.Add("X-Idempotency-Key", Guid.NewGuid().ToString("N"));
         request.Content = JsonContent.Create(new { dieIndex, commandId });
         return request;
     }
@@ -243,6 +397,7 @@ public sealed class Issue64WebAppPlacementFlowTests
 
         var request = new HttpRequestMessage(HttpMethod.Post, $"/api/webapp/game/undo?gameId={groupChatId}");
         request.Headers.Add("X-Telegram-Init-Data", initData);
+        request.Headers.Add("X-Idempotency-Key", Guid.NewGuid().ToString("N"));
         return request;
     }
 
@@ -253,6 +408,13 @@ public sealed class Issue64WebAppPlacementFlowTests
 
         var request = new HttpRequestMessage(method, url);
         request.Headers.Add("X-Telegram-Init-Data", initData);
+        if (method == HttpMethod.Post
+            && (url.Contains("/api/webapp/game/roll", StringComparison.Ordinal)
+                || url.Contains("/api/webapp/game/place", StringComparison.Ordinal)
+                || url.Contains("/api/webapp/game/undo", StringComparison.Ordinal)))
+        {
+            request.Headers.Add("X-Idempotency-Key", Guid.NewGuid().ToString("N"));
+        }
 
         if (content is not null)
             request.Content = JsonContent.Create(content);

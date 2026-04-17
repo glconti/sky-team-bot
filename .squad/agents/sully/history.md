@@ -5,252 +5,181 @@
 **Project:** Sky Team Bot — Telegram bot for the cooperative board game Sky Team
 **Stack:** .NET 10 / C# 14, xUnit, FluentAssertions, DDD
 
-## Learnings
+> **Note (2026-03-02 Round 16):** Session 28 summary below. Full session logs archived in `.squad/log/` and decision records in `.squad/decisions.md`. Detailed history from Sessions 1–25 summarized into Core Context.
 
-### Session 1: Backlog Setup & GitHub Label Taxonomy (2026-02-20)
-- Created 25 GitHub labels across 5 categories: Type, Priority, Status, Area, and Routing
-- Established 14 vertical-slice issues for M1 foundation work
-- Key design decision: All issues represent end-to-end playable increments, not infrastructure-only work
-- Dependency graph: Rules clarification (#14) is the critical path blocker for module work
-- Squad routing embedded in labels for easy filtering and handoff
-- Status model: `ready` for foundation, `blocked` for work waiting on clarification, `review` for PR gates
-- Milestones structured for incremental delivery: MVP → Bot → Polish → Advanced
+## Session 28–29 Summary (2026-03-02)
 
-### Cross-Team Context
-- **Tenerife** completed M1 rules specification (all 7 modules, landing criteria, clarifications)
-- **Skiles** identified Phase 1 blocker: GameState aggregate + ExecuteCommand dispatcher must be built first
-- **Aloha** standing by with test harness for module implementations
+### Issue #77 Final Closure Workflow (Session 29 Round 17)
+- **Timestamp:** 2026-03-02T06:40–07:10:00Z
+- **Task:** #77 residual implementation (Skiles) + closure verification (Sully)
+- **Outcome:** ✅ Completed; #77 ready for merge; epic #75 advanced to 8/11
+- **Residual Checklist:** Cross-platform QA proof (iOS/Android/Desktop), callback-data 64-byte safety, group-first fallback guidance
+- **Key Artifacts:**
+  - `Issue60LaunchMiniAppButtonTests`: callback payload assertions (≤64 bytes)
+  - `TelegramBotService` fallback refinement: keeps launchpad retries in group context
+  - `readme.md`: explicit #77 residual sign-off bullets + callback-size guardrails
+- **QA Narrative:** Locked with iOS/Android/Desktop client coverage + callback constraint pattern
+- **Critical Impact:** All pre-UI gates now CLOSED; #77–#79 (UI slices) unblocked on critical path
 
-### Session 2: Telegram Placement + Concentration Token Architecture (2026-02-21)
-**Outcome:** Assessed secret placement and coffee token UX fit against DDD aggregate pattern; produced extended interaction contract and command model for Skiles.
+### Issue #81 Closure Verification
+- **Timestamp:** 2026-03-02T02:18:00Z
+- **Task:** Verify Skiles' Session 27 InvalidGameContext binding + close #81
+- **Outcome:** ✅ Completed; #81 closed in GitHub; epic #75 advanced to 7/11
+- **Verification:**
+  - Invalid context detected at aggregate level (groupChatId vs. active session mapping)
+  - WebApp surface returns `InvalidGameContext` when viewer mutates different chat
+  - Regression suite guards store + WebApp contract (place/undo paths)
+  - Tests: 56 assertions pass; 16 pre-existing skipped
 
-**Key Decisions:**
-- **Secret placement:** Architecturally Excellent — aligns with DDD game aggregate. No public infrastructure changes needed.
-- **Token command model:** Option A (Recommended) — Token spend as multi-token parameter on PlaceDieCommand (`SpendTokens: int?` or `AdjustedValue: int?` with derived cost). Prevents ordering ambiguity and state-machine complexity.
-- **Extended command shape:** Single `PlaceDieCommand` with optional adjustment parameters: `UseTokenForAdjustment: bool`, `AdjustedValue: int?`, `TokensToSpend: int` (derived). Validation method checks pool availability and value validity.
-- **Telegram contract:** Ephemeral UI (private keyboards, color-coded options), readiness handling, reveal broadcasting. Domain stays UI-agnostic.
-- **Module resolution order locked:** Land on Concentration → Gain token → Advance (prevents race conditions)
+### Epic #75 Status After Round 16
+- **Closed Issues:** 7/11 (#76, #80, #81, #82, #83, #85, #86)
+- **Unblocked:** #77–#79 (UI Slice), #84 (Abuse Protection expansion)
+- **Critical Gate:** #81 security-context-binding CLOSED
+- **Next Priority:** #77 (UI Slice — Place/Undo)
 
-**Delivered Artifacts:**
-- Telegram placement + token architecture assessment (`.squad/decisions.md`)
-- Extended interaction contract: Bot ↔ Domain interface with multi-token support
-- Command shape guidance for Skiles: `PlaceDieOnConcentrationCommand` with spend validation
-- One orchestration log entry: Sully (architecture assessment)
-
-**Cross-Coordination:**
-- **Tenerife** finalized official rules spec with multi-token spend locked (cost `k = |adjusted - rolled|`)
-- **Skiles** extended domain model to support multi-token spend per this architecture guidance
-- **Aloha** can incorporate secret storage + multi-token testing per Skiles' extended proposal
-
-### Session 3: Decision Consolidation & Team Handoff (2026-02-21)
-**Outcome:** Scribe merged decision inbox, updated agent histories, committed `.squad/` state; team unblocked for Phase 1 implementation with multi-token spec fully validated.
-
-**Key Actions:**
-- Merged multi-token spec into decisions.md (Tenerife canonical reference + Skiles extended command model)
-- Deleted deduplicated inbox files
-- Updated Sully history with multi-token command shape guidance
-- Committed `.squad/` changes (orchestration logs, session log, updated histories)
-
-**Team Readiness:**
-- ✅ Multi-token spec complete: cost `k = |adjusted - rolled|`, no wraparound, full die value range supported
-- ✅ Command shape extended: `AdjustedValue` optional parameter with derived spend cost
-- ✅ Architecture validated: Single command, no separate token spend command, domain ↔ UI boundary clear
-- ✅ Skiles can implement Phase 1 with confidence in token model and command shape
-- ✅ Aloha can test multi-token flows (1-token, 2-token, 3-token, insufficient tokens edge cases)
-
-### Session 4: Telegram Architecture + MVP Backlog Sprint (2026-02-21)
-**Outcome:** Four agents drafted comprehensive Telegram bot architecture, UX specification, implementation plan, and test strategy; produced 4 orchestration logs + session log + merged decisions.
-
-**Key Decisions:**
-- **Sully:** 5-layer architecture (Domain → Application → Presentation → Telegram Adapter → Bot Host); 7 Epic MVP backlog (A–G) with vertical slices; 8 user interview questions
-- **Skiles:** Created `SkyTeam.TelegramBot` console project + integrated into solution (`.slnx`)
-- **Tenerife:** Comprehensive Telegram UX specification (570+ lines, 7 example transcripts, secret placement + button-driven token mechanics)
-- **Aloha:** Test-backlog recommendations (verbal; integrated into decisions if formal artifact needed)
-
-**Delivered Artifacts:**
-- `.squad/orchestration-log/2026-02-21T08-22-30Z-sully.md` — Architecture + MVP backlog orchestration log
-- `.squad/orchestration-log/2026-02-21T08-22-31Z-skiles.md` — Project initialization orchestration log
-- `.squad/orchestration-log/2026-02-21T08-22-32Z-tenerife.md` — UX specification orchestration log
-- `.squad/orchestration-log/2026-02-21T08-22-33Z-aloha.md` — QA recommendations orchestration log
-- `.squad/log/2026-02-21T08-22-00Z-telegram-bot-backlog.md` — Session log
-- `.squad/decisions.md` — Merged 4 new decision entries (user directive, Sully architecture, Skiles project, Tenerife UX)
-
-**Team Synchronization:**
-- **Sully → Skiles:** Epic roadmap defines implementation phases (A–G); 8 interview questions clarify UX tradeoffs
-- **Tenerife → Skiles:** UX spec provides binding contract for Telegram adapter (button rendering, state display, message formats)
-- **Sully ↔ Tenerife:** Architecture/UX alignment on secret placement (DM-based), public reveal (group broadcast), token UX (buttons, not commands)
-- **Aloha → Team:** Test recommendations ready for Epic-by-Epic implementation (unit → integration → E2E)
-
-**Pending Actions:**
-- User answers Sully's 8 interview questions (UX clarifications: DM onboarding, turn discipline, persistence, undo/cancel policy, etc.)
-- Skiles begins Phase 1: GameState aggregate + ExecuteCommand dispatcher (critical path for all Epics B–G)
-- Tenerife validates module implementations against UX spec (readiness gate per Epic D–F)
-- Aloha integrates test harness with Skiles' implementation phases
-
-### Session 5: Issue #31 Completion Round (2026-02-21T10:21:03Z)
-**Outcome:** Tenerife finalized comprehensive 500+ line spec documenting all 7 modules, landing win/loss criteria, resolution order, and edge cases. Skiles delivered draft PR #37 with all 7 module implementations and coffee-token multi-spend. Aloha created draft PR #38 with test coverage for boundaries, landing outcomes, and token mechanics.
-
-**Tenerife's Deliverables:**
-- **Spec document:** Issue #31 specification (tenerife-issue31-spec.md) covering modules 1–7 with detailed state, placement rules, resolution timing, landing criteria per module, edge cases, and 10-section verification checklist
-- **Module Order:** Axis → Engines → Brakes → Flaps → Landing Gear → Radio → Concentration (fixed, documented)
-- **Landing Criteria:** 6 conditions (all must pass for win: axis [-2,+2], engines ≥9, brakes ==3 and >speed, flaps ==4, gear ==3, approach clear)
-- **Loss Conditions:** Axis imbalance (immediate), altitude exhausted (final round), landing failure (any criterion fails)
-- **Clarifications:** Brakes criterion, Engines final round suppression, Landing Gear idempotence, multi-token spend bounds, token pool scoping, net token change (spend + concentration), reroll out-of-scope
-
-**Aloha's Findings:**
-- **Spec Mismatch #1:** Brakes landing criterion inconsistent — spec says `BrakesValue == 3 AND BrakesValue > LastSpeed` but BrakesValue is switch count (0–3); if LastSpeed ≥ 9, condition is impossible
-- **Spec Mismatch #2:** Current code treats BrakesValue as last activated value (2/4/6) and checks `BrakesValue >= 6` without speed comparison
-- **Recommendation:** Clarify intended landing check before finalizing tests
-- **Token-Adjusted Commands:** Validated design surface (e.g., `Axis.AssignBlue:1>3`); tests confirm command surfacing, spend behavior, pool/die bounds
-
-**Skiles' Implementations:**
-- All 7 modules working in draft PR #37
-- Landing validation logic complete
-- Command ID surface for token-adjusted placements operational
-- GameState refactor complete; ExecuteCommand dispatcher wired
-
-**Cross-Agent Dependencies:**
-- Awaiting Sully code review (module design, command dispatcher, aggregate cohesion)
-- Awaiting user clarification on Brakes landing criterion semantics
-- Concentration token design complete; ready for Telegram adapter once Epic B baseline established
-
-**Delivered Artifacts (Session 5):**
-- `.squad/orchestration-log/2026-02-21T10-21-03Z-skiles.md` — Skiles orchestration log
-- `.squad/orchestration-log/2026-02-21T10-21-03Z-tenerife.md` — Tenerife orchestration log
-- `.squad/orchestration-log/2026-02-21T10-21-03Z-aloha.md` — Aloha orchestration log
-- `.squad/log/2026-02-21T10-21-03Z-ralph-round.md` — Session log
-- `.squad/decisions.md` — Merged Tenerife spec + Aloha findings + user directive (placement undo)
-- Updated agent histories (Tenerife, Skiles, Aloha)
-
-**Pending Escalations:**
-1. **Brakes Landing Criterion:** Reconcile spec vs. code semantics before finalizing tests
-2. **Token-Adjusted Command IDs:** Await Telegram button rendering spec (Sully + Tenerife)
-
-### Session 6: PR #37 Unblock & Loss Semantics Finalization (2026-02-21T18:06:26Z)
-**Outcome:** Sully fixed token pool wiring in PR #37. Tenerife produced comprehensive loss condition checklist (15 explicit losses, 8 invalid-move categories, 3 TODOs). Aloha added ExecuteCommand smoke tests. Scribe logged all work and merged decisions.
-
-**Sully's PR #37 Fix:**
-- **Token Pool Ownership:** Coffee token pool owned by `ConcentrationModule` (authoritative source)
-- **Spend Delegation:** `Game.SpendCoffeeTokens(k)` → `ConcentrationModule.SpendCoffeeTokens(k)`
-- **Landing Checks:** 6 independent criteria (Engines ≥9, Brakes ≥6, Flaps ≥4, Gear ≥3, Axis ∈[-2,2], Approach cleared); no mandatory placement loss gate
-- **Tests:** Green; wiring minimal and consistent
-
-**Tenerife's Loss Semantics Checklist:**
-- **Explicit Losses (throw `GameRuleLossException`):**
-  1. Axis Out of Balance at Landing: `AxisPosition < -2 OR > 2`
-  2. Speed Too High at Landing: `BrakesValue < EnginesValue`
-  3. Approach Track Collision: ANY plane token remains
-  4. Altitude Exhausted: No segments left without landing
-  5. Mid-Round Axis Invariant: Position ≥ ±3 after both dice placed
-- **Invalid Moves (prevent via command validation):**
-  1. Brakes/Flaps sequence violations
-  2. Duplicate placements (Landing Gear, Axis, Engines)
-  3. Concentration/Radio exhaustion
-  4. Token overspend
-  5. Die not available (bot bug, not user error)
-- **Bugs Noted:**
-  - Axis landing check currently == 0, should check ∈[-2,2]
-  - Speed comparison uses >, verify if intended
-  - Altitude exhaustion not explicit; needs implementation
-  - Reroll mechanics not visible
-- **Rationale:** Separating losses from validation errors enables proper exception handling and deterministic game-state management
-
-**Aloha's ExecuteCommand Smoke Tests:**
-- Added base-scenario coverage: valid command execution, token spend, invalid rejection
-- AAA pattern, FluentAssertions, data-driven matrix
-- Tests green; ready for broader integration suite
-
-**Scribe's Logging & Consolidation:**
-- **Orchestration Logs (3):** Sully PR#37, Tenerife loss semantics, Aloha ExecuteCommand
-- **Session Log:** PR#37 unblock summary
-- **Decisions Merge:** Moved inbox files into decisions.md; deleted processed inbox files
-- **Agent Histories:** Updated Scribe, Sully, Tenerife, Aloha with session context
-- **Git Commit:** Staged and committed `.squad/` changes
-
-**Team Readiness:**
-- ✅ PR #37 token wiring fixed and validated
-- ✅ Loss semantics documented; ready for implementation validation
-
-### Session 4: Slice #59 — WebApp Foundation Design Review (2026-02-22)
-
-**Outcome:** Architected Telegram Mini App (WebApp) as primary UI. Designed read-only API endpoint, HMAC validation strategy, and single-host hosting model.
-
-**Key Decisions:**
-- **Hosting:** Convert existing `SkyTeam.TelegramBot` from console app to ASP.NET Core Web SDK. In-memory stores become singletons in DI; Telegram polling moves to `IHostedService`. Single process, single deployment unit.
-- **Static files:** Minimal `wwwroot/index.html` shell (vanilla HTML + Telegram.WebApp.js). No bundler, no SPA framework yet. Slice #62 adds real UI.
-- **WebApp API:** Single read-only endpoint `GET /api/webapp/game-state?gameId=...` with `X-Telegram-Init-Data` header auth. Returns public game state (no secrets). 200/400/401/404 responses.
-- **Security:** HMAC-SHA256 validation per Telegram spec (FixedTimeEquals constant-time comparison), 5-minute auth_date freshness window, cross-check signed `start_param` against query gameId.
-- **Risk mitigation:** 9 edge cases identified (HTTPS requirement, replay, spoofing, token exposure, concurrency, parse failure, missing state, missing initData, clock skew) with documented mitigations.
-
-**Strategic Pivot:**
-- **Old design:** Group chat cockpit + secret interactions in DM.
-- **New design:** Mini App is primary UI; all secrets (dice hand, placements) stay inside mini app. Group chat becomes low-noise "Open app" launchpad. DM flows obsolete.
-
-**Action Items Delivered:**
-- Sully: Comprehensive design doc + risk analysis (approved for implementation)
-- Gimli: Created `wwwroot/index.html` shell + configuration decision
-- Skiles: Web SDK conversion + TelegramInitDataValidator + TelegramInitDataFilter + GET /api/webapp/game-state endpoint
-- Aloha: Unit tests (validator), integration tests (endpoint), Issue #53 callback tests (passing)
-
-**Backlog Restructure:**
-- Slice #59 ✅ COMPLETE: WebApp foundation (hosting + validation + read-only API)
-- Slice #60: Launch surface ("Open app" button + start_param wiring)
-- Slice #61: Mini app lobby (New/Join/Start UI)
-- Slice #62: Mini app in-game view (cockpit + private hand)
-- Slice #63: Mini app actions (Roll + refresh + group update)
-- Slice #64: Mini app placement (place die + token adjust + undo)
-- Slice #65: Hardening + tests + command redirects
-
-**Test Status:**
-- 206 total tests, 193 passed, 13 skipped, 0 failed
-- New Issue #59 suites (validator, endpoint) ✅ green
-- Issue #53 callback tests ✅ green (in-game rolls, DM placement, privacy contract)
-
-**Team Readiness:**
-- ✅ Slice #59 complete and tested
-- ✅ Strategic UI pivot locked (Mini App primary, DM flows obsolete)
-- ✅ Ready for merge to main
-
-- ✅ ExecuteCommand baseline established; smoke tests passing
-- ✅ Next phase unblocked: Skiles integration testing + altitude/reroll redesign
-
-### Session 8: Telegram UX Epic #49 Spawn + Triage (2026-02-21T23:05:13Z)
-**Outcome:** Sully created GitHub Epic #49 (Telegram button-first UX) + 8 child issues (#50–#57); Epic #26 (MVP playable group chat) marked CLOSED with all 10 child issues resolved (PRs #47–#48 merged).
-
-**Sully's UX Epic #49 Creation:**
-- **Epic Scope:** Button-first Telegram UI via single edited "Cockpit" message (group) + DM hand menus (private)
-- **Pattern:** Inline keyboards + callback queries for primary flows; `/sky ...` command handlers as fallback
-- **Lifecycle:** Send cockpit on first interaction, edit on all state changes (no new message spam)
-- **Implementation Phases:** Issue #54 (menu state store) unblocks #50–#52 (callbacks, cockpit renderer, DM menu)
-
-**Child Issues Breakdown:**
-- #50: Callback query handler + validation + retry logic
-- #51: Single edited cockpit message + state persistence  
-- #52: DM menu with hand display + inline keyboard
-- #53: callback_data 64-byte constraint + token design (short versioned action tokens)
-- #54: Menu state store (in-memory, per-group, thread-safe, 1-hour GC)
-- #55: Deep-link onboarding (`/start?game=<groupId>`)
-- #56: Button lifecycle + dedup/expiry ("menu expired" toast)
-- #57: E2E integration tests (callback→action mapping, message edits, DM sends)
-
-**Epic #26 Closure:**
-- All 10 child issues closed (#27–#36 across P0 + P1 paths)
-- PRs #47 (undo + cockpit renderer + app tests) and #48 (per-chat dedup) merged to master
-- **MVP Deliverable:** Fully playable group chat (2 seated players + spectators), secret DM dice, public placements with strict alternation, undo support, round resolution + broadcast, all 7 domain modules, in-memory persistence with hardening
-- **Post-MVP Roadmap:** Persistence, spectator visibility, UX polish, stats/leaderboard, reroll mechanics
-
-**Team Coordination:**
-- Skiles receives Epic #49 child issues with implementation sequencing (Issue #54 first)
-- Tenerife validates button text + rendering against existing UX spec
-- Aloha prepares E2E callback test harness (Telegram SDK mock)
-- Scribe logs all work + merges decision inbox (3 files) + updates agent histories
+## Key Learnings (Updated Round 16)
+- Security outcome granularity enables deterministic tamper telemetry + corrective flows
+- Explicit `InvalidGameContext` prevents client/ops ambiguity vs. collapsed authorization
+- Audit cadence validates critical path alignment + catches acceptance gaps early
+- Gate closure (#81) unblocks parallel execution of UI (#77–#79) + abuse protection (#84)
 
 ---
 
-### Session 4: Mini App Launch Surface Architecture (2026-03-01)
+> Full detailed history from Sessions 1–25 preserved in `core-context.md` for reference.
+- **Sully (You):** Issue #80 CLOSURE AUDIT COMPLETE (Round 13). Verified Skiles remediation deliverables: repository contract (CRUD + CleanupExpired) ✅, TTL policy (config + documentation) ✅, restart evidence (Issue80FileBackedRestartPersistenceTests) ✅, versioning (expectedVersion + conflict detection) ✅. Outstanding blocker: Game aggregate schema + migration. Scope options: DB implementation or formal revision to embrace JSON persistence.
+- **Skiles:** Issue #80 REMEDIATION COMPLETE (Round 13). Delivered repository contract, lifecycle policy (metadata + retention config), restart integration test. Commit 8bd9d1d (PR #87). Awaiting audit closure and schema/migration path decision.
+- **Aloha:** QA verdict (Round 12) identified contract/schema gaps. Skiles remediation addressed behavior validation. Sully audit confirmed findings. Outstanding: Database schema implementation.
+- **Tenerife:** Standby. Awaiting #80 closure decision before #81 expansion.
+- **Critical Path:** Issue #80 schema/migration decision point. DB path: schema + migration design/implement. Scope revision path: update issue text to align with JSON persistence. Either path enables #81 full scope + #82 expansion.
+- **Blockers:** Game aggregate schema + migration (design + decision required). PR #87 merge contingent on #80 closure roadmap clarity.
+- **Next:** Schema/migration owner to decide. Link findings to PR #87 comments. Merge when path is clear.
 
-**Outcome:** Finalized Mini App launch surface design.
+## Cross-Team Status (2026-03-02T01:51:00Z) — Round 14 Scribe Sync (Schema Migration + Closure)
+- **Sully (You):** FINAL CLOSURE VERIFIED (Round 14). All acceptance criteria confirmed: GameSessions schema ✅, repository contract ✅, TTL config ✅, restart tests ✅, version/lock semantics ✅. Issue #80 close-ready. Critical path advances to #81 (security-context-binding) and #82 (versioning/concurrency) before UI (#77–#79) ships.
+- **Skiles:** SCHEMA MIGRATION DELIVERED (Round 14, Commit ab61d0e). Implemented `0001_game_sessions_schema.sql` migration artifact, `GameSessionsSchemaMigrator` runner, runtime wiring in `JsonGameSessionPersistence`. Migration applies on startup with idempotent SQL. Issue #80 now ready for closure.
+- **Aloha:** QA cycle complete. Restart integration test + schema migration both validated. Issue #80 meets all acceptance criteria.
+- **Tenerife:** Ready for #81 expansion on #80 closure.
+- **Epic #75 Status:** #80 → CLOSED (critical path unblocked); #81–#82 priority critical; #83–#86 queue pending concurrency gate.
+- **Next:** Close issue #80 on GitHub. Merge PR #87. Begin #81 security-context-binding design.
 
-**Key Decision:**
-- Mini App launch mechanism: startapp deep links with BotFather Main Mini App config
-- Artifacts: Orchestration log \& Session log created
+## Cross-Team Status (2026-03-02T02:03:00Z) — Round 15 Closure Sweep & Scribe Reconciliation
+- **Sully (You):** ROUND 15 CLOSURE SWEEP COMPLETE (background × 2). Issue #80 explicitly closed on GitHub. Audited #77/#81/#82/#83/#84 scope. Closed #82 (versioning) and #83 (async turn notifications) ✅. Posted residual checklists on #77 (UI), #81 (chat/game binding), #84 (abuse protection) with remaining acceptance criteria + priority order. Updated epic #75 to 6/11 closed.
+- **Key Learnings:** Cross-chat error handling requires explicit `InvalidGameContext` signal (not generic `NotSeated` fall-through). Open app launchpad depends on per-platform QA + pinned-cockpit guidance before UI slice ships.
+- **Epic #75 Critical Gate:** #81 (security-context-binding) must close before #77–#79 (UI) and #84 (abuse protection) ship.
+- **Decisions Logged:** Issue #80 closure finalized. Sully round 15 closure sweep logged.
+- **Next:** Ralph orchestrates #81 security-context-binding expansion on gate unblock.
+
+## Session 28: Issue #81 closure completion (2026-03-02T02:18:00Z)
+
+**Outcome:** Validated Skiles' Session 27 InvalidGameContext binding completion. All #81 acceptance criteria verified. Closed #81 in GitHub. Epic #75 advanced to 7/11 closed.
+
+**Team Status Post-Round 16:**
+- #81 security-context-binding gate → CLOSED
+- Unblocked: #77–#79 (UI) and #84 (abuse protection)
+- Epic #75: 7/11 issues closed (63.6%)
+- Next priority: #77 (UI Slice — Place/Undo)
+
+## Session 30: Round 18 Closure Sweep — Issue #84 Explicit Close (2026-03-02T02:40:00Z)
+
+**Outcome:** Completed explicit GitHub closure of issue #84 (abuse protection expansion).
+
+**Task:** Declare #84 closure and advance epic #75 to 8/11.
+
+**Verification:**
+- Abuse protection gates satisfied: 10 req/sec per user ✅, 100 req/min per IP ✅, 1 req/user/5min lobby throttle ✅
+- Endpoint filters preserve DDD (domain untouched) ✅
+- Logging for operator telemetry ✅
+- All acceptance criteria met and verified in PR #87
+
+**Team Status Post-Round 18:**
+- #84 abuse protection → CLOSED (explicit)
+- Epic #75: 8/11 issues closed (72.7%)
+- Remaining open: #78–#79 (UI — pending manual Telegram client QA), #85–#86 (implementation complete)
+- Critical gates: ALL CLEARED (infrastructure + abuse protection now satisfied)
+- Next blocker: Manual Telegram client QA on iOS/Android/Desktop/Web
+
+**Key Learnings:**
+- Explicit security-violation outcomes (`InvalidGameContext`) prevent client/ops ambiguity better than collapsed generic authorization responses
+- User-to-chat context binding best enforced at application boundary before domain mutations
+- Distinct failure codes enable deterministic tamper telemetry and proper corrective flows
+
+## Learnings
+- Epic chaining requires upfront design of foundational layers (#76, #80) to prevent rework
+- Persistence + concurrency are inseparable; must co-design from day one
+- Telegram API constraints (64-byte callback data) must be factored early in Cockpit design
+- Configuration validation as startup gate prevents silent failures
+- Deterministic integration tests (WebApplicationFactory + in-memory) scale better than UI automation
+- QA matrix as living documentation in readme.md is more maintainable than static spreadsheets
+- Draft PR as collaboration gate enables architecture feedback before merge; reduces rework
+- Audit cadence valuable for validating critical path alignment
+- Shared review gate model (Sully architecture, Skiles implementation, Aloha testing) prevents rework
+- Round 10 closure audit confirmed PR #87 only satisfies #76/#85; #80–#84 still pending, so persistence (#80) is the immediate gate for the epic
+- Persistent storage auditing must keep the DB schema requirement explicit; successful JSON persistence demos do not fulfill acceptance until we either add the GameSessions migration or amend the issue scope.
+- Adding the explicit GameSessions schema migration against the JSON persistence proof point finally satisfied the acceptance gate and allows the critical path to move forward.
+- Security outcome granularity matters for tamper detection and ops visibility; collapse ambiguity early.
+- **Solo Mode Architecture (Session 31):** Seat-based domain turn tracking naturally supports solo mode without domain changes. Application layer's dynamic user→seat mapping allows same user to control both Pilot and Copilot. Key insight: domain doesn't know about users, only seats.
+- **Issues #78/#79 Gap Analysis (Session 31):** Tests asserting UI elements are brittle but valuable for verifying acceptance criteria. Both issues were complete but marked "go:needs-research" prematurely; comprehensive index.html review proved full implementation.
+
+### Foundational Phases (2026-02-20 to 2026-02-22)
+Established GitHub label taxonomy (25 labels), 14-issue vertical-slice backlog, M1 foundation roadmap. Completed base game logic: all 7 modules, landing validation, multi-token command model, DDD architecture (Domain → App → Presentation → Adapter → Host), loss semantics (15 explicit losses). Foundation: GameState refactor, ExecuteCommand dispatcher, test harness. Team coordinated on rules, command shapes, module implementations. PRs #37–#38 draft ready.
+
+**Key Achievements:**
+- ✅ 5-layer Telegram bot architecture with clear separation of concerns
+- ✅ 7 domain modules + landing validation + multi-token mechanics operational
+- ✅ Module resolution order locked: Axis → Engines → Brakes → Flaps → Gear → Radio → Concentration
+- ✅ Domain-first design: Secret placement in DM, no infrastructure leakage
+- ✅ 206 total tests, 193 passed, 0 failed
+
+### Mini App Strategic Pivot (2026-02-22)
+Architected Telegram Mini App as primary UI (from cockpit-centric design). Designed read-only WebApp API with HMAC-SHA256 validation. Single ASP.NET Core Web SDK deployment. Slices #59–#65 structured for incremental UI + action delivery.
+
+**Key Decisions:**
+- WebApp as primary UI; all secrets stay inside mini app
+- Group chat becomes low-noise "Open app" launchpad with startapp deep links
+- Read-only API endpoint (`GET /api/webapp/game-state`) with TelegramInitData validation
+- 9 security edge cases identified + mitigations documented
+
+### GitHub Epics #26 + #49 Completion (2026-02-21)
+**Epic #26 (MVP Playable):** All 10 issues closed; PRs #47–#48 merged. Fully playable group chat, 2 seated + spectators, secret DM dice, public placements, undo, all 7 modules, in-memory persistence.
+
+**Epic #49 (UX Button-First):** 8 child issues (#50–#57); Issue #54 (menu state store) is blocker; callback query + cockpit renderer + DM menus depend on it.
+
+### Epic #75 — Mini App-first Async Play (2026-03-01 to 2026-03-02)
+**11 Issues Scoped:** #76 (BotFather) → #77 (Open app launchpad) → #78–#79 (UI) → #80 (persistence) → #81–#82 (security/concurrency) → #83 (turn notifications) → #84 (rate limits) → #85–#86 (testing/QA).
+
+**Critical Path Locked:** #80 (persistence) and #82 (versioning/concurrency) must co-design from day one. No sequential iteration. Version field critical for CAS semantics.
+
+**Architecture Contracts Signed:**
+- **#80 Persistence:** GameSessions table with Version field (CAS), round logs serialization, 30-day TTL, IGameSessionRepository interface
+- **#82 Versioning:** Optimistic locking, UpdateAsync(session, expectedVersion), 409 ConcurrencyConflict response
+- **#77 Cockpit Button:** startapp deep link per Telegram spec, ≤ 64-byte callback data
+
+**PR #87 Completion (2026-03-02):**
+- **#76 (Skiles):** WebAppOptionsValidator with HTTPS enforcement, DI integration, readme docs
+- **#85 (Aloha):** Lobby flow integration tests, start validation, test helper for auth
+- **#86 (Aloha):** Manual QA matrix (8 clients, 5 happy path, 8 error, 7 multi-player sync, release checklist)
+- **Status:** Draft PR ready; all acceptance criteria met. PR #87 closes only #76 + #85 (2/11 = 18% epic).
+
+### Current Challenges & Next Steps
+- **#80 Implementation Pending:** Skiles' vertical slice complete (persistence + version tracking + tests). Awaiting review + merge.
+- **#81 Design Pending:** Security-context-binding contract due before #80 closes. Game aggregate must be bound to ChatId at creation (immutable). All commands validate ChatId match.
+- **#82 Blocked on #81:** Versioning API design sketch done; awaiting full implementation after #81 scope defined.
+- **#77–#79 Blocked on #80–#82:** UI development gated by persistence/concurrency infrastructure.
+
+**Learnings:**
+- Epic chaining requires upfront design of foundational layers (#76, #80) to prevent rework
+- Persistence + concurrency are inseparable; must co-design from day one
+- Telegram API constraints (64-byte callback data) must be factored early in Cockpit design
+- Configuration validation as startup gate prevents silent failures
+- Deterministic integration tests (WebApplicationFactory + in-memory) scale better than UI automation
+- QA matrix as living documentation in readme.md is more maintainable than static spreadsheets
+- Draft PR as collaboration gate enables architecture feedback before merge; reduces rework
+- Audit cadence valuable for validating critical path alignment
+- Shared review gate model (Sully architecture, Skiles implementation, Aloha testing) prevents rework
+- Round 10 closure audit confirmed PR #87 only satisfies #76/#85; #80–#84 still pending, so persistence (#80) is the immediate gate for the epic
+- Persistent storage auditing must keep the DB schema requirement explicit; successful JSON persistence demos do not fulfill acceptance until we either add the GameSessions migration or amend the issue scope.
+- Adding the explicit GameSessions schema migration against the JSON persistence proof point finally satisfied the acceptance gate and allows the critical path to move forward.
+
+---
+
+*History summarized to core context on 2026-03-02. Full session logs archived in `.squad/log/` and decision records in `.squad/decisions.md`.*
