@@ -20,16 +20,16 @@ public sealed class Issue60LaunchMiniAppButtonTests
 
         var groupChatId = 123L;
         var botUsername = "sky_team_bot";
-        var miniAppUrl = "https://example.test/";
+        var miniAppShortName = "skyteam";
 
         // Act
-        var keyboard = (InlineKeyboardMarkup?)buildKeyboard!.Invoke(null, [groupChatId, botUsername, miniAppUrl]);
+        var keyboard = (InlineKeyboardMarkup?)buildKeyboard!.Invoke(null, [groupChatId, botUsername, miniAppShortName]);
 
         // Assert
         keyboard.Should().NotBeNull();
 
         var buttons = keyboard!.InlineKeyboard.SelectMany(row => row).ToArray();
-        buttons.Should().Contain(b => b.Url == "https://t.me/sky_team_bot?startapp=123");
+        buttons.Should().Contain(b => b.Url == "https://t.me/sky_team_bot/skyteam?startapp=123");
         buttons.Should().NotContain(b => b.WebApp != null);
     }
 
@@ -103,6 +103,26 @@ public sealed class Issue60LaunchMiniAppButtonTests
             buttons.Should().Contain(button => button.Text == "Open app" && button.Url == "https://t.me/sky_team_bot?startapp=-1001234567890");
             buttons.Should().Contain(button => button.Text == "Refresh" && button.CallbackData != null);
         }
+    }
+
+    [Fact]
+    public void BuildGroupStateKeyboard_ShouldFallbackToPrimaryStartAppLink_WhenMiniAppShortNameIsInvalid()
+    {
+        // Arrange
+        var type = ResolveBotServiceTypeOrSkip();
+        var buildKeyboard = type.GetMethod(
+            "BuildGroupStateKeyboard",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        buildKeyboard.Should().NotBeNull();
+
+        // Act
+        var keyboard = (InlineKeyboardMarkup?)buildKeyboard!.Invoke(null, [123L, "sky_team_bot", "invalid-short-name!"]);
+
+        // Assert
+        keyboard.Should().NotBeNull();
+        var buttons = keyboard!.InlineKeyboard.SelectMany(row => row).ToArray();
+        buttons.Should().Contain(button => button.Text == "Open app" && button.Url == "https://t.me/sky_team_bot?startapp=123");
     }
 
     [Fact]

@@ -489,13 +489,21 @@
         const lobby = state.lobby || { pilot: null, copilot: null, isReady: false };
         const viewerSeat = state.viewer && state.viewer.seat;
         const isFull = !!(lobby.pilot && lobby.copilot);
+        const isSoloMode = !!(lobby.isSoloMode);
 
         lobbyStatusEl.innerHTML = '';
         lobbyStatusEl.appendChild(createBadge(lobby.isReady ? 'Ready to start' : 'Waiting for players', lobby.isReady));
         lobbyStatusEl.appendChild(createBadge(viewerSeat ? `You: ${viewerSeat}` : 'Spectator', !!viewerSeat));
+        if (isSoloMode) {
+          lobbyStatusEl.appendChild(createBadge('🎮 Solo Mode', true));
+        }
 
         lobbySeatsEl.appendChild(createSeatCard('Pilot', lobby.pilot, 'Waiting for Pilot…'));
         lobbySeatsEl.appendChild(createSeatCard('Copilot', lobby.copilot, 'Waiting for Copilot…'));
+
+        if (isSoloMode) {
+          lobbyNoteEl.textContent = '⚠️ Solo mode is for testing only';
+        }
 
         const newButton = createButton(
           isCreateLobbyFormOpen ? 'Cancel New Lobby' : 'New Lobby',
@@ -507,6 +515,12 @@
           { primary: true }
         );
         lobbyActionsEl.appendChild(newButton);
+
+        const soloButton = createButton(
+          'Solo Mode',
+          () => runAction(() => postAction('/api/webapp/lobby/new-solo'))
+        );
+        lobbyActionsEl.appendChild(soloButton);
 
         if (isCreateLobbyFormOpen) {
           const createForm = document.createElement('form');
@@ -558,7 +572,7 @@
           lobbyActionsEl.appendChild(createForm);
         }
 
-        if (!viewerSeat && !isFull) {
+        if (!viewerSeat && !isFull && !isSoloMode) {
           const joinButton = createButton(
             isJoinByCodeFormOpen ? 'Cancel Join Lobby' : 'Join Lobby',
             () => {

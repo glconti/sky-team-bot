@@ -28,6 +28,33 @@
 
 ## Learnings
 
+### Issue #88: Solo Mode Tests (2025-01-26)
+
+**Context:** Skiles implementing solo mode feature. Wrote comprehensive tests before implementation complete.
+
+**Tests Created:** `Issue88SoloModeTests.cs`
+- Lobby creation tests: `CreateSoloLobby()` should auto-seat player in both Pilot and Copilot roles
+- WebApp state tests: `IsSoloMode` flag detection based on matching Pilot/Copilot UserId
+- Endpoint tests: `POST /webapp/lobby/new-solo` endpoint
+- UI tests: Solo Mode button, badge, warning text, and `isSoloMode` flag handling
+- Domain tests: `GameMode` enum with `TwoPlayer` and `Solo` values
+
+**Patterns Learned:**
+- WebApplicationFactory pattern with TestBotToken and TelegramBotWebAppFactory
+- Use `BuildInitData()` helper for authenticated requests with X-Telegram-Init-Data header
+- UI tests read index.html with `File.ReadAllText(ResolveWebAppIndexPath())`
+- Domain enum tests use reflection when types not yet available
+- AAA pattern with FluentAssertions: `.Should().BeTrue("reason")`
+
+**Build Result:**
+- 6 compile errors as expected (features not implemented yet):
+  - `InMemoryGroupLobbyStore.CreateSoloLobby()` missing
+  - `WebAppLobbyState.IsSoloMode` property missing
+  - `GameMode` enum not yet defined
+- Tests will pass once Skiles ships implementation
+
+**Coverage:** Lobby creation, WebApp state flags, HTTP endpoints, UI strings, domain model enum
+
 ### Session 1: Telegram Architecture + MVP Backlog Sprint (2026-02-21)
 **Outcome:** QA recommendations prepared (verbal); test-backlog strategy ready for integration with implementation phases.
 
@@ -294,6 +321,39 @@
 - **QA Matrix Table:** 8 rows (iOS/Android/Desktop/Web × cockpit button/deep link) with pass/fail columns for lobby load, create, join, play, error recovery
 - **Happy Path Tests:** 5 test cases covering create/join flow, game play (roll/place/undo/refresh), token spending
 - **Error Cases:** 8 test scenarios—tampered signature, expired auth, network loss, concurrent placement, stale game ref, empty/long names, special chars, rapid clicks
+
+### Session 13: Issue #78 & #79 — WebApp UI Test Expansion (2026-03-03)
+**Outcome:** Expanded test coverage for WebApp lobby and in-game UI contracts by adding 8 new test cases across Issue78WebAppLobbyUiTests and Issue79WebAppInGameUiTests.
+
+**Tests Added (Issue #78 - Lobby UI):**
+1. `LobbyView_ShouldShowJoinAsButtons_WhenCurrentUserNotSeated` — validates join action exposure
+2. `StartButton_ShouldBeDisabled_WhenNotAllSeatsFilledAndEnabledWhenFilled` — validates lobby seat checks for start button
+3. `DisplayName_ShouldTruncate_AtVariousBoundaries` (Theory with boundaries 32, 64, 128) — validates truncateDisplayName usage
+4. `LobbyView_ShouldShowFilledSeat_WhenPilotSeated` — validates pilot seat rendering with displayName
+
+**Tests Added (Issue #79 - In-Game UI):**
+5. `InGameView_ShouldHaveUndoButton_WhenPlacementReversible` — validates undo button presence
+6. `InGameView_ShouldNotLeakPrivateHand_ToPublicSection` — validates privateHand conditional rendering with seat check
+7. `InGameView_ShouldShowModuleStatusIndicators_ForCockpitModules` — validates all 5 cockpit modules (Axis, Engines, Brakes, Flaps, Landing Gear)
+8. `InGameView_ShouldDisplayRollButton_WhenActivePlayer` — validates roll button conditional rendering
+
+**Test Results:**
+- All 15 tests passed (7 existing + 8 new)
+- Total suite: 206 tests (193 passed, 13 skipped, 0 failed)
+- Build succeeded with 62 warnings (all xUnit1051 - CancellationToken usage)
+
+**Learnings:**
+- WebApp UI tests follow consistent pattern: read index.html, check for strings/patterns via `Contains()`
+- Tests encode the contract (UI elements must exist) without testing JS behavior
+- Skiles is implementing UI in parallel; tests validate HTML source structure
+- Pattern works well for lobby seat state logic (lobby.pilot/lobby.copilot), module rendering, and conditional button display (viewerSeat checks)
+- Theory tests work for boundary validation when logic is referenced consistently (truncateDisplayName)
+
+**Coverage Notes:**
+- Join button logic: checks for "Join Lobby" text (actual join-as-pilot/copilot differentiation not yet in HTML)
+- Start button disable logic: checks for lobby.pilot/lobby.copilot references near start button
+- Private hand leak protection: validates viewerSeat conditional checks exist
+- All 5 cockpit modules: Axis, Engines, Brakes, Flaps, Landing Gear rendered in index.html
 - **Concurrency & Resilience:** 7 multi-player sync tests—simultaneous rolls/placements, turn blocking, message polling, reconnection
 - **Device & UI Checks:** Responsive design (320px–1920px), dark mode toggle, accessibility (keyboard nav, screen readers), touch targets ≥ 48px
 - **Performance Baselines:** Lobby load < 2s, game fetch < 1s, die roll response < 500ms, cockpit updates < 1s

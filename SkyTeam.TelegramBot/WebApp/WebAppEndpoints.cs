@@ -17,7 +17,8 @@ public sealed record WebAppLobbySeat(long UserId, string DisplayName);
 public sealed record WebAppLobbyState(
     WebAppLobbySeat? Pilot,
     WebAppLobbySeat? Copilot,
-    bool IsReady);
+    bool IsReady,
+    bool IsSoloMode);
 
 public sealed record WebAppCockpitState(
     int RoundNumber,
@@ -86,6 +87,7 @@ public static class WebAppEndpoints
 
         group.MapGet("/game-state", GetGameState);
         group.MapPost("/lobby/new", CreateLobby);
+        group.MapPost("/lobby/new-solo", CreateSoloLobby);
         group.MapPost("/lobby/join", JoinLobby);
         group.MapPost("/lobby/start", StartGame);
         group.MapPost("/game/roll", RollGame);
@@ -142,6 +144,37 @@ public static class WebAppEndpoints
             await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId.Value, cancellationToken);
 
         return Results.Ok(MapStateResponse(createResult.Snapshot, result.GroupChatId.Value, result.Context!.Viewer.UserId));
+    }
+
+    private static async Task<IResult> CreateSoloLobby(
+        string? gameId,
+        HttpContext httpContext,
+        InMemoryGroupLobbyStore lobbyStore,
+        InMemoryGroupGameSessionStore gameSessionStore,
+        TelegramBotService telegramBotService,
+        CancellationToken cancellationToken)
+    {
+        var result = ResolveRequestContext(gameId, httpContext);
+        if (result.Error is not null)
+            return result.Error;
+
+        var displayName = result.Context!.Viewer.DisplayName.Trim();
+        if (string.IsNullOrWhiteSpace(displayName) || displayName.Length > MaxDisplayNameLength)
+            return Results.BadRequest(new
+            {
+                error = "Invalid display name.",
+                retryHint = $"Use a non-empty display name up to {MaxDisplayNameLength} characters."
+            });
+
+        var player = new LobbyPlayer(result.Context.Viewer.UserId, displayName);
+        var createResult = lobbyStore.CreateSoloLobby(result.GroupChatId!.Value, player);
+
+        if (createResult.Status == LobbyCreateStatus.AlreadyExists)
+            return Results.BadRequest(new { error = "Lobby already exists" });
+
+        await telegramBotService.RefreshGroupCockpitFromWebAppAsync(result.GroupChatId.Value, cancellationToken);
+
+        return Results.Ok(MapStateResponse(createResult.Snapshot, result.GroupChatId.Value, result.Context.Viewer.UserId));
     }
 
     private static async Task<IResult> JoinLobby(
@@ -422,10 +455,13 @@ public static class WebAppEndpoints
 
     private static WebAppGameStateResponse MapStateResponse(LobbySnapshot lobby, long groupChatId, long viewerUserId)
     {
+        var isSoloMode = lobby.Pilot?.UserId == lobby.Copilot?.UserId;
+
         var lobbyState = new WebAppLobbyState(
             Pilot: lobby.Pilot is null ? null : new WebAppLobbySeat(lobby.Pilot.UserId, lobby.Pilot.DisplayName),
             Copilot: lobby.Copilot is null ? null : new WebAppLobbySeat(lobby.Copilot.UserId, lobby.Copilot.DisplayName),
-            IsReady: lobby.IsReady);
+            IsReady: lobby.IsReady,
+            IsSoloMode: isSoloMode);
 
         return new WebAppGameStateResponse(
             GameId: groupChatId,

@@ -20,7 +20,9 @@ class Game
 
     internal GameStatus Status { get; private set; } = GameStatus.InProgress;
 
-    public Game(Airport airport, Altitude altitude, GameModule[] modules)
+    public GameMode Mode { get; }
+
+    public Game(Airport airport, Altitude altitude, GameModule[] modules, GameMode mode = GameMode.TwoPlayer)
     {
         ArgumentNullException.ThrowIfNull(airport);
         ArgumentNullException.ThrowIfNull(altitude);
@@ -29,6 +31,7 @@ class Game
         _airport = airport;
         _altitude = altitude;
         _modules = modules.ToArray();
+        Mode = mode;
         _state.SetCurrentPlayer(altitude.CurrentPlayer);
         RollDice();
 

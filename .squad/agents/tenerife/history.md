@@ -132,4 +132,33 @@
 - Skiles addresses identified bugs (axis check, speed comparison, altitude exhaustion)
 - Aloha finalizes test coverage once bugs clarified
 
+### Session 7: Solo Testing Mode Specification (2026-03-02)
+**Outcome:** Tenerife produced comprehensive solo mode specification clarifying that solo mode is a **non-rule change** (purely a "who controls what" switching mechanism) with no domain model impacts.
+
+**Key Decisions:**
+- **Solo mode definition:** Single player controls both Pilot (blue) and Copilot (orange) seats; all 7 modules and win/loss conditions remain identical
+- **Placement mechanics (Option B selected):** Player rolls both hands, places all 8 dice simultaneously with full visibility (preserves game integrity, supports scenario testing, minimizes code complexity)
+- **Domain model:** Game aggregate requires NO changes; mode-agnostic by design
+- **Session layer:** Recommended optional `GameMode` enum (TwoPlayer/Solo) at application layer for lobby routing and UI adaptation
+- **Module behavior:** Concentration and Radio modules work identically; solo player implicitly "controls both" for agreement purposes
+- **Win/loss parity:** All landing criteria, loss conditions, altitude track, approach track, coffee tokens, reroll tokens unchanged
+- **Concentration/Radio:** No special solo handling; existing mechanics apply identically
+
+**Rationale for Recommended Approach:**
+- **Visible simultaneous placement** (Option B) best supports testing use cases (developer can set up exact dice scenarios) while preserving game rules and minimizing aggregate complexity
+- **Sequential placement** (Option A) rejected: introduces asymmetric information not present in 2-player mode
+- **Hidden then revealed** (Option C) rejected: adds friction to testing workflow
+
+**Delivered Artifacts:**
+- `.squad/agents/tenerife/solo-mode-spec.md` — Full specification (10 sections, 100+ rule preservation checks, implementation roadmap for Sully/Skiles/Aloha)
+- `.squad/decisions/inbox/tenerife-solo-mode-spec.md` — Architectural decisions summary with cross-team coordination guidance
+
+**Cross-Team Coordination:**
+- **Sully:** Review session layer mode flag recommendations; update Telegram/WebApp UI to show all 8 dice (solo) vs. current player 4 dice (2-player)
+- **Skiles:** Validate domain implementations are mode-agnostic (no code changes needed); run domain tests with solo instances
+- **Aloha:** Prepare solo test harness; verify win/loss parity with 2-player rules
+
+**Critical Design Insight:**
+Solo mode is a **session/presentation concern**, not a domain rule concern. The `Game` class alternates Pilot/Copilot regardless of how many humans play. This separation keeps the domain pure and testing flexible.
+
 ---

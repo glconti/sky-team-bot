@@ -186,12 +186,12 @@ public sealed class TelegramBotService(
 
         return callbackData switch
         {
-            var data when data == NewCallbackData => await HandleLobbyNewFromCallbackAsync(botClient, groupChatId, cancellationToken),
-            var data when data == JoinCallbackData => await HandleLobbyJoinFromCallbackAsync(botClient, callbackQuery.From, groupChatId, cancellationToken),
-            var data when data == StartCallbackData => await HandleLobbyStartFromCallbackAsync(botClient, callbackQuery.From, groupChatId, cancellationToken),
-            var data when data == RollCallbackData => await HandleInGameRollFromCallbackAsync(botClient, groupChatId, cancellationToken),
-            var data when data == PlaceDmCallbackData => await HandleInGamePlaceFromCallbackAsync(botClient, callbackQuery.From, cancellationToken),
-            var data when data == RefreshCallbackData => await HandleLobbyRefreshFromCallbackAsync(botClient, groupChatId, cancellationToken),
+            _ when callbackData == NewCallbackData => await HandleLobbyNewFromCallbackAsync(botClient, groupChatId, cancellationToken),
+            _ when callbackData == JoinCallbackData => await HandleLobbyJoinFromCallbackAsync(botClient, callbackQuery.From, groupChatId, cancellationToken),
+            _ when callbackData == StartCallbackData => await HandleLobbyStartFromCallbackAsync(botClient, callbackQuery.From, groupChatId, cancellationToken),
+            _ when callbackData == RollCallbackData => await HandleInGameRollFromCallbackAsync(botClient, groupChatId, cancellationToken),
+            _ when callbackData == PlaceDmCallbackData => await HandleInGamePlaceFromCallbackAsync(botClient, callbackQuery.From, cancellationToken),
+            _ when callbackData == RefreshCallbackData => await HandleLobbyRefreshFromCallbackAsync(botClient, groupChatId, cancellationToken),
             _ => ExpiredMenuToast
         };
     }
@@ -424,7 +424,7 @@ public sealed class TelegramBotService(
         }
 
         var groupChatId = message.Chat.Id;
-        if (!TryBuildStartAppUrl(botUsername, groupChatId, out var startAppUrl))
+        if (!TryBuildStartAppUrl(botUsername, groupChatId, webAppOptions.Value.MiniAppShortName, out var startAppUrl))
         {
             await botClient.SendMessage(
                 groupChatId,
@@ -589,7 +589,7 @@ public sealed class TelegramBotService(
             return;
         }
 
-        if (!TryBuildStartAppUrl(botUsername, groupChatId, out var startAppUrl))
+        if (!TryBuildStartAppUrl(botUsername, groupChatId, webAppOptions.Value.MiniAppShortName, out var startAppUrl))
         {
             await botClient.SendMessage(
                 message.Chat.Id,
@@ -626,7 +626,7 @@ public sealed class TelegramBotService(
         if (string.IsNullOrWhiteSpace(_botUsername))
             _botUsername = await GetBotUsernameAsync(botClient, cancellationToken);
 
-        var replyMarkup = BuildGroupStateKeyboard(groupChatId, _botUsername, webAppOptions.Value.MiniAppUrl);
+        var replyMarkup = BuildGroupStateKeyboard(groupChatId, _botUsername, webAppOptions.Value.MiniAppShortName);
 
         if (gameSessionStore.TryGetCockpitMessageId(groupChatId, out var cockpitMessageId))
             if (await TryEditCockpitAsync(botClient, groupChatId, cockpitMessageId, text, replyMarkup, cancellationToken))
@@ -886,10 +886,9 @@ public sealed class TelegramBotService(
             [NewCallbackData, JoinCallbackData, StartCallbackData, RollCallbackData, PlaceDmCallbackData, RefreshCallbackData]);
     }
 
-    private static InlineKeyboardMarkup BuildGroupStateKeyboard(long groupChatId, string? botUsername, string? miniAppUrl)
+    private static InlineKeyboardMarkup BuildGroupStateKeyboard(long groupChatId, string? botUsername, string? miniAppShortName)
     {
-        _ = miniAppUrl;
-        InlineKeyboardButton[] secondRow = TryBuildStartAppUrl(botUsername, groupChatId, out var startAppUrl)
+        InlineKeyboardButton[] secondRow = TryBuildStartAppUrl(botUsername, groupChatId, miniAppShortName, out var startAppUrl)
             ? [InlineKeyboardButton.WithUrl("Open app", startAppUrl), InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)]
             : [InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)];
 
@@ -906,7 +905,7 @@ public sealed class TelegramBotService(
     private static InlineKeyboardMarkup BuildOpenAppKeyboard(string startAppUrl)
         => new([[InlineKeyboardButton.WithUrl("Open app", startAppUrl)]]);
 
-    private static bool TryBuildStartAppUrl(string? botUsername, long groupChatId, out string startAppUrl)
+    private static bool TryBuildStartAppUrl(string? botUsername, long groupChatId, string? miniAppShortName, out string startAppUrl)
     {
         startAppUrl = string.Empty;
         if (groupChatId == 0 || string.IsNullOrWhiteSpace(botUsername))
@@ -916,7 +915,7 @@ public sealed class TelegramBotService(
         if (!IsValidBotUsername(username))
             return false;
 
-        startAppUrl = BuildStartAppUrl(username, groupChatId);
+        startAppUrl = BuildStartAppUrl(username, groupChatId, miniAppShortName);
         return true;
     }
 
@@ -928,9 +927,33 @@ public sealed class TelegramBotService(
         return username.All(ch => char.IsLetterOrDigit(ch) || ch == '_');
     }
 
-    private static string BuildStartAppUrl(string botUsername, long groupChatId)
+    private static bool TryNormalizeMiniAppShortName(string? value, out string? miniAppShortName)
     {
-        return $"https://t.me/{botUsername}?startapp={Uri.EscapeDataString(groupChatId.ToString(CultureInfo.InvariantCulture))}";
+        miniAppShortName = null;
+        if (string.IsNullOrWhiteSpace(value))
+            return true;
+
+        var candidate = value.Trim();
+        if (candidate.StartsWith('/'))
+            candidate = candidate.TrimStart('/');
+
+        if (candidate.Length is < 3 or > 32)
+            return false;
+
+        if (!candidate.All(ch => char.IsLetterOrDigit(ch) || ch == '_'))
+            return false;
+
+        miniAppShortName = candidate;
+        return true;
+    }
+
+    private static string BuildStartAppUrl(string botUsername, long groupChatId, string? miniAppShortName)
+    {
+        // var encodedGroupChatId = Uri.EscapeDataString(groupChatId.ToString(CultureInfo.InvariantCulture));
+        // if (TryNormalizeMiniAppShortName(miniAppShortName, out var normalizedMiniAppShortName) && normalizedMiniAppShortName is not null)
+        //     return $"https://t.me/{botUsername}/{normalizedMiniAppShortName}?startapp={encodedGroupChatId}";
+
+        return $"https://t.me/{botUsername}?startapp";
     }
 
     private bool TryResolveSecretFlowGroupChatId(Message message, out long groupChatId)

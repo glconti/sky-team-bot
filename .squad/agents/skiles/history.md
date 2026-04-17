@@ -272,3 +272,62 @@ All work consolidated on `feat/issue-76-85-botfather-config-webapp-tests` branch
 - Callback payload budget needs explicit regression coverage at the cockpit-button layer, not only at codec decode time, to keep Telegram 64-byte guarantees visible.
 - Abuse guardrails are easiest to enforce consistently when transport filters centralize 429 throttling, idempotency replay checks, and payload-size validation before domain mutation.
 - 400/429 responses should always include action-oriented retry hints so Mini App clients can recover deterministically without exposing sensitive request payloads in logs.
+
+### Session 29: Issue #78 Mini App Lobby UI Verification (2026-03-03)
+
+**Outcome:** Verified that Issue #78 (Mini App Lobby UI) is already fully implemented and all tests are passing. The lobby UI was previously implemented as part of the WebApp foundation work and includes all required elements.
+
+**Key Learnings:**
+- The lobby UI implementation already contains all required elements from the test specifications
+- All three Issue78WebAppLobbyUiTests test cases passing:
+  1. `LobbyView_ShouldExposeSeatPlaceholdersAndActions_ForMiniAppLobbyUi` ✅
+  2. `LobbyView_ShouldTruncateDisplayNames_ToTelegramLimit` ✅
+  3. `LobbyView_ShouldExposeValidationMessages_ForInvalidCreateAndJoinInput` ✅
+- Implementation includes:
+  - Seat display with "Waiting for Pilot…" / "Waiting for Copilot…" placeholders
+  - Action buttons: "New Lobby", "Join Lobby", "Start Game"
+  - Create form: "Game name", "Player count", "Lobby settings" inputs
+  - Join form: "Game code" input
+  - Client-side validation with exact error messages
+  - `maxDisplayNameLength = 32` constant and `truncateDisplayName` function
+  - Display name truncation applied to pilot/copilot seat rendering
+
+**Test Results:**
+- Issue78 tests: 3/3 passing
+- Total test suite: 164 passing, 4 failing (unrelated Issue60 tests), 16 skipped
+
+**No changes required** — the issue acceptance criteria were already met by previous implementation.
+
+### Session 30: Issue #79 Mini App In-Game UI Verification (2026-03-03)
+
+**Outcome:** Verified that Issue #79 (Mini App In-Game UI) is already fully implemented and all tests are passing. The in-game UI was previously implemented as part of the WebApp foundation work and includes all required elements.
+
+**What Was Verified:**
+- All six Issue79WebAppInGameUiTests test cases passing:
+  1. ConcurrencyConflict handling (409 status + refresh flow)
+  2. expectedVersion parameter passed in action requests
+  3. "In Game" section header
+  4. "Round & Turn" info card showing placements
+  5. "Cockpit" card displaying module status (Axis, Engines, Brakes, Flaps, Landing gear)
+  6. Undo button conditionally shown (requires privateHand + viewerSeat)
+  7. Roll button conditionally shown (viewerSeat + AwaitingRoll status)
+  8. Private hand gated on viewer seat check (viewerSeat === hand.seat)
+  9. Module status indicators for all required modules
+
+**Existing Implementation Coverage:**
+- Line 247: `<div class="panel-title">In Game</div>` section header
+- Lines 637-656: Three cards for "Round & Turn", "Cockpit", "Systems", "Flight"
+- Lines 642-646: Cockpit card with Axis position, Engines speed, Approach
+- Lines 648-650: Brakes, Flaps, Landing gear status in Systems card
+- Lines 665-671: Undo button with `canUndo = !!(state.privateHand && viewerSeat)` condition
+- Lines 673-679: Roll button with viewerSeat + roundStatus check
+- Lines 684-698: `renderPlacement` function gates on `!hand || !viewerSeat` early return
+- Lines 368-374: `buildUrl` function adds expectedVersion parameter
+- Lines 464-467: ConcurrencyConflict handling with 409 status check + loadState() refresh
+- Lines 792-796: Place action passes `state.version` as expectedVersion
+
+**Test Results:**
+- Issue79 tests: 6/6 passing
+- Total test suite: 309 passing, 4 failing (unrelated Issue60 tests), 16 skipped
+
+**No changes required** — the issue acceptance criteria were already met by previous implementation.

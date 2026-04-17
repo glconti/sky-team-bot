@@ -32,6 +32,7 @@ The bot uses long polling, keeps lobby state in-memory, and persists active game
 ### Mini App flow (for seated players)
 Set a public HTTPS URL for the Mini App shell (served by this host):
 - `SKYTEAM_MINI_APP_URL` (or `WebApp:MiniAppUrl`)
+- Optional BotFather Mini App short name for app-specific deep links: `SKYTEAM_MINI_APP_SHORT_NAME` (or `WebApp:MiniAppShortName`)
 - Optional persistence file override: `Persistence:GameSessionsFilePath`
 - Optional GameSessions schema database override: `Persistence:GameSessionsDatabasePath`
 - Optional completed-session retention override (days): `Persistence:CompletedSessionRetentionDays` (default `30`)
@@ -55,7 +56,7 @@ Bot commands remain as fallback and will redirect you to the Mini App when secre
 ### startapp link syntax
 - Primary deep link (group/game-aware):
   - `https://t.me/<bot_username>?startapp=<groupChatId>`
-- Optional app-short-name variant (fallback if needed on some clients):
+- App-short-name variant (recommended when `SKYTEAM_MINI_APP_SHORT_NAME` is configured):
   - `https://t.me/<bot_username>/<app_short_name>?startapp=<groupChatId>`
 
 ### In-group launchpad persistence

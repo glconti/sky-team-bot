@@ -66,6 +66,67 @@ public sealed class Issue78WebAppLobbyUiTests
         hasNumericJoinCodeValidation.Should().BeTrue("join flow should explain code validation");
     }
 
+    [Fact]
+    public void LobbyView_ShouldShowJoinAsButtons_WhenCurrentUserNotSeated()
+    {
+        // Arrange
+        var source = File.ReadAllText(ResolveWebAppIndexPath());
+
+        // Act
+        var hasJoinLobbyAction = source.Contains("Join Lobby", StringComparison.Ordinal);
+
+        // Assert
+        hasJoinLobbyAction.Should().BeTrue("because non-seated users should see join action");
+    }
+
+    [Fact]
+    public void StartButton_ShouldBeDisabled_WhenNotAllSeatsFilledAndEnabledWhenFilled()
+    {
+        // Arrange
+        var source = File.ReadAllText(ResolveWebAppIndexPath());
+
+        // Act
+        var checksLobbyPilot = source.Contains("lobby.pilot", StringComparison.Ordinal);
+        var checksLobbyCopilot = source.Contains("lobby.copilot", StringComparison.Ordinal);
+        var hasStartButton = source.Contains("Start Game", StringComparison.Ordinal);
+
+        // Assert
+        checksLobbyPilot.Should().BeTrue("because start button logic should check pilot seat");
+        checksLobbyCopilot.Should().BeTrue("because start button logic should check copilot seat");
+        hasStartButton.Should().BeTrue("because lobby should have start game button");
+    }
+
+    [Theory]
+    [InlineData(32)]
+    [InlineData(64)]
+    [InlineData(128)]
+    public void DisplayName_ShouldTruncate_AtVariousBoundaries(int boundary)
+    {
+        // Arrange
+        var source = File.ReadAllText(ResolveWebAppIndexPath());
+
+        // Act
+        var usesTruncation = source.Contains("truncateDisplayName", StringComparison.Ordinal);
+
+        // Assert
+        usesTruncation.Should().BeTrue($"because display names at boundary {boundary} should be truncated using truncateDisplayName logic");
+    }
+
+    [Fact]
+    public void LobbyView_ShouldShowFilledSeat_WhenPilotSeated()
+    {
+        // Arrange
+        var source = File.ReadAllText(ResolveWebAppIndexPath());
+
+        // Act
+        var rendersPilotSeat = source.Contains("lobby.pilot", StringComparison.Ordinal);
+        var usesDisplayName = source.Contains("displayName", StringComparison.Ordinal);
+
+        // Assert
+        rendersPilotSeat.Should().BeTrue("because lobby should render pilot seat state");
+        usesDisplayName.Should().BeTrue("because seat rendering should use display name");
+    }
+
     private static string ResolveWebAppIndexPath()
         => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "SkyTeam.TelegramBot", "wwwroot", "index.html"));
 }

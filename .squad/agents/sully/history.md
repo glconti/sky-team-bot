@@ -117,6 +117,8 @@
 - Persistent storage auditing must keep the DB schema requirement explicit; successful JSON persistence demos do not fulfill acceptance until we either add the GameSessions migration or amend the issue scope.
 - Adding the explicit GameSessions schema migration against the JSON persistence proof point finally satisfied the acceptance gate and allows the critical path to move forward.
 - Security outcome granularity matters for tamper detection and ops visibility; collapse ambiguity early.
+- **Solo Mode Architecture (Session 31):** Seat-based domain turn tracking naturally supports solo mode without domain changes. Application layer's dynamic user→seat mapping allows same user to control both Pilot and Copilot. Key insight: domain doesn't know about users, only seats.
+- **Issues #78/#79 Gap Analysis (Session 31):** Tests asserting UI elements are brittle but valuable for verifying acceptance criteria. Both issues were complete but marked "go:needs-research" prematurely; comprehensive index.html review proved full implementation.
 
 ### Foundational Phases (2026-02-20 to 2026-02-22)
 Established GitHub label taxonomy (25 labels), 14-issue vertical-slice backlog, M1 foundation roadmap. Completed base game logic: all 7 modules, landing validation, multi-token command model, DDD architecture (Domain → App → Presentation → Adapter → Host), loss semantics (15 explicit losses). Foundation: GameState refactor, ExecuteCommand dispatcher, test harness. Team coordinated on rules, command shapes, module implementations. PRs #37–#38 draft ready.

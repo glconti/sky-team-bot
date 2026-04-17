@@ -27,6 +27,7 @@ builder.Services.Configure<WebAppOptions>(options =>
 {
     builder.Configuration.GetSection("WebApp").Bind(options);
     options.MiniAppUrl ??= builder.Configuration["SKYTEAM_MINI_APP_URL"];
+    options.MiniAppShortName ??= builder.Configuration["SKYTEAM_MINI_APP_SHORT_NAME"];
 });
 builder.Services.AddSingleton<IValidateOptions<WebAppOptions>, WebAppOptionsValidator>();
 builder.Services.AddOptions<WebAppOptions>().ValidateOnStart();
