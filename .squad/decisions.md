@@ -2,6 +2,265 @@
 
 > Append-only ledger of team decisions. Never retroactively edit entries.
 
+## 2026-04-18T10:05:00Z — Open App Button Deep-Link Fix (Skiles)
+
+**Timestamp:** 2026-04-18T10:05:00Z  
+**Agent:** Skiles (Domain Developer)  
+**Status:** ✅ Implemented — All 145 tests pass
+
+### Context
+
+The "Open app" button was sending users to the bot's private chat instead of opening the Mini App. Root cause: `BuildStartAppUrl` returned `https://t.me/{bot}?startapp` — Telegram requires a path segment (`/{shortName}`) for `?startapp` to be recognized as a Mini App deep-link.
+
+### Decision
+
+Replace `TryBuildStartAppUrl` + `BuildStartAppUrl` + `BuildOpenAppKeyboard(string)` with a unified `TryBuildOpenAppButton` that encapsulates all button construction logic:
+
+1. **ShortName configured:** `InlineKeyboardButton.WithUrl` → `https://t.me/{bot}/{shortName}?startapp={encodedChatId}`
+2. **Only MiniAppUrl configured:** `InlineKeyboardButton.WithWebApp` → opens Mini App in-chat (no deep-link needed)
+3. **Neither configured:** returns `false`, no button rendered
+
+`BuildOpenAppKeyboard` now accepts `InlineKeyboardButton` directly; `BuildGroupStateKeyboard` now takes `miniAppUrl` as a parameter.
+
+### Rationale
+
+- Callers must not decide button type; that logic belongs in one place.
+- `WithWebApp` is a valid fallback when no shortName is registered with BotFather — the app still opens correctly in the Telegram client.
+- Removing the broken `BuildStartAppUrl` eliminates the bug at the source.
+
+### Files Changed
+
+- `SkyTeam.TelegramBot/TelegramBotService.cs`
+
+### Tests
+
+- All 145 tests passing
+- No regressions
+
+---
+
+## 2026-03-02T06:10:00Z — Solo Mode Specification (Tenerife)
+
+**Timestamp:** 2026-03-02T06:10:00Z  
+**Agent:** Tenerife (Rules Expert)  
+**Document:** `.squad/agents/tenerife/solo-mode-spec.md`  
+**Status:** Ready for team review
+
+### Context
+
+Solo mode is a testing and exploration convenience. A single player controls both Pilot (blue dice) and Copilot (orange dice) without requiring a second human.
+
+### Decision
+
+Solo mode uses **visible & simultaneous placement** with all rules identical to 2-player mode:
+
+1. **Domain Model:** No changes required (mode-agnostic aggregate)
+2. **Session Layer:** Add `GameMode` enum flag (`TwoPlayer`, `Solo`)
+3. **Placement Mechanics:** Player rolls both hands, places all 8 dice simultaneously with full visibility
+4. **Module Behavior:** Identical to 2-player (Concentration token pool, Radio clearing rules, etc.)
+5. **Win/Loss Conditions:** Unchanged (all 6 landing criteria, loss conditions)
+
+### Rationale
+
+- Supports testing scenarios (developer can set up exact dice combinations)
+- Preserves game integrity (all rules apply)
+- Minimizes code complexity (no special "secret" state)
+
+### Next Steps
+
+- Sully to review architecture recommendations
+- Skiles to validate domain implementations are mode-agnostic
+- Aloha to begin solo test harness preparation
+
+---
+
+## 2026-03-02T06:00:00Z — Solo Mode Architecture Decisions (Sully)
+
+**Timestamp:** 2026-03-02T06:00:00Z  
+**Agent:** Sully (Architecture)  
+**Document:** `.squad/agents/sully/solo-mode-architecture.md`  
+**Status:** Architecture review complete
+
+### Context
+
+Solo testing mode architecture + Issues #78/#79 scope review
+
+### Decisions
+
+1. **GameMode as Domain Enum**
+   - Introduce `GameMode` enum (`TwoPlayer`, `Solo`) at Domain level as constructor parameter for `Game` aggregate
+   - Domain should own configuration that affects its public API surface
+   - Default to `TwoPlayer` for backward compatibility
+
+2. **Solo Lobby as Separate API**
+   - Add `InMemoryGroupLobbyStore.CreateSoloLobby(long groupChatId, LobbyPlayer player)`
+   - Add endpoint `POST /api/webapp/lobby/new-solo`
+   - Clear separation: solo games distinct from normal lobby flow
+   - Prevents ambiguous "join" semantics
+
+3. **No Turn-Flow Changes Required**
+   - Seat-based turn tracking naturally supports solo mode
+   - Application layer's dynamic `GetSeatForUser` maps both Pilot/Copilot to same user ID
+   - Zero changes to `PlaceDie` / `UndoLastPlacement` validation
+   - Zero changes to domain turn-flow methods
+
+4. **Issues #78 and #79 Are Complete**
+   - All lobby UI elements present (placeholders, buttons, forms, validation)
+   - All in-game UI elements present (headers, sections, concurrency handling)
+   - All tests passing; remaining work is manual QA on Telegram clients
+
+5. **Implementation Order**
+   - Tenerife: Confirm rules alignment
+   - Sully: Architecture review (complete)
+   - Skiles: Implement domain enum, lobby logic, WebApp endpoint, tests
+   - Aloha: QA solo turn flow, edge cases
+
+### Risks Mitigated
+
+- Solo Mode Confusion: Add explicit UI warning ("For testing only")
+- Accidental Activation: Require confirmation dialog
+- State Leakage: Ensure `GameMode` persisted with session
+
+---
+
+## 2026-03-03T00:00:00Z — Issue #79 In-Game UI Verification (Skiles)
+
+**Timestamp:** 2026-03-03T00:00:00Z  
+**Agent:** Skiles (Domain Developer)  
+**Issue:** https://github.com/glconti/sky-team-bot/issues/79  
+**Status:** ✅ Complete (No changes required)
+
+### Context
+
+Issue #79 (Mini App In-Game UI) was found to be already fully implemented in `index.html`. All six test cases in `Issue79WebAppInGameUiTests` are passing.
+
+### Key Findings
+
+- **Concurrency Control:** `buildUrl()` adds `expectedVersion` parameter; 409 response handling implemented
+- **UI Sections:** In Game header, Round & Turn card, Cockpit card all present
+- **Undo Button:** Conditional on `privateHand && viewerSeat`
+- **Private Hand Gating:** Multi-layer guard prevents leakage to spectators
+- **Roll Button:** Conditional on active player (`viewerSeat && awaitingroll`)
+- **Module Status:** All 5 indicators present (Axis, Engines, Brakes, Flaps, Landing gear)
+
+### Test Results
+
+- 6/6 Issue #79 tests passing
+- 309/329 total suite passing (pre-existing Issue60 failures excluded)
+- All acceptance criteria met
+
+### Recommendation
+
+Declare Issue #79 complete after manual Telegram client QA (iOS, Android, Desktop, Web).
+
+---
+
+## 2026-03-03T00:00:00Z — Issue #78 Lobby UI Verification (Skiles)
+
+**Timestamp:** 2026-03-03T00:00:00Z  
+**Agent:** Skiles (Domain Developer)  
+**Issue:** https://github.com/glconti/sky-team-bot/issues/78  
+**Status:** ✅ Complete (No changes required)
+
+### Context
+
+Issue #78 (Mini App Lobby UI) was found to be already fully implemented in `index.html`. All test cases in `Issue78WebAppLobbyUiTests` are passing.
+
+### Key Findings
+
+- **Seat Rendering:** `createSeatCard()` displays avatars, initials, placeholder text, applies truncation
+- **Action Buttons:** "New Lobby", "Join Lobby", "Start Game" (disabled until both seats filled)
+- **Forms:** Create lobby form (game name, player count, settings); join form (game code)
+- **Validation:** Exact error messages for required fields, numeric validation
+- **Display Name Truncation:** `truncateDisplayName()` function clips at 32 chars with ellipsis
+
+### Test Results
+
+- 3/3 Issue78 tests passing (existing suite: 206 total, 193 passed, 13 skipped)
+- All API endpoints wired (`GET /api/webapp/game-state`, `POST /api/webapp/lobby/new`, etc.)
+- All endpoints protected by `TelegramInitDataFilter` and `WebAppAbuseProtectionFilter`
+
+### Recommendation
+
+Declare Issue #78 complete after manual Telegram client QA.
+
+---
+
+## 2026-03-03T00:00:00Z — Issue #78 & #79 WebApp UI Test Expansion (Aloha)
+
+**Timestamp:** 2026-03-03T00:00:00Z  
+**Agent:** Aloha (Tester/QA)  
+**Status:** ✅ Complete — All 15 tests pass
+
+### Context
+
+Expanded test coverage for Issues #78 (lobby UI) and #79 (in-game UI) by adding 8 new test cases.
+
+### Test Coverage Added
+
+**Issue78WebAppLobbyUiTests (4 new tests):**
+1. `LobbyView_ShouldShowJoinAsButtons_WhenCurrentUserNotSeated` — presence of "Join Lobby" text
+2. `StartButton_ShouldBeDisabled_WhenNotAllSeatsFilledAndEnabledWhenFilled` — button logic validation
+3. `DisplayName_ShouldTruncate_AtVariousBoundaries` — 32, 64, 128 char boundaries
+4. `LobbyView_ShouldShowFilledSeat_WhenPilotSeated` — name rendering
+
+**Issue79WebAppInGameUiTests (4 new tests):**
+5. `InGameView_ShouldHaveUndoButton_WhenPlacementReversible` — undo button presence
+6. `InGameView_ShouldNotLeakPrivateHand_ToPublicSection` — conditional rendering
+7. `InGameView_ShouldShowModuleStatusIndicators_ForCockpitModules` — all 5 modules
+8. `InGameView_ShouldDisplayRollButton_WhenActivePlayer` — active player conditional
+
+### Result
+
+- ✅ All 15 tests passed (7 existing + 8 new)
+- Total suite: 206 tests (193 passed, 13 skipped, 0 failed)
+- Build: 62 warnings (all xUnit1051 - non-blocking)
+
+### Pattern
+
+All tests follow HTML source string validation (no mocking). Rationale: Encode UI contract (elements must exist) without testing JavaScript behavior—appropriate for contract validation before frontend integration.
+
+### Recommendations
+
+1. JavaScript unit tests: Jest/Vitest for button handlers, API calls, state management
+2. E2E tests: Playwright/Cypress for browser rendering and interaction
+3. Join button enhancement: Update HTML to differentiate join-as-pilot/copilot
+4. Start button attribute: Verify `disabled` attribute is actually set/removed
+
+---
+
+## 2026-01-26T00:00:00Z — Solo Mode Test Coverage — Issue #88 (Aloha)
+
+**Timestamp:** 2026-01-26T00:00:00Z  
+**Agent:** Aloha (Tester)  
+**Status:** Tests written, pending Skiles implementation
+
+### Context
+
+Comprehensive test suite created for Solo Mode feature (Issue #88) before implementation.
+
+### Test Coverage
+
+- **Lobby Store Tests:** `SoloModeLobbyCreation_ShouldAutoSeatSinglePlayerInBothRoles`, idempotency validation
+- **WebApp State Tests:** `IsSoloMode` flag exposure based on pilot/copilot user ID match
+- **HTTP Endpoint Tests:** `POST /api/webapp/lobby/new-solo` with error handling
+- **UI Tests:** Solo Mode button, badge, indicator, state rendering
+- **Domain Model Tests:** `GameMode` enum values, default to `TwoPlayer`
+
+### Build Status
+
+6 compilation errors (expected, features not implemented). All tests pass once Skiles completes implementation.
+
+### Next Steps
+
+Skiles to implement:
+1. `CreateSoloLobby()` in `InMemoryGroupLobbyStore`
+2. `IsSoloMode` property in `WebAppLobbyState`
+3. `POST /api/webapp/lobby/new-solo` endpoint
+4. Solo Mode UI elements (button, badge, warning)
+5. `GameMode` enum in `SkyTeam.Domain`
+6. `Game.Mode` property (default `TwoPlayer`)
+
 ## 2026-03-02T07:10:00Z — Issue #77 Final Closure (Sully)
 
 **Timestamp:** 2026-03-02T07:10:00Z  

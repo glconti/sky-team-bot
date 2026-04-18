@@ -78,6 +78,8 @@ All work consolidated on `feat/issue-76-85-botfather-config-webapp-tests` branch
 - Soft-fail callback UX (toast on invalid press) better than blocking button availability
 - In-memory sliding-window abuse protection effective without external infrastructure
 - Input validation safest at endpoint boundaries with explicit 400 errors
+- `https://t.me/{bot}?startapp` is a plain bot link — Telegram ignores `?startapp` without a Mini App path segment and opens the private chat. Correct deep-link requires the shortName path segment: `https://t.me/{bot}/{shortName}?startapp={chatId}`. When shortName is absent but a direct URL is available, `WithWebApp` is the correct fallback (opens in-chat, no deep-link needed).
+- Unified `TryBuildOpenAppButton` pattern: one method returns the correct `InlineKeyboardButton` type (WithUrl for deep-link, WithWebApp for direct URL) so callers never have to decide button type themselves.
 - Turn-notification dedup caches should reset per group when a new game starts, otherwise valid notifications can be suppressed in later sessions
 - Notification fallback delivery should be best-effort (log + continue) so gameplay mutations never fail on Telegram transport issues
 
