@@ -25,6 +25,7 @@ public sealed class TelegramBotService(
     private const string NewCallbackAction = "new";
     private const string JoinCallbackAction = "join";
     private const string StartCallbackAction = "start";
+    private const string SoloCallbackAction = "solo";
     private const string RollCallbackAction = "roll";
     private const string PlaceDmCallbackAction = "place-dm";
     private const string RefreshCallbackAction = "refresh";
@@ -34,6 +35,7 @@ public sealed class TelegramBotService(
     private static readonly string NewCallbackData = CallbackDataCodec.EncodeGroupAction(NewCallbackAction);
     private static readonly string JoinCallbackData = CallbackDataCodec.EncodeGroupAction(JoinCallbackAction);
     private static readonly string StartCallbackData = CallbackDataCodec.EncodeGroupAction(StartCallbackAction);
+    private static readonly string SoloCallbackData = CallbackDataCodec.EncodeGroupAction(SoloCallbackAction);
     private static readonly string RollCallbackData = CallbackDataCodec.EncodeGroupAction(RollCallbackAction);
     private static readonly string PlaceDmCallbackData = CallbackDataCodec.EncodeGroupAction(PlaceDmCallbackAction);
     private static readonly string RefreshCallbackData = CallbackDataCodec.EncodeGroupAction(RefreshCallbackAction);
@@ -189,6 +191,7 @@ public sealed class TelegramBotService(
             _ when callbackData == NewCallbackData => await HandleLobbyNewFromCallbackAsync(botClient, groupChatId, cancellationToken),
             _ when callbackData == JoinCallbackData => await HandleLobbyJoinFromCallbackAsync(botClient, callbackQuery.From, groupChatId, cancellationToken),
             _ when callbackData == StartCallbackData => await HandleLobbyStartFromCallbackAsync(botClient, callbackQuery.From, groupChatId, cancellationToken),
+            _ when callbackData == SoloCallbackData => await HandleLobbySoloFromCallbackAsync(botClient, callbackQuery.From, groupChatId, cancellationToken),
             _ when callbackData == RollCallbackData => await HandleInGameRollFromCallbackAsync(botClient, groupChatId, cancellationToken),
             _ when callbackData == PlaceDmCallbackData => await HandleInGamePlaceFromCallbackAsync(botClient, callbackQuery.From, cancellationToken),
             _ when callbackData == RefreshCallbackData => await HandleLobbyRefreshFromCallbackAsync(botClient, groupChatId, cancellationToken),
@@ -204,6 +207,25 @@ public sealed class TelegramBotService(
         var result = lobbyStore.CreateNew(groupChatId);
         if (result.Status != LobbyCreateStatus.Created)
             return "Lobby already exists.";
+
+        await RefreshGroupCockpitAsync(botClient, groupChatId, cancellationToken);
+        return null;
+    }
+
+    private async Task<string?> HandleLobbySoloFromCallbackAsync(
+        ITelegramBotClient botClient,
+        User user,
+        long groupChatId,
+        CancellationToken cancellationToken)
+    {
+        var player = new LobbyPlayer(user.Id, GetDisplayName(user));
+        var createResult = lobbyStore.CreateSoloLobby(groupChatId, player);
+        if (createResult.Status != LobbyCreateStatus.Created)
+            return "Lobby already exists.";
+
+        var startResult = gameSessionStore.Start(groupChatId, createResult.Snapshot, user.Id);
+        if (startResult.Status == GameSessionStartStatus.Started)
+            ForgetTurnNotificationKeysForGroup(groupChatId);
 
         await RefreshGroupCockpitAsync(botClient, groupChatId, cancellationToken);
         return null;
@@ -424,7 +446,7 @@ public sealed class TelegramBotService(
         }
 
         var groupChatId = message.Chat.Id;
-        if (!TryBuildOpenAppButton(botUsername, groupChatId, webAppOptions.Value.MiniAppShortName, webAppOptions.Value.MiniAppUrl, out var openAppButton))
+        if (!TryBuildOpenAppButton(botUsername, groupChatId, webAppOptions.Value.MiniAppShortName, out var openAppButton))
         {
             await botClient.SendMessage(
                 groupChatId,
@@ -589,7 +611,7 @@ public sealed class TelegramBotService(
             return;
         }
 
-        if (!TryBuildOpenAppButton(botUsername, groupChatId, webAppOptions.Value.MiniAppShortName, webAppOptions.Value.MiniAppUrl, out var openAppButton))
+        if (!TryBuildOpenAppButton(botUsername, groupChatId, webAppOptions.Value.MiniAppShortName, out var openAppButton))
         {
             await botClient.SendMessage(
                 message.Chat.Id,
@@ -883,12 +905,12 @@ public sealed class TelegramBotService(
         _callbackMenuStateStore.RegisterGroupMenu(
             groupChatId,
             messageId,
-            [NewCallbackData, JoinCallbackData, StartCallbackData, RollCallbackData, PlaceDmCallbackData, RefreshCallbackData]);
+            [NewCallbackData, JoinCallbackData, StartCallbackData, SoloCallbackData, RollCallbackData, PlaceDmCallbackData, RefreshCallbackData]);
     }
 
     private static InlineKeyboardMarkup BuildGroupStateKeyboard(long groupChatId, string? botUsername, string? miniAppShortName, string? miniAppUrl)
     {
-        InlineKeyboardButton[] secondRow = TryBuildOpenAppButton(botUsername, groupChatId, miniAppShortName, miniAppUrl, out var openAppButton)
+        InlineKeyboardButton[] bottomRow = TryBuildOpenAppButton(botUsername, groupChatId, miniAppShortName, out var openAppButton)
             ? [openAppButton, InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)]
             : [InlineKeyboardButton.WithCallbackData("Refresh", RefreshCallbackData)];
 
@@ -898,7 +920,8 @@ public sealed class TelegramBotService(
                 InlineKeyboardButton.WithCallbackData("Join", JoinCallbackData),
                 InlineKeyboardButton.WithCallbackData("Start", StartCallbackData)
             ],
-            secondRow
+            [InlineKeyboardButton.WithCallbackData("Solo (test)", SoloCallbackData)],
+            bottomRow
         ]);
     }
 
@@ -906,7 +929,7 @@ public sealed class TelegramBotService(
         => new([[openAppButton]]);
 
     private static bool TryBuildOpenAppButton(
-        string? botUsername, long groupChatId, string? miniAppShortName, string? miniAppUrl,
+        string? botUsername, long groupChatId, string? miniAppShortName,
         out InlineKeyboardButton openAppButton)
     {
         openAppButton = default!;
@@ -922,12 +945,6 @@ public sealed class TelegramBotService(
                 openAppButton = InlineKeyboardButton.WithUrl("Open app", $"https://t.me/{username}/{normalizedShortName}?startapp={encodedGroupChatId}");
                 return true;
             }
-        }
-
-        if (!string.IsNullOrWhiteSpace(miniAppUrl))
-        {
-            openAppButton = InlineKeyboardButton.WithWebApp("Open app", new WebAppInfo { Url = miniAppUrl });
-            return true;
         }
 
         return false;

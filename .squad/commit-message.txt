@@ -1,10 +1,1 @@
-squad: merge skiles issue #77 completion & capture orchestration state
-
-- Scribe: Orchestration log for Skiles background task completion (issue #77 slice 1)
-- Scribe: Session log (Ralph round 6) for post-spawn manifest processing
-- Decisions: Merged inbox entry (skiles-issue-77.md) → decisions.md
-- Decisions: Deleted processed inbox file
-- Scope: Launchpad hardening, deeplink safety validation, deliverables captured
-- Impact: Issue #77 slice 1 ready for QA sign-off; optional fallback deferred by design
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+Scribe session: Merged 7 decision inbox entries (skiles-open-app-button-fix + 6 others) into .squad/decisions.md. Deleted inbox files. Logged Skiles' Open App Button Deep-Link Fix (all 145 tests pass). Deduplicated decision records. .squad/ state ready for production.
