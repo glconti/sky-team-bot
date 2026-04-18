@@ -51,15 +51,12 @@ public sealed class InMemoryGroupLobbyStore
 
         lock (_sync)
         {
-            if (_sessions.TryGetValue(groupChatId, out var existing))
-                return new(LobbyCreateStatus.AlreadyExists, existing.ToSnapshot());
-
             var created = new LobbySession(groupChatId)
             {
                 Pilot = player,
                 Copilot = player
             };
-            _sessions.Add(groupChatId, created);
+            _sessions[groupChatId] = created;
 
             return new(LobbyCreateStatus.Created, created.ToSnapshot());
         }

@@ -877,11 +877,13 @@
       }
 
       async function postAction(path, body, expectedVersion) {
+        const idempotencyKey = crypto.randomUUID().replace(/-/g, '');
+        const baseHeaders = { ...withInitDataHeaders(), 'X-Idempotency-Key': idempotencyKey };
         const response = await fetch(buildUrl(path, expectedVersion), {
           method: 'POST',
           headers: body
-            ? { ...withInitDataHeaders(), 'Content-Type': 'application/json' }
-            : withInitDataHeaders(),
+            ? { ...baseHeaders, 'Content-Type': 'application/json' }
+            : baseHeaders,
           body: body ? JSON.stringify(body) : null,
           cache: 'no-store'
         });

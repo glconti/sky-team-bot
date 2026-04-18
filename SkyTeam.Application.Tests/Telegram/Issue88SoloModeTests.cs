@@ -42,7 +42,7 @@ public sealed class Issue88SoloModeTests
     }
 
     [Fact]
-    public void SoloModeLobbyCreation_ShouldReturnAlreadyExists_WhenLobbyAlreadyExistsForChat()
+    public void SoloModeLobbyCreation_ShouldReplaceExistingLobby_WhenLobbyAlreadyExistsForChat()
     {
         // Arrange
         var store = new InMemoryGroupLobbyStore();
@@ -54,7 +54,9 @@ public sealed class Issue88SoloModeTests
         var result = store.CreateSoloLobby(groupChatId, player);
 
         // Assert
-        result.Status.Should().Be(LobbyCreateStatus.AlreadyExists);
+        result.Status.Should().Be(LobbyCreateStatus.Created);
+        result.Snapshot.Pilot!.UserId.Should().Be(111);
+        result.Snapshot.Copilot!.UserId.Should().Be(111);
     }
 
     [Fact]
@@ -135,7 +137,7 @@ public sealed class Issue88SoloModeTests
     }
 
     [Fact]
-    public async Task SoloModeEndpoint_ShouldReturnBadRequest_WhenLobbyAlreadyExists()
+    public async Task SoloModeEndpoint_ShouldReplaceExistingLobby_WhenLobbyAlreadyExists()
     {
         // Arrange
         const long groupChatId = 666;
@@ -154,11 +156,13 @@ public sealed class Issue88SoloModeTests
 
         // Act
         var response = await client.SendAsync(request);
-        var payload = await response.Content.ReadAsStringAsync();
+        var state = await response.Content.ReadFromJsonAsync<WebAppGameStateResponse>(JsonOptions);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        payload.Should().Contain("Lobby already exists");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        state!.Lobby.Pilot!.UserId.Should().Be(111);
+        state.Lobby.Copilot!.UserId.Should().Be(111);
+        state.Lobby.IsSoloMode.Should().BeTrue();
     }
 
     [Fact]
